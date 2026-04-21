@@ -1,0 +1,34 @@
+This is a 2D side-scrolling action RPG prototype (MapleStory-inspired).
+
+ARCHITECTURE
+- Files in src/ organized by role: config/ core/ entities/ systems/
+- All tunable values: src/config/Constants.js
+- All item definitions: src/config/Items.js
+- All map definitions: src/config/Maps.js
+- Skill tree: src/config/SkillTree.js
+- Use ES modules (import/export), not CommonJS
+- No file > ~400 lines; split if larger
+
+WORKFLOW FOR PHASE 3
+- Read HANDOFF/PHASE3_HANDOFF.md before architectural decisions
+- 10 files listed as "already written" in the handoff doc are FROZEN — do not modify them
+- 9 files listed as "need to update" are the scope of your work
+- Do updates in the order specified in the handoff doc
+
+CODE STYLE
+- Preserve existing behavior when modifying a file unless explicitly changing it
+- Comment the "why", not the "what"
+- Keep functions small and single-purpose
+- No premature optimization
+
+GAME DESIGN
+- Game feel > graphics
+- Hitstop, knockback, screen shake, and damage numbers are essential and must remain
+- Fast responsive controls — no floaty movement
+- Snappy audio feedback on every action
+- Respawning enemies = grind never stops
+
+TESTING
+- Don't break Phase 2 save files; handle missing fields gracefully
+- After each file update, verify the file passes `node --check`
+- After batch updates, run the testing checklist at the bottom of the handoff doc

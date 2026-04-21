@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "timestamp": 1710000000000,
+  "player": {
+    "x": 100,
+    "y": 300,
+    "hp": 84,
+    "mp": 22,
+    "coins": 10
+  },
+  "progression": {
+    "level": 3,
+    "exp": 22
+  },
+  "stats": {
+    "str": 8,
+    "dex": 6,
+    "vit": 5,
+    "luk": 5,
+    "availablePoints": 1
+  },
+  "inventory": {
+    "items": []
+  },
+  "skills": {
+    "unlocked": ["dash_slash", "projectile"]
+  }
+}

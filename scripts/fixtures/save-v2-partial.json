@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "timestamp": "bad",
+  "player": null,
+  "progression": {},
+  "stats": {},
+  "inventory": {},
+  "skills": {},
+  "maps": {
+    "currentId": "forest",
+    "defeatedBosses": ["ancient_warden", 123]
+  },
+  "unlockedTreeNodes": ["combat_mastery_1", null, "mana_pool"]
+}
