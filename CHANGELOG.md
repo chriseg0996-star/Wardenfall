@@ -2,6 +2,35 @@
 
 All notable changes to Wardenfall are documented in this file.
 
+## [0.3.0] - 2026-04-21
+
+### Added
+- Combat pacing knobs for encounter design:
+  - `COMBAT.HITSTOP_FINISHER`
+  - `COMBAT.HITSTOP_KILL`
+  - `ENCOUNTER` tuning group for zoner/bruiser pressure.
+- Expanded tactical enemy composition in `forest` by introducing `ALPHA_WOLF` packs.
+
+### Changed
+- Enemy readability and fairness:
+  - Added clearer per-archetype telegraph styling.
+  - Added post-attack recovery windows to improve punish/counterplay.
+  - Added role-based behavior (`chaser`, `zoner`, `bruiser`) for better encounter variety.
+- Boss cadence and anti-frustration:
+  - Replaced pure RNG attack selection with phase-based attack queue cadence.
+  - Added anti-chain constraints for dash usage.
+  - Added contact/dash hit cooldowns to reduce unfair overlap damage.
+  - Increased attack expressiveness with per-attack telegraph styling and labels.
+- Hit feel consistency:
+  - Unified hitstop/shake behavior across melee, projectiles, and skills.
+  - Added audio micro-variation to `hit`, `crit`, `enemyDie`, and `skillCast` to reduce repetition.
+- Analytics improvements:
+  - Added `deathsByMap` tracking for balancing and fairness diagnostics.
+  - Added map-entry timing markers for pacing review.
+
+### Validation
+- `node scripts/run-quality-gates.mjs` passes after Combat & Feel changes.
+
 ## [0.2.0] - 2026-04-21
 
 ### Added
