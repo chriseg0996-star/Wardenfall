@@ -117,6 +117,11 @@ export const MAPS = {
         targetMap: "forest", targetX: 2480, targetY: 300,
         label: "← Dark Forest",
       },
+      {
+        x: 1330, y: 420, width: 48, height: 72,
+        targetMap: "skyreach", targetX: 120, targetY: 280,
+        label: "→ Skyreach Cliffs",
+      },
     ],
     boss: {
       id: "ancient_warden",
@@ -124,6 +129,42 @@ export const MAPS = {
       spawnY: 380,
       // Once defeated, stays dead via save file
     },
+  },
+
+  // ----- Map 4: Late-game cliff route -----
+  skyreach: {
+    id: "skyreach",
+    name: "Skyreach Cliffs",
+    width: 2800,
+    height: 540,
+    background: { far: "#10182a", near: "#1b2940" },
+    playerStart: { x: 120, y: 280 },
+    platforms: [
+      { x: 0, y: 500, width: 2800, height: 40, oneWay: false },
+      { x: 280, y: 390, width: 220, height: 16, oneWay: true },
+      { x: 620, y: 340, width: 220, height: 16, oneWay: true },
+      { x: 980, y: 300, width: 220, height: 16, oneWay: true },
+      { x: 1340, y: 360, width: 220, height: 16, oneWay: true },
+      { x: 1680, y: 320, width: 220, height: 16, oneWay: true },
+      { x: 2040, y: 380, width: 220, height: 16, oneWay: true },
+      { x: 2380, y: 330, width: 220, height: 16, oneWay: true },
+    ],
+    spawnPoints: [
+      { x: 420, y: 320, typeId: "WOLF" },
+      { x: 760, y: 260, typeId: "ALPHA_WOLF" },
+      { x: 1120, y: 220, typeId: "WOLF" },
+      { x: 1480, y: 280, typeId: "ALPHA_WOLF" },
+      { x: 1840, y: 240, typeId: "WOLF" },
+      { x: 2200, y: 300, typeId: "ALPHA_WOLF" },
+      { x: 2520, y: 260, typeId: "WOLF" },
+    ],
+    portals: [
+      {
+        x: 10, y: 420, width: 48, height: 72,
+        targetMap: "ruins", targetX: 1240, targetY: 300,
+        label: "← Ancient Ruins",
+      },
+    ],
   },
 };
 

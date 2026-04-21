@@ -74,6 +74,18 @@ export const ENEMY = {
     attackCooldown: 30,
     staggerResist: 0.5,
   },
+  ALPHA_WOLF: {
+    id: "alpha_wolf",
+    name: "Alpha Wolf",
+    width: 48, height: 32,
+    hp: 150, damage: 28, exp: 80,
+    moveSpeed: 2.9,
+    color: "#b8b8b8",
+    detectRange: 420,
+    knockback: 7,
+    attackCooldown: 24,
+    staggerResist: 0.7,
+  },
 };
 
 export const PROGRESSION = {
@@ -184,3 +196,22 @@ export const COLORS = {
 };
 
 export const SAVE_KEY = "actionrpg_save_v1";
+
+// Structured tuning presets for progression/economy iteration.
+export const TUNING_PROFILES = {
+  early: {
+    expBase: 42,
+    expCurve: 1.42,
+    itemDropChance: 0.1,
+  },
+  standard: {
+    expBase: 50,
+    expCurve: 1.5,
+    itemDropChance: 0.08,
+  },
+  late: {
+    expBase: 56,
+    expCurve: 1.6,
+    itemDropChance: 0.065,
+  },
+};

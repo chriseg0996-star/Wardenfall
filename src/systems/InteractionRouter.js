@@ -9,6 +9,9 @@ export function handleGlobalInput(game) {
   if (input.wasPressed("b")) ui.toggleMenu("inventory");
   if (input.wasPressed("t")) ui.toggleMenu("tree");
   if (input.wasPressed("escape")) ui.openMenu = null;
+  if (input.wasPressed("c")) game.commandBus?.pushCommand("open_stats_menu");
+  if (input.wasPressed("b")) game.commandBus?.pushCommand("open_inventory_menu");
+  if (input.wasPressed("t")) game.commandBus?.pushCommand("open_tree_menu");
 
   if (!ui.openMenu && !player.isDead) {
     if (input.wasPressed("1")) tryUsePotion(game, "hp_potion");
@@ -50,14 +53,25 @@ export function handleSkillInput(game) {
     game,
   };
 
-  if (game.input.wasPressed(SKILLS.PROJECTILE.key)) game.skills.tryCast("projectile", ctx);
-  if (game.input.wasPressed(SKILLS.DASH_SLASH.key)) game.skills.tryCast("dash_slash", ctx);
-  if (game.input.wasPressed(SKILLS.AOE_SLAM.key)) game.skills.tryCast("aoe_slam", ctx);
+  if (game.input.wasPressed(SKILLS.PROJECTILE.key)) {
+    game.commandBus?.pushCommand("cast_skill", { id: "projectile" });
+    game.skills.tryCast("projectile", ctx);
+  }
+  if (game.input.wasPressed(SKILLS.DASH_SLASH.key)) {
+    game.commandBus?.pushCommand("cast_skill", { id: "dash_slash" });
+    game.skills.tryCast("dash_slash", ctx);
+  }
+  if (game.input.wasPressed(SKILLS.AOE_SLAM.key)) {
+    game.commandBus?.pushCommand("cast_skill", { id: "aoe_slam" });
+    game.skills.tryCast("aoe_slam", ctx);
+  }
 }
 
 export function tryUsePotion(game, itemId) {
+  game.commandBus?.pushCommand("use_item", { itemId });
   const tpl = game.inventory.useFirst((t) => t.id === itemId);
   if (!tpl) return;
+  game.analytics && (game.analytics.potionsUsed += 1);
   if (tpl.effect.heal) game.player.heal(tpl.effect.heal);
   if (tpl.effect.restoreMp) {
     game.player.mp = Math.min(game.player.maxMp, game.player.mp + tpl.effect.restoreMp);
@@ -102,6 +116,8 @@ export function tryEnterPortal(game) {
     if (game.audio._initialized && game.audio.currentBgmMap() !== targetMap) {
       game.audio.playMapMusic(targetMap);
     }
+    game.analytics && (game.analytics.mapTransitions += 1);
+    game.commandBus?.pushEvent("map_transition", { targetMap });
     return true;
   }
   return false;

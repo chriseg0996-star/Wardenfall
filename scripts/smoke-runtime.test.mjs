@@ -8,6 +8,8 @@ import { SkillSystem } from "../src/systems/Skills.js";
 import { UI } from "../src/systems/UI.js";
 import { migrateSaveData } from "../src/systems/SaveLoad.js";
 import { handleMenuInput } from "../src/systems/ui/MenuController.js";
+import { CommandBus } from "../src/systems/CommandBus.js";
+import { buildSnapshot } from "../src/systems/Snapshot.js";
 
 function makeMapRuntime() {
   return {
@@ -36,6 +38,14 @@ function testMapLoad() {
   assert.ok(game.platforms.length > 0, "platforms should populate");
   assert.ok(game.enemies.length > 0, "enemies should populate");
   assert.ok(game.portals.length > 0, "portals should populate");
+
+  const skyOk = maps.loadMap("skyreach", game);
+  assert.equal(skyOk, true, "new content map should load");
+  assert.ok(game.enemies.length > 0, "new map should spawn enemies");
+
+  maps.markBossDefeated("ancient_warden");
+  maps.loadMap("ruins", game);
+  assert.equal(game.boss, null, "boss should stay defeated after persistence mark");
 }
 
 function testPlayerModifiers() {
@@ -119,6 +129,33 @@ function testSaveMigration() {
   assert.ok(Array.isArray(migrated.unlockedTreeNodes), "tree nodes should normalize");
 }
 
+function testCommandAndSnapshotHooks() {
+  const bus = new CommandBus();
+  bus.beginTick();
+  bus.pushCommand("cast_skill", { id: "projectile" });
+  bus.pushEvent("enemy_killed", { typeId: "slime" });
+  const drained = bus.drain();
+  assert.equal(drained.commands.length, 1);
+  assert.equal(drained.events.length, 1);
+
+  const progression = new Progression();
+  const stats = new Stats();
+  const inventory = new Inventory();
+  const player = new Player(10, 20, progression, stats, inventory);
+  const snapshot = buildSnapshot({
+    player,
+    progression,
+    maps: { currentId: "meadow" },
+    worldWidth: 2400,
+    worldHeight: 540,
+    enemies: [],
+    loot: [],
+    boss: null,
+  });
+  assert.equal(snapshot.player.x, 10);
+  assert.equal(snapshot.map.id, "meadow");
+}
+
 function run() {
   testMapLoad();
   testPlayerModifiers();
@@ -126,6 +163,7 @@ function run() {
   testUiFacadeApi();
   testUiMenuParity();
   testSaveMigration();
+  testCommandAndSnapshotHooks();
   console.log("runtime smoke tests passed");
 }
 

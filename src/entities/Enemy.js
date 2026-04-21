@@ -28,6 +28,7 @@ export class Enemy {
     this.state = "patrol";
     this.patrolTimer = 60 + Math.floor(Math.random() * 120);
     this.attackCooldown = 0;
+    this.attackWindup = 0;
 
     this.hitFlash = 0;
     this.knockbackX = 0;
@@ -106,7 +107,18 @@ export class Enemy {
       this.x + this.width > player.x &&
       this.y < player.y + player.height &&
       this.y + this.height > player.y;
-    if (overlap) {
+    if (!overlap) {
+      this.attackWindup = 0;
+      return;
+    }
+
+    // Short windup improves readability and dodgeability.
+    if (this.attackWindup <= 0) {
+      this.attackWindup = 10;
+      return;
+    }
+    this.attackWindup--;
+    if (this.attackWindup <= 0) {
       const didHit = player.takeDamage(this.damage, this.x + this.width / 2);
       if (didHit) this.attackCooldown = this.type.attackCooldown;
     }
@@ -132,7 +144,7 @@ export class Enemy {
       spriteKey = `slime_${this.animFrame}`;
     } else if (id === "mushroom") {
       spriteKey = `mushroom_${this.animFrame}`;
-    } else if (id === "wolf") {
+    } else if (id === "wolf" || id === "alpha_wolf") {
       const d = this.dir === 1 ? "right" : "left";
       spriteKey = `wolf_${d}_${this.animFrame}`;
     }
@@ -169,6 +181,12 @@ export class Enemy {
       ctx.fillRect(this.x, this.y - 8, barW, barH);
       ctx.fillStyle = "#e63946";
       ctx.fillRect(this.x, this.y - 8, barW * (this.hp / this.maxHp), barH);
+    }
+
+    if (this.attackWindup > 0) {
+      const pulse = 0.45 + 0.45 * Math.sin(Date.now() / 60);
+      ctx.fillStyle = `rgba(255, 80, 80, ${pulse})`;
+      ctx.fillRect(this.x, this.y - 14, this.width, 4);
     }
   }
 }

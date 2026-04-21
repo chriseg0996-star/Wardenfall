@@ -42,6 +42,13 @@ node scripts/smoke-runtime.test.mjs
 node scripts/run-quality-gates.mjs
 ```
 
+### Planning and release docs
+
+- `docs/runtime-architecture.md` - update/render order contracts
+- `docs/release-checklist.md` - pre-release validation checklist
+- `docs/balance-targets.md` - pacing and economy targets
+- `docs/playtest-triage.md` - issue triage template for playtests
+
 ## Troubleshooting (quick)
 
 - Open [http://127.0.0.1:8000](http://127.0.0.1:8000) with a hard refresh (`Ctrl+F5`) after code changes.

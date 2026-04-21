@@ -25,6 +25,8 @@ import { MAPS, STARTING_MAP } from "../config/Maps.js";
 import { getNode, canUnlock } from "../config/SkillTree.js";
 import { handleGlobalInput as routeGlobalInput, tryEnterPortal as routeTryEnterPortal, tryUsePotion as routeTryUsePotion } from "../systems/InteractionRouter.js";
 import { updateWorld } from "../systems/WorldUpdatePipeline.js";
+import { CommandBus } from "../systems/CommandBus.js";
+import { buildSnapshot } from "../systems/Snapshot.js";
 
 export class Game {
   constructor(canvas) {
@@ -42,10 +44,24 @@ export class Game {
     this.maps = new MapManager();
     this.ui = new UI();
     this.audio = audio;
+    this.commandBus = new CommandBus();
+    this.lastSnapshot = null;
+    this.analytics = {
+      sessionStartMs: Date.now(),
+      deaths: 0,
+      potionsUsed: 0,
+      mapTransitions: 0,
+      levelUps: [],
+    };
+    this.objective = "Reach the Ancient Ruins and defeat the Warden";
 
     // Wire progression
     this.progression.bindStats(this.stats);
     this.progression.onLevelUp = (lvl) => {
+      this.analytics.levelUps.push({
+        level: lvl,
+        elapsedSec: Math.round((Date.now() - this.analytics.sessionStartMs) / 1000),
+      });
       this.player.recalcStats();
       this.player.hp = this.player.maxHp;
       this.player.mp = this.player.maxMp;
@@ -113,6 +129,7 @@ export class Game {
     this._pendingBgmMap = this.maps.currentId;
 
     this.running = false;
+    this._wasDead = false;
   }
 
   // ---------- LOOP ----------
@@ -136,7 +153,11 @@ export class Game {
 
   // ---------- UPDATE ----------
   update() {
+    this.commandBus.beginTick();
     this.handleGlobalInput();
+
+    if (!this._wasDead && this.player.isDead) this.analytics.deaths++;
+    this._wasDead = this.player.isDead;
 
     // Start any pending BGM once audio has been initialized by a user gesture
     if (this._pendingBgmMap && this.audio._initialized) {
@@ -166,6 +187,7 @@ export class Game {
     }
 
     updateWorld(this);
+    this.lastSnapshot = buildSnapshot(this);
   }
 
   // ---------- INPUT ----------
@@ -183,6 +205,7 @@ export class Game {
     if (target === this.boss) return;
 
     this.progression.gainExp(target.exp);
+    this.commandBus?.pushEvent("enemy_killed", { typeId: target.type?.id || "unknown", exp: target.exp });
     const drops = rollDrops(target, this.player);
     this.loot.push(...drops);
 
@@ -208,6 +231,7 @@ export class Game {
 
     // Huge XP + guaranteed legendary
     this.progression.gainExp(b.exp);
+    this.commandBus?.pushEvent("boss_defeated", { bossId: b.bossId || "boss", exp: b.exp });
     this.loot.push(new Loot(
       b.x + b.width / 2, b.y + b.height / 2,
       "item", { itemId: "sharp_fang", rarity: "LEGENDARY" }
@@ -218,6 +242,7 @@ export class Game {
     ));
 
     this.ui.showMessage("BOSS DEFEATED!", 180);
+    this.objective = "Explore Skyreach Cliffs for tougher hunts";
     this.audio.bossRoar();
 
     this.boss = null;
@@ -226,6 +251,7 @@ export class Game {
   onLootPickup(loot) {
     if (loot.kind === "coin") {
       this.player.coins += loot.payload.value;
+      this.commandBus?.pushEvent("coin_pickup", { value: loot.payload.value });
       this.audio.coin();
       this.particles.spawn(loot.x, loot.y, {
         count: PARTICLES.COIN_PICKUP_COUNT,
@@ -236,6 +262,7 @@ export class Game {
       const { itemId, rarity } = loot.payload;
       const added = this.inventory.addItem(itemId, rarity);
       if (added) {
+        this.commandBus?.pushEvent("item_pickup", { itemId, rarity });
         const tpl = ITEMS[itemId];
         this.audio.itemPickup(rarity);
         // Auto-equip gear upgrades (but not consumables)
@@ -304,6 +331,7 @@ export class Game {
     this.player.comboCount = 0;
     this.player.comboWindow = 0;
     this.ui.showMessage("RESPAWNED", 60);
+    this._wasDead = false;
   }
 
   triggerHitstop(frames) {

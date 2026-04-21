@@ -10,6 +10,7 @@ export function renderHud(ctx, game) {
   renderSkillBar(ctx, player, skills, canvas);
   renderPotionQuickbar(ctx, inventory, canvas);
   renderMapName(ctx, game, canvas);
+  renderObjective(ctx, game, canvas);
   if (game.boss && !game.boss.dead) renderBossBar(ctx, game.boss, canvas);
   renderMuteIndicator(ctx, game, canvas);
   renderDebugOverlay(ctx, game, canvas);
@@ -198,6 +199,18 @@ function renderMapName(ctx, game, canvas) {
   ctx.fillText(name, canvas.width - 24, 29);
 }
 
+function renderObjective(ctx, game, canvas) {
+  if (!game.objective) return;
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  const text = `Objective: ${game.objective}`;
+  const w = Math.min(canvas.width - 24, ctx.measureText(text).width + 24);
+  ctx.fillRect(12, 130, w, 22);
+  ctx.fillStyle = "#cde4ff";
+  ctx.font = "12px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(text, 20, 145);
+}
+
 function renderBossBar(ctx, boss, canvas) {
   const barW = 480;
   const barH = 18;
@@ -291,5 +304,8 @@ function renderDebugOverlay(ctx, game, canvas) {
   ctx.fillText(`upd ${game.metrics.updateMs.toFixed(2)}ms`, 18, canvas.height - 64);
   ctx.fillText(`rnd ${game.metrics.renderMs.toFixed(2)}ms`, 18, canvas.height - 48);
   ctx.fillText(`ent e:${enemyCount} l:${lootCount} p:${particleCount}`, 18, canvas.height - 32);
+  const deaths = game.analytics?.deaths ?? 0;
+  const potions = game.analytics?.potionsUsed ?? 0;
+  ctx.fillText(`d:${deaths} pot:${potions}`, 140, canvas.height - 16);
   ctx.fillText("toggle F3", 18, canvas.height - 16);
 }
