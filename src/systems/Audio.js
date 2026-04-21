@@ -105,17 +105,19 @@ class AudioEngine {
 
   // ---------- Game-specific sounds ----------
 
-  hit() {
+  hit(variant = 0) {
+    const jitter = (Math.random() * 24 - 12) + variant * 4;
     this._tone({ freq: 380, freqEnd: 180, type: "square",
-      duration: 0.06, attack: 0.001, sustain: 0.6, volume: 0.35 });
+      duration: 0.06, attack: 0.001, sustain: 0.6, volume: 0.35, detune: jitter });
     this._noise({ duration: 0.05, volume: 0.15, filterFreq: 1800 });
   }
 
-  crit() {
+  crit(variant = 0) {
+    const jitter = (Math.random() * 18 - 9) + variant * 6;
     this._tone({ freq: 600, freqEnd: 220, type: "sawtooth",
-      duration: 0.09, attack: 0.001, sustain: 0.7, volume: 0.4 });
+      duration: 0.09, attack: 0.001, sustain: 0.7, volume: 0.4, detune: jitter });
     this._tone({ freq: 1200, freqEnd: 400, type: "square",
-      duration: 0.08, attack: 0.001, sustain: 0.5, volume: 0.25 });
+      duration: 0.08, attack: 0.001, sustain: 0.5, volume: 0.25, detune: -jitter });
     this._noise({ duration: 0.08, volume: 0.18, filterFreq: 2500 });
   }
 
@@ -139,9 +141,9 @@ class AudioEngine {
       duration: 0.5, sustain: 0.5, volume: 0.45 });
   }
 
-  enemyDie() {
+  enemyDie(variant = 0) {
     this._tone({ freq: 350, freqEnd: 80, type: "triangle",
-      duration: 0.18, sustain: 0.5, volume: 0.3 });
+      duration: 0.18, sustain: 0.5, volume: 0.3, detune: variant * 5 });
     this._noise({ duration: 0.1, volume: 0.15, filterFreq: 900 });
   }
 
@@ -178,17 +180,17 @@ class AudioEngine {
     });
   }
 
-  skillCast(flavor = "projectile") {
+  skillCast(flavor = "projectile", variant = 0) {
     if (flavor === "projectile") {
       this._tone({ freq: 600, freqEnd: 900, type: "sine",
-        duration: 0.1, sustain: 0.5, volume: 0.28 });
+        duration: 0.1, sustain: 0.5, volume: 0.28, detune: variant * 3 });
     } else if (flavor === "dash") {
       this._noise({ duration: 0.12, volume: 0.2, filterFreq: 1500, filterQ: 3 });
       this._tone({ freq: 180, freqEnd: 500, type: "sawtooth",
-        duration: 0.1, sustain: 0.4, volume: 0.22 });
+        duration: 0.1, sustain: 0.4, volume: 0.22, detune: variant * 4 });
     } else if (flavor === "slam") {
       this._tone({ freq: 90, freqEnd: 40, type: "sawtooth",
-        duration: 0.3, sustain: 0.6, volume: 0.5 });
+        duration: 0.3, sustain: 0.6, volume: 0.5, detune: variant * 2 });
       this._noise({ duration: 0.25, volume: 0.3, filterFreq: 400 });
     }
   }

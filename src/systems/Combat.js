@@ -32,6 +32,7 @@ export function resolvePlayerAttacks(
 
   let anyHit = false;
   let anyCrit = false;
+  let anyKill = false;
 
   const targets = gatherTargets(enemies, boss);
 
@@ -67,22 +68,27 @@ export function resolvePlayerAttacks(
       });
 
       // Audio — per-hit so rapid hits produce rapid sounds
-      if (isCrit) audio.crit(); else audio.hit();
+      if (isCrit) audio.crit(player.isFinisher ? 1 : 0);
+      else audio.hit(player.isFinisher ? 1 : 0);
 
       anyHit = true;
       if (isCrit) anyCrit = true;
 
       if (target.dead) {
-        audio.enemyDie();
+        anyKill = true;
+        audio.enemyDie(player.isFinisher ? 1 : 0);
         if (onKill) onKill(target);
       }
     }
   }
 
   if (anyHit) {
-    const base = player.isFinisher ? 5 : 2;
-    camera.shake(anyCrit ? base + 2 : base, anyCrit ? 10 : 6);
-    const stop = anyCrit ? COMBAT.HITSTOP_CRIT : COMBAT.HITSTOP_FRAMES;
+    const base = player.isFinisher ? 6 : 2;
+    const duration = anyKill ? 14 : anyCrit ? 10 : 6;
+    camera.shake(anyCrit ? base + 2 : base, duration);
+    let stop = anyCrit ? COMBAT.HITSTOP_CRIT : COMBAT.HITSTOP_FRAMES;
+    if (player.isFinisher) stop = Math.max(stop, COMBAT.HITSTOP_FINISHER);
+    if (anyKill) stop = Math.max(stop, COMBAT.HITSTOP_KILL);
     if (game) game.triggerHitstop(stop);
   }
 }
@@ -115,10 +121,12 @@ export function resolveProjectiles(
           speedMin: 1, speedMax: 3, life: 16, size: 3,
         });
 
-        if (isCrit) audio.crit(); else audio.hit();
+        if (isCrit) audio.crit(1); else audio.hit(1);
+        camera.shake(isCrit ? 4 : 2, isCrit ? 8 : 5);
+        game?.triggerHitstop(isCrit ? COMBAT.HITSTOP_CRIT : COMBAT.HITSTOP_FRAMES);
 
         if (target.dead) {
-          audio.enemyDie();
+          audio.enemyDie(1);
           if (onKill) onKill(target);
         }
       }

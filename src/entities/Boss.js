@@ -35,6 +35,11 @@ export class Boss {
     this.state = "idle";
     this.stateTimer = 90;   // initial idle
     this.attackCooldown = 0;
+    this.attackQueue = [];
+    this.lastAttack = null;
+    this.consecutiveDashes = 0;
+    this.contactCooldown = 0;
+    this.dashHitCooldown = 0;
 
     this.knockbackX = 0;
     this.hitFlash = 0;
@@ -47,6 +52,7 @@ export class Boss {
     // Current attack data
     this.currentAttack = null;
     this.telegraphZone = null;  // { x, y, width, height } to warn player
+    this.telegraphStyle = { fill: "rgba(255, 64, 96,", stroke: "rgba(255, 200, 50," };
 
     // Spawn reference resolved by Game when creating
     this.type = { id: "boss", name: "Ancient Warden", color: "#c040ff", staggerResist: 0.75, knockback: 3 };
@@ -94,6 +100,8 @@ export class Boss {
 
     // State machine
     this.stateTimer--;
+    if (this.contactCooldown > 0) this.contactCooldown--;
+    if (this.dashHitCooldown > 0) this.dashHitCooldown--;
 
     switch (this.state) {
       case "phase_transition":
@@ -158,11 +166,7 @@ export class Boss {
   }
 
   chooseAttack(dist, player, game) {
-    const roll = Math.random();
-    const attacks = this.phase === 1
-      ? ["slam", "fireball"]
-      : ["slam", "triple_shot", "dash"];
-    const choice = attacks[Math.floor(Math.random() * attacks.length)];
+    const choice = this.nextAttack();
 
     this.currentAttack = choice;
     this.state = "telegraph";
@@ -177,13 +181,16 @@ export class Boss {
         width: zoneW,
         height: 30,
       };
-      this.stateTimer = 50;  // telegraph frames
+      this.stateTimer = 52;  // telegraph frames
+      this.telegraphStyle = { fill: "rgba(255, 70, 90,", stroke: "rgba(255, 200, 50," };
     } else if (choice === "fireball") {
       this.telegraphZone = null;
-      this.stateTimer = 40;
+      this.stateTimer = 38;
+      this.telegraphStyle = { fill: "rgba(255, 140, 70,", stroke: "rgba(255, 230, 130," };
     } else if (choice === "triple_shot") {
       this.telegraphZone = null;
       this.stateTimer = 45;
+      this.telegraphStyle = { fill: "rgba(255, 120, 70,", stroke: "rgba(255, 230, 130," };
     } else if (choice === "dash") {
       // Face player before dashing
       this.facing = (player.x + player.width / 2 < this.x + this.width / 2) ? -1 : 1;
@@ -195,9 +202,27 @@ export class Boss {
         height: this.height - 30,
       };
       this.stateTimer = 60;
+      this.telegraphStyle = { fill: "rgba(160, 80, 255,", stroke: "rgba(220, 160, 255," };
     }
 
+    this.lastAttack = choice;
     game.audio.bossCharge();
+  }
+
+  nextAttack() {
+    const phasePattern = this.phase === 1
+      ? ["slam", "fireball", "slam", "fireball"]
+      : ["slam", "triple_shot", "dash", "slam", "fireball", "triple_shot"];
+    if (this.attackQueue.length === 0) this.attackQueue = phasePattern.slice();
+
+    let choice = this.attackQueue.shift();
+    // Anti-frustration: cap dash chains.
+    if (choice === "dash" && this.consecutiveDashes >= 1) {
+      choice = this.attackQueue.find((a) => a !== "dash") || "slam";
+    }
+    if (choice === "dash") this.consecutiveDashes++;
+    else this.consecutiveDashes = 0;
+    return choice;
   }
 
   executeAttack(player, game) {
@@ -216,7 +241,7 @@ export class Boss {
       );
       game.audio.skillCast("slam");
       this.state = "execute";
-      this.stateTimer = 10;
+      this.stateTimer = 12;
     } else if (this.currentAttack === "fireball") {
       const px = dir === 1 ? this.x + this.width : this.x;
       const py = this.y + this.height / 2;
@@ -225,7 +250,7 @@ export class Boss {
       ));
       game.audio.skillCast("projectile");
       this.state = "execute";
-      this.stateTimer = 10;
+      this.stateTimer = 12;
     } else if (this.currentAttack === "triple_shot") {
       const px = dir === 1 ? this.x + this.width : this.x;
       const py = this.y + this.height / 2;
@@ -237,24 +262,26 @@ export class Boss {
       }
       game.audio.skillCast("projectile");
       this.state = "execute";
-      this.stateTimer = 10;
+      this.stateTimer = 14;
     } else if (this.currentAttack === "dash") {
       this.vx = dir * 11;
       this.state = "dashing";
-      this.stateTimer = 22;
+      this.stateTimer = 18;
       game.audio.skillCast("dash");
     }
   }
 
   checkDashHit(player) {
     if (player.isDead) return;
+    if (this.dashHitCooldown > 0) return;
     const overlap =
       this.x < player.x + player.width &&
       this.x + this.width > player.x &&
       this.y < player.y + player.height &&
       this.y + this.height > player.y;
     if (overlap) {
-      player.takeDamage(32, this.x + this.width / 2);
+      const didHit = player.takeDamage(32, this.x + this.width / 2);
+      if (didHit) this.dashHitCooldown = 20;
     }
   }
 
@@ -269,12 +296,16 @@ export class Boss {
 
   tryDamagePlayer(player) {
     if (player.isDead) return;
+    if (this.contactCooldown > 0) return;
     const overlap =
       this.x < player.x + player.width &&
       this.x + this.width > player.x &&
       this.y < player.y + player.height &&
       this.y + this.height > player.y;
-    if (overlap) player.takeDamage(this.contactDamage, this.x + this.width / 2);
+    if (overlap) {
+      const didHit = player.takeDamage(this.contactDamage, this.x + this.width / 2);
+      if (didHit) this.contactCooldown = 24;
+    }
   }
 
   takeDamage(amount, sourceX) {
@@ -292,17 +323,24 @@ export class Boss {
     // Telegraph warning indicator
     if (this.telegraphZone && this.state === "telegraph") {
       const pulse = 0.4 + 0.3 * Math.sin(Date.now() / 80);
-      ctx.fillStyle = `rgba(255, 64, 96, ${pulse * 0.6})`;
+      ctx.fillStyle = `${this.telegraphStyle.fill} ${pulse * 0.6})`;
       ctx.fillRect(
         this.telegraphZone.x, this.telegraphZone.y,
         this.telegraphZone.width, this.telegraphZone.height
       );
-      ctx.strokeStyle = `rgba(255, 200, 50, ${pulse})`;
+      ctx.strokeStyle = `${this.telegraphStyle.stroke} ${pulse})`;
       ctx.lineWidth = 3;
       ctx.strokeRect(
         this.telegraphZone.x + 1.5, this.telegraphZone.y + 1.5,
         this.telegraphZone.width - 3, this.telegraphZone.height - 3
       );
+    }
+
+    if (this.state === "telegraph" && this.currentAttack) {
+      ctx.fillStyle = "#ffd7aa";
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(this.currentAttack.toUpperCase(), this.x + this.width / 2, this.y - 18);
     }
 
     // Sprite

@@ -117,6 +117,10 @@ export function tryEnterPortal(game) {
       game.audio.playMapMusic(targetMap);
     }
     game.analytics && (game.analytics.mapTransitions += 1);
+    if (game.analytics) {
+      const mapId = targetMap || "unknown";
+      game.analytics[`lastEntered_${mapId}`] = Math.round((Date.now() - game.analytics.sessionStartMs) / 1000);
+    }
     game.commandBus?.pushEvent("map_transition", { targetMap });
     return true;
   }

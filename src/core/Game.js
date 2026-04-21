@@ -49,6 +49,7 @@ export class Game {
     this.analytics = {
       sessionStartMs: Date.now(),
       deaths: 0,
+      deathsByMap: {},
       potionsUsed: 0,
       mapTransitions: 0,
       levelUps: [],
@@ -156,7 +157,11 @@ export class Game {
     this.commandBus.beginTick();
     this.handleGlobalInput();
 
-    if (!this._wasDead && this.player.isDead) this.analytics.deaths++;
+    if (!this._wasDead && this.player.isDead) {
+      this.analytics.deaths++;
+      const mapId = this.maps.currentId || "unknown";
+      this.analytics.deathsByMap[mapId] = (this.analytics.deathsByMap[mapId] || 0) + 1;
+    }
     this._wasDead = this.player.isDead;
 
     // Start any pending BGM once audio has been initialized by a user gesture

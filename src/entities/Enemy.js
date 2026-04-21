@@ -5,7 +5,7 @@
 // ============================================================
 
 import { applyPhysics } from "../systems/Physics.js";
-import { COMBAT } from "../config/Constants.js";
+import { COMBAT, ENCOUNTER } from "../config/Constants.js";
 import { drawSprite } from "../systems/Sprite.js";
 
 export class Enemy {
@@ -29,6 +29,8 @@ export class Enemy {
     this.patrolTimer = 60 + Math.floor(Math.random() * 120);
     this.attackCooldown = 0;
     this.attackWindup = 0;
+    this.recoverFrames = 0;
+    this.attackTelegraphColor = this.pickTelegraphColor(type.id);
 
     this.hitFlash = 0;
     this.knockbackX = 0;
@@ -40,12 +42,34 @@ export class Enemy {
     this.animTimer = 0;
   }
 
+  pickTelegraphColor(id) {
+    if (id === "slime") return "rgba(140, 255, 140, ";
+    if (id === "mushroom") return "rgba(255, 180, 120, ";
+    if (id === "alpha_wolf") return "rgba(255, 80, 80, ";
+    return "rgba(255, 120, 120, ";
+  }
+
+  getRole() {
+    if (this.type.id === "mushroom") return "zoner";
+    if (this.type.id === "alpha_wolf") return "bruiser";
+    return "chaser";
+  }
+
   update(player, platforms) {
     // Advance animation regardless of state
     this.animTimer++;
     if (this.animTimer >= 20) {
       this.animFrame = 1 - this.animFrame;
       this.animTimer = 0;
+    }
+
+    if (this.recoverFrames > 0) {
+      this.recoverFrames--;
+      this.vx *= 0.75;
+      if (this.hitFlash > 0) this.hitFlash--;
+      if (this.attackCooldown > 0) this.attackCooldown--;
+      applyPhysics(this, platforms);
+      return;
     }
 
     if (this.stagger > 0) {
@@ -65,6 +89,7 @@ export class Enemy {
     const dist = Math.abs(px - ex);
     this.state = (!player.isDead && dist < this.type.detectRange) ? "chase" : "patrol";
 
+    const role = this.getRole();
     if (this.state === "patrol") {
       this.patrolTimer--;
       if (this.patrolTimer <= 0) {
@@ -75,7 +100,19 @@ export class Enemy {
       if (this.onGround && this.willFall(platforms)) this.dir *= -1;
     } else {
       this.dir = px < ex ? -1 : 1;
-      this.vx = this.dir * this.type.moveSpeed;
+      if (role === "zoner") {
+        if (dist < ENCOUNTER.ZONER_RETREAT_RANGE) {
+          this.vx = -this.dir * this.type.moveSpeed * 0.85;
+        } else if (dist > ENCOUNTER.ZONER_IDEAL_RANGE) {
+          this.vx = this.dir * this.type.moveSpeed * 0.55;
+        } else {
+          this.vx = 0;
+        }
+      } else if (role === "bruiser" && this.attackCooldown <= 0) {
+        this.vx = this.dir * this.type.moveSpeed * ENCOUNTER.BRUISER_COMMIT_SPEED_MULT;
+      } else {
+        this.vx = this.dir * this.type.moveSpeed;
+      }
     }
 
     this.vx += this.knockbackX;
@@ -120,7 +157,10 @@ export class Enemy {
     this.attackWindup--;
     if (this.attackWindup <= 0) {
       const didHit = player.takeDamage(this.damage, this.x + this.width / 2);
-      if (didHit) this.attackCooldown = this.type.attackCooldown;
+      if (didHit) {
+        this.attackCooldown = this.type.attackCooldown;
+        this.recoverFrames = this.type.id === "alpha_wolf" ? 14 : 8;
+      }
     }
   }
 
@@ -185,7 +225,7 @@ export class Enemy {
 
     if (this.attackWindup > 0) {
       const pulse = 0.45 + 0.45 * Math.sin(Date.now() / 60);
-      ctx.fillStyle = `rgba(255, 80, 80, ${pulse})`;
+      ctx.fillStyle = this.attackTelegraphColor + pulse + ")";
       ctx.fillRect(this.x, this.y - 14, this.width, 4);
     }
   }

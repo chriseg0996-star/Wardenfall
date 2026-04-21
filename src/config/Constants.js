@@ -110,6 +110,15 @@ export const COMBAT = {
   STAGGER_FRAMES: 18,
   HITSTOP_FRAMES: 2,            // tiny freeze on hit — HUGE for game feel
   HITSTOP_CRIT: 4,
+  HITSTOP_FINISHER: 5,
+  HITSTOP_KILL: 6,
+};
+
+// Encounter pacing knobs to tune pressure per archetype.
+export const ENCOUNTER = {
+  ZONER_IDEAL_RANGE: 150,
+  ZONER_RETREAT_RANGE: 80,
+  BRUISER_COMMIT_SPEED_MULT: 1.12,
 };
 
 export const LOOT = {

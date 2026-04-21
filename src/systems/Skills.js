@@ -70,7 +70,7 @@ export class SkillSystem {
       Math.abs(def.dashDistance), player.height - 16, def.color
     ));
 
-    audio.skillCast("dash");
+    audio.skillCast("dash", 1);
 
     // Damage a horizontal strip along the dash
     const dmg = Math.round(player.damage * def.damageMult * (player.skillDamageMult || 1));
@@ -113,15 +113,15 @@ export class SkillSystem {
         e.takeDamage(final, cx);
         damageNumbers.push(new DamageNumber(ex, e.y - 4, final, isCrit));
         particles.spawn(ex, ey, { count: 5, color: "#fff", speedMin: 1, speedMax: 3, life: 18, size: 2 });
-        if (isCrit) audio.crit(); else audio.hit();
+        if (isCrit) audio.crit(2); else audio.hit(2);
         if (e.dead) {
-          audio.enemyDie();
+          audio.enemyDie(2);
           if (game) game.onEnemyKilled(e);
         }
       }
     }
-    camera.shake(8, 14);
-    game?.triggerHitstop(COMBAT.HITSTOP_FRAMES + 2);
+    camera.shake(9, 16);
+    game?.triggerHitstop(COMBAT.HITSTOP_FINISHER);
     return true;
   }
 
@@ -136,7 +136,7 @@ export class SkillSystem {
     particles.spawn(px + 8, py + 4, {
       count: 5, color: def.color, speedMin: 1, speedMax: 3, life: 14, size: 2,
     });
-    audio.skillCast("projectile");
+    audio.skillCast("projectile", 1);
     return true;
   }
 
@@ -162,14 +162,17 @@ export class SkillSystem {
           count: 5, color: "#fff", speedMin: 1, speedMax: 3, life: 16, size: 2,
         });
         hit.add(e);
-        if (isCrit) audio.crit(); else audio.hit();
+        if (isCrit) audio.crit(1); else audio.hit(1);
         if (e.dead) {
-          audio.enemyDie();
+          audio.enemyDie(1);
           if (game) game.onEnemyKilled(e);
         }
       }
     }
-    if (hit.size > 0) camera.shake(4, 8);
+    if (hit.size > 0) {
+      camera.shake(5, 9);
+      game?.triggerHitstop(COMBAT.HITSTOP_FRAMES);
+    }
   }
 
   serialize() {

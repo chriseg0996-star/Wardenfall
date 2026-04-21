@@ -75,10 +75,10 @@ export const MAPS = {
       { x: 550,  y: 200, typeId: "WOLF" },
       { x: 850,  y: 300, typeId: "MUSHROOM" },
       { x: 1100, y: 150, typeId: "WOLF" },
-      { x: 1350, y: 300, typeId: "WOLF" },
+      { x: 1350, y: 300, typeId: "ALPHA_WOLF" },
       { x: 1650, y: 150, typeId: "MUSHROOM" },
       { x: 1950, y: 250, typeId: "WOLF" },
-      { x: 2200, y: 150, typeId: "WOLF" },
+      { x: 2200, y: 150, typeId: "ALPHA_WOLF" },
       { x: 2430, y: 300, typeId: "WOLF" },
     ],
     portals: [
