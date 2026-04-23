@@ -21,8 +21,13 @@ export class Input {
       if (!this.keys.has(k)) this.justPressed.add(k);
       this.keys.add(k);
 
-      // Prevent page scroll on space / arrows
-      if ([" ", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) {
+      // Prevent browser defaults that collide with game inputs:
+      // space/arrows scroll the page; F5 reloads (races with F5-to-save);
+      // F3 opens Firefox "Find next". F8 is listed for symmetry.
+      if (
+        [" ", "arrowup", "arrowdown", "arrowleft", "arrowright",
+         "f3", "f5", "f8"].includes(k)
+      ) {
         e.preventDefault();
       }
     });
@@ -31,8 +36,12 @@ export class Input {
       this.keys.delete(e.key.toLowerCase());
     });
 
-    // Clear keys when window loses focus (prevents stuck keys)
-    window.addEventListener("blur", () => this.keys.clear());
+    // Clear keys when window loses focus (prevents stuck keys and
+    // stale just-pressed events firing after Alt-Tab).
+    window.addEventListener("blur", () => {
+      this.keys.clear();
+      this.justPressed.clear();
+    });
   }
 
   isDown(...keys) {
