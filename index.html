@@ -326,6 +326,84 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   transition:width 0.18s;
 }
 .boss-stats { color:#aaa; font-size:9px; text-align:center; }
+
+/* Phase L — Death Screen & Run Meta */
+#death-overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,0.94);
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  z-index:220; font-family:'Courier New',monospace; color:#aaa;
+  opacity:0; transition: opacity 0.8s ease-out;
+}
+#death-overlay.show { display:flex; }
+#death-overlay.show-anim { opacity:1; }
+.death-panel {
+  background:#0a0a14; border:1px solid #6a3030; border-radius:4px;
+  padding:18px 22px; min-width:340px; max-width:96vw; max-height:92vh; overflow-y:auto;
+  box-shadow:0 0 60px rgba(160,30,30,0.35);
+}
+.death-header {
+  color:#ff4040; font-size:20px; letter-spacing:5px; text-align:center;
+  margin-bottom:6px; text-shadow:0 0 12px rgba(255,60,60,0.55);
+}
+.death-seed-row {
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  font-size:10px; color:#888; margin-bottom:12px;
+}
+.death-seed-row #death-seed-val { color:#a080ff; font-weight:bold; letter-spacing:1px; }
+.death-btn-small {
+  background:#222; border:1px solid #555; color:#eee; padding:1px 7px;
+  border-radius:2px; font-family:'Courier New',monospace; font-size:9px; cursor:pointer;
+  letter-spacing:1px;
+}
+.death-btn-small:hover { background:#333; }
+.death-stats {
+  display:grid; grid-template-columns: repeat(3, 1fr); gap:6px 10px;
+  margin-bottom:14px;
+}
+.death-stat {
+  background:#15151c; border:1px solid #2a2a3a; border-radius:3px;
+  padding:6px 6px 7px; text-align:center;
+}
+.death-stat .ds-label { font-size:8px; color:#666; letter-spacing:1px; text-transform:uppercase; }
+.death-stat .ds-value { font-size:14px; color:#f0c060; font-weight:bold; margin-top:3px; font-family:'Courier New',monospace; }
+.death-stat .ds-value.best { font-size:10px; line-height:1.2; }
+.death-actions {
+  display:flex; justify-content:center; gap:10px; margin-top:6px;
+}
+.death-btn {
+  background:linear-gradient(135deg,#2a1840,#4a2870);
+  border:1px solid #6040a0; border-radius:3px; padding:7px 18px;
+  color:#e0c0ff; font-size:11px; cursor:pointer; letter-spacing:2px;
+  font-family:'Courier New',monospace;
+}
+.death-btn:hover { background:linear-gradient(135deg,#3a2060,#5a30a0); }
+.death-btn.primary {
+  background:linear-gradient(135deg,#6a1818,#a02828);
+  border-color:#c04040; color:#ffe0e0;
+}
+.death-btn.primary:hover { background:linear-gradient(135deg,#8a2020,#c03030); }
+.death-scores {
+  display:none; margin-top:14px; border-top:1px solid #3a2a2a; padding-top:10px;
+}
+.death-scores.show { display:block; }
+.scores-title { color:#a080ff; font-size:11px; letter-spacing:2px; text-align:center; margin-bottom:8px; }
+.scores-table { width:100%; border-collapse:collapse; font-size:10px; }
+.scores-table th, .scores-table td { padding:3px 5px; text-align:left; border-bottom:1px solid #1f1f28; }
+.scores-table th { color:#666; font-weight:normal; font-size:8px; letter-spacing:1px; text-transform:uppercase; }
+.scores-table td.col-score { color:#f0c060; font-weight:bold; }
+.scores-table tr.you td { background:rgba(160,80,255,0.13); }
+.scores-table tr.you td.col-rank { color:#e0c0ff; font-weight:bold; }
+.scores-clear {
+  margin:10px 0 0; background:#1a1a22; border:1px solid #555; color:#888;
+  padding:3px 10px; border-radius:2px; font-family:'Courier New',monospace; font-size:9px;
+  cursor:pointer; display:block; margin-left:auto;
+}
+.scores-clear:hover { background:#2a2a32; color:#eee; }
+@media (max-width: 540px) {
+  .death-stats { grid-template-columns: repeat(2, 1fr); }
+  .scores-table th:nth-child(4), .scores-table td:nth-child(4),
+  .scores-table th:nth-child(7), .scores-table td:nth-child(7) { display:none; }
+}
 </style>
 </head>
 <body>
@@ -408,6 +486,23 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
       <div class="settings-section">AUDIO</div>
       <div id="audio-list"></div>
       <button class="settings-close" onclick="closeSettings()">RESUME</button>
+    </div>
+  </div>
+
+  <!-- Phase L — Death Screen & Run Meta -->
+  <div id="death-overlay">
+    <div class="death-panel">
+      <div class="death-header">YOU HAVE FALLEN</div>
+      <div class="death-seed-row">
+        <span>Run seed: <span id="death-seed-val">0x00000000</span></span>
+        <button class="death-btn-small" id="death-copy-seed">COPY</button>
+      </div>
+      <div class="death-stats" id="death-stats"></div>
+      <div class="death-actions">
+        <button class="death-btn primary" onclick="location.reload()">TRY AGAIN</button>
+        <button class="death-btn" id="death-view-scores">VIEW SCORES</button>
+      </div>
+      <div class="death-scores" id="death-scores"></div>
     </div>
   </div>
 
@@ -1537,6 +1632,7 @@ const SPELLS = {
           const rawDmg = Math.max(1, Math.round(p.atk*1.3 + p.level*2));
           const dmg = shieldedDamage(e, rawDmg);   // Phase I — shielder block
           e.hp -= dmg;
+          RunStats.damageDealt += dmg;             // Phase L
           e.iframes = 280;
           hits++;
           spawnParticles(e.x, e.y, 6, '#a0d8ff');
@@ -1775,6 +1871,7 @@ function updateProjectiles(dt) {
           e.hp -= dmg;
           e.iframes = 300;
           pr.hitSet.add(e);
+          RunStats.damageDealt += dmg;                // Phase L
           addLog(`Firebolt — ${e.name} -${dmg}`, 'dmg');
           spawnParticles(e.x, e.y, 6, '#ff8030');
           // small knockback along projectile heading
@@ -1803,6 +1900,7 @@ function updateProjectiles(dt) {
           const dmg = Math.max(1, pr.damage - Math.floor(player.def*0.5));
           player.hp = Math.max(0, player.hp - dmg);
           player.iframes = 700;
+          RunStats.damageTaken += dmg;    // Phase L
           addLog(`Hit for ${dmg}!`, 'dmg');
           triggerDamageVignette();
           triggerShake(4, 160);
@@ -2312,6 +2410,7 @@ function doAttack() {
       const rawDmg = Math.max(1, player.atk + Math.floor(Math.random()*5-2));
       const dmg = shieldedDamage(e, rawDmg);   // Phase I — shielder block
       e.hp -= dmg;
+      RunStats.damageDealt += dmg;             // Phase L
       e.iframes = 300;
       hit = true;
       addLog(`Hit ${e.name} for ${dmg}`, 'dmg');
@@ -2333,6 +2432,9 @@ function killEnemy(e) {
   e.alive = false;
   addLog(`Defeated ${e.name}! +${e.xp} XP`, 'kill');
   player.xp += e.xp;
+  // Phase L — run telemetry
+  RunStats.enemiesKilled++;
+  if (isBossEnemy(e)) RunStats.bossesKilled++;
 
   // Phase I — if this enemy was a Necromancer's summon (or a Brood Mother
   // summon in Phase K), free the slot so the summoner can summon again.
@@ -2417,6 +2519,7 @@ function enemyAttackPlayer(e) {
   const dmg = Math.max(1, e.atk - player.def + Math.floor(Math.random()*4-2));
   player.hp = Math.max(0, player.hp-dmg);
   player.iframes = 700;
+  RunStats.damageTaken += dmg;             // Phase L
   addLog(`${e.name} hits you for ${dmg}!`, 'dmg');
   triggerDamageVignette();
   triggerShake(5, 200);
@@ -2446,6 +2549,7 @@ function castSpell(slot) {
   player.spellCd[slot] = s.cd;
   s.cast(player);
   if (SFX[id]) SFX[id]();          // Phase G: per-spell sound
+  RunStats.spellsCast++;           // Phase L
   updateHUD(); updateHotbar();
 }
 
@@ -2485,7 +2589,250 @@ function checkLevelUp() {
 function playerDie() {
   player.dead = true;
   addLog('You have fallen...', 'sys');
+  showDeathScreen();           // Phase L
 }
+
+// ─────────────────────────────────────────────
+// Phase L — Death Screen & Run Meta
+// RunStats accumulates per-run telemetry from event hooks scattered across
+// combat / pickup / cast / descend / boss-kill sites. On death the values
+// are flushed into a count-up animation overlay and (if the score ranks)
+// persisted to a top-5 localStorage leaderboard.
+// ─────────────────────────────────────────────
+const SCORE_STORAGE_KEY = 'wardenfall.scores.v1';
+const RARITY_RANK = { common:0, uncommon:1, rare:2, epic:3, legendary:4 };
+
+let RunStats = {
+  floorsCleared: 0,
+  enemiesKilled: 0,
+  goldCollected: 0,
+  damageDealt:   0,
+  damageTaken:   0,
+  bestItem:      null,        // {name, icon, rarity}
+  bossesKilled:  0,
+  spellsCast:    0,
+  startTime:     0,           // Date.now() at startGame
+  seed:          0,           // GameState.runSeed snapshot
+};
+
+function resetRunStats() {
+  RunStats = {
+    floorsCleared: 1,         // start on floor 1 (counts as reached)
+    enemiesKilled: 0,
+    goldCollected: 0,
+    damageDealt:   0,
+    damageTaken:   0,
+    bestItem:      null,
+    bossesKilled:  0,
+    spellsCast:    0,
+    startTime:     Date.now(),
+    seed:          GameState.runSeed,
+  };
+}
+
+function updateBestItem(item) {
+  if (!item) return;
+  const cur = RunStats.bestItem;
+  const newRank = RARITY_RANK[item.rarity] != null ? RARITY_RANK[item.rarity] : 0;
+  const curRank = cur ? (RARITY_RANK[cur.rarity] != null ? RARITY_RANK[cur.rarity] : 0) : -1;
+  if (!cur || newRank > curRank) {
+    RunStats.bestItem = { name: item.name, icon: item.icon, rarity: item.rarity };
+  }
+}
+
+function loadScores() {
+  try {
+    const raw = localStorage.getItem(SCORE_STORAGE_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+function saveScores(arr) {
+  try { localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(arr)); } catch {}
+}
+
+function submitRunToScores() {
+  const score =
+    RunStats.floorsCleared * 1000 +
+    RunStats.enemiesKilled * 10 +
+    RunStats.goldCollected;
+  const entry = {
+    score,
+    floorsCleared: RunStats.floorsCleared,
+    enemiesKilled: RunStats.enemiesKilled,
+    gold:          RunStats.goldCollected,
+    bestItem:      RunStats.bestItem,
+    seed:          RunStats.seed,
+    date:          new Date().toISOString(),
+  };
+  const list = loadScores();
+  list.push(entry);
+  list.sort((a, b) => b.score - a.score);
+  const top5 = list.slice(0, 5);
+  saveScores(top5);
+  const rank = top5.findIndex(e =>
+    e.score === entry.score && e.seed === entry.seed && e.date === entry.date) + 1;
+  return { entry, scores: top5, rank };
+}
+
+function _formatRunTime(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const mm = Math.floor(total / 60);
+  const ss = total % 60;
+  return String(mm).padStart(2,'0') + ':' + String(ss).padStart(2,'0');
+}
+
+// RAF-based count-up. items: [{el, target}]. Easing: ease-out quad.
+function _animateCountUp(items, durationMs) {
+  const start = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - start) / durationMs);
+    const eased = 1 - (1 - t) * (1 - t);
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      it.el.textContent = String(Math.floor(it.target * eased));
+    }
+    if (t < 1) requestAnimationFrame(tick);
+    else {
+      for (let i = 0; i < items.length; i++) {
+        items[i].el.textContent = String(items[i].target);
+      }
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+function _formatSeed(seed) {
+  return '0x' + (seed >>> 0).toString(16).padStart(8, '0').toUpperCase();
+}
+
+function showDeathScreen() {
+  const overlay = document.getElementById('death-overlay');
+  if (!overlay) return;
+  const submission = submitRunToScores();
+  const elapsed = Date.now() - RunStats.startTime;
+  // Seed display
+  document.getElementById('death-seed-val').textContent = _formatSeed(RunStats.seed);
+  // Stats grid (Time + Best Item rendered final; numeric stats start at 0
+  // and animate up over 1200ms via _animateCountUp).
+  const bestColor = RunStats.bestItem ? (RARITY_COL[RunStats.bestItem.rarity] || '#aaa') : '#666';
+  const bestText  = RunStats.bestItem
+    ? `${RunStats.bestItem.icon} ${RunStats.bestItem.name}`
+    : 'None';
+  const stats = document.getElementById('death-stats');
+  stats.innerHTML = `
+    <div class="death-stat"><div class="ds-label">Floor Reached</div><div class="ds-value"      data-target="${RunStats.floorsCleared}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Enemies Slain</div><div class="ds-value"      data-target="${RunStats.enemiesKilled}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Gold Collected</div><div class="ds-value"     data-target="${RunStats.goldCollected}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Damage Dealt</div><div class="ds-value"       data-target="${RunStats.damageDealt}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Damage Taken</div><div class="ds-value"       data-target="${RunStats.damageTaken}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Bosses Defeated</div><div class="ds-value"    data-target="${RunStats.bossesKilled}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Spells Cast</div><div class="ds-value"        data-target="${RunStats.spellsCast}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Time Survived</div><div class="ds-value">${_formatRunTime(elapsed)}</div></div>
+    <div class="death-stat"><div class="ds-label">Best Item Found</div><div class="ds-value best" style="color:${bestColor}">${bestText}</div></div>
+  `;
+  // Animate numeric stats
+  const numEls = stats.querySelectorAll('.ds-value[data-target]');
+  const items = [];
+  numEls.forEach(el => items.push({ el, target: parseInt(el.dataset.target, 10) || 0 }));
+  _animateCountUp(items, 1200);
+  // Build the scores panel (hidden until user clicks VIEW SCORES)
+  renderScores(submission);
+  document.getElementById('death-scores').classList.remove('show');
+  // Trigger fade-in (display:flex first, then add show-anim on next frame so
+  // the opacity transition actually fires).
+  overlay.classList.add('show');
+  requestAnimationFrame(() => overlay.classList.add('show-anim'));
+}
+
+function renderScores(submission) {
+  const div = document.getElementById('death-scores');
+  if (!div) return;
+  const scores  = submission.scores;
+  const youEntry = submission.entry;
+  const youRank  = submission.rank;
+  if (!scores || scores.length === 0) {
+    div.innerHTML = `
+      <div class="scores-title">★ TOP 5 ★</div>
+      <div style="text-align:center; color:#666; font-size:10px; padding:10px 0">No runs recorded yet.</div>
+      <button class="scores-clear" onclick="clearScoresConfirm()">CLEAR SCORES</button>
+    `;
+    return;
+  }
+  const rows = scores.map((s, i) => {
+    const isYou = s.score === youEntry.score && s.seed === youEntry.seed && s.date === youEntry.date;
+    const cls   = isYou ? 'you' : '';
+    const dt    = new Date(s.date);
+    const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+    const bestStr = s.bestItem
+      ? `<span style="color:${RARITY_COL[s.bestItem.rarity]||'#aaa'}">${s.bestItem.icon} ${s.bestItem.name}</span>`
+      : '<span style="color:#555">—</span>';
+    return `<tr class="${cls}">
+      <td class="col-rank">#${i+1}</td>
+      <td class="col-score">${s.score}</td>
+      <td>${s.floorsCleared}</td>
+      <td>${s.enemiesKilled}</td>
+      <td>${s.gold}</td>
+      <td>${bestStr}</td>
+      <td>${dateStr}</td>
+    </tr>`;
+  }).join('');
+  div.innerHTML = `
+    <div class="scores-title">★ TOP 5${youRank > 0 ? ` — YOU RANKED #${youRank}` : ''} ★</div>
+    <table class="scores-table">
+      <thead><tr>
+        <th>Rank</th><th>Score</th><th>Floor</th><th>Kills</th>
+        <th>Gold</th><th>Best Item</th><th>Date</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <button class="scores-clear" onclick="clearScoresConfirm()">CLEAR SCORES</button>
+  `;
+}
+
+function clearScoresConfirm() {
+  if (confirm('Clear all leaderboard scores? This cannot be undone.')) {
+    saveScores([]);
+    renderScores({ entry: {}, scores: [], rank: -1 });
+  }
+}
+
+// Wire static event handlers once (these elements live in the DOM from
+// page load — no need to re-bind on each death).
+(function _wireDeathOverlayHandlers() {
+  const onReady = () => {
+    const copyBtn = document.getElementById('death-copy-seed');
+    if (copyBtn) copyBtn.addEventListener('click', () => {
+      const seed = _formatSeed(RunStats.seed);
+      const flash = () => {
+        const orig = copyBtn.textContent;
+        copyBtn.textContent = 'COPIED';
+        setTimeout(() => { copyBtn.textContent = orig; }, 1400);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(seed).then(flash).catch(flash);
+      } else {
+        // Fallback for non-clipboard contexts: select a temp textarea
+        const ta = document.createElement('textarea');
+        ta.value = seed; document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch {}
+        document.body.removeChild(ta);
+        flash();
+      }
+    });
+    const viewBtn = document.getElementById('death-view-scores');
+    if (viewBtn) viewBtn.addEventListener('click', () => {
+      document.getElementById('death-scores').classList.toggle('show');
+      viewBtn.textContent =
+        document.getElementById('death-scores').classList.contains('show')
+          ? 'HIDE SCORES' : 'VIEW SCORES';
+    });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady);
+  else onReady();
+})();
 
 // ─────────────────────────────────────────────
 // MODULE: FLOOR PROGRESSION
@@ -2539,6 +2886,7 @@ function descendFloor() {
   SFX.descend();                   // Phase G
   const fade = document.getElementById('floor-fade');
   GameState.floorNum++;
+  RunStats.floorsCleared = Math.max(RunStats.floorsCleared, GameState.floorNum);  // Phase L
   addLog(`Descending to Floor ${GameState.floorNum}...`, 'lvl');
   // Small reward for clearing a floor
   player.hp = Math.min(player.maxHp, player.hp + Math.round(player.maxHp*0.25));
@@ -2908,12 +3256,11 @@ function drawGame(dt) {
   drawLightingPass(collectLights(startTX, endTX, startTY, endTY));
 
   // ── DEAD OVERLAY ──
+  // Phase L — canvas death text removed; #death-overlay DOM modal owns
+  // the YOU HAVE FALLEN screen now. Keep a faint canvas wash for the
+  // frame between playerDie() and the overlay's 800ms fade-in.
   if(player.dead) {
-    ctx.fillStyle='rgba(80,0,0,0.6)'; ctx.fillRect(0,0,VIEW_W,VIEW_H);
-    ctx.fillStyle='#ff4040'; ctx.font='bold 18px Courier New'; ctx.textAlign='center';
-    ctx.fillText('YOU DIED', VIEW_W/2, VIEW_H/2-6);
-    ctx.fillStyle='#888'; ctx.font='9px Courier New';
-    ctx.fillText('Refresh to try again', VIEW_W/2, VIEW_H/2+14);
+    ctx.fillStyle='rgba(60,0,0,0.45)'; ctx.fillRect(0,0,VIEW_W,VIEW_H);
   }
 }
 
@@ -2949,6 +3296,7 @@ function shielderBash(e) {
     const dmg = Math.max(1, Math.round(e.atk * 1.5) - Math.floor(player.def * 0.5));
     player.hp = Math.max(0, player.hp - dmg);
     player.iframes = 800;
+    RunStats.damageTaken += dmg;        // Phase L
     addLog(`${e.name} bashes you for ${dmg}!`, 'dmg');
     triggerDamageVignette();
     triggerShake(5, 200);
@@ -3037,6 +3385,7 @@ function colossusSlam(e) {
     const dmg = Math.max(1, e.atk * 2 - Math.floor(player.def * 0.5));
     player.hp = Math.max(0, player.hp - dmg);
     player.iframes = 700;
+    RunStats.damageTaken += dmg;        // Phase L
     addLog(`SLAM! -${dmg} HP`, 'dmg');
     triggerDamageVignette();
     updateHUD();
@@ -3319,6 +3668,7 @@ function update(dt) {
   if(isHazard(tileAt(player.x, player.y)) && player.iframes<=0) {
     player.hp = Math.max(0, player.hp-4);
     player.iframes=800;
+    RunStats.damageTaken += 4;          // Phase L
     addLog('Spike! -4 HP', 'dmg');
     triggerDamageVignette();
     updateHUD();
@@ -3535,6 +3885,7 @@ function update(dt) {
     if(dist<20) {
       if(p.type==='gold') {
         player.gold+=p.amount;
+        RunStats.goldCollected += p.amount;   // Phase L
         document.getElementById('gold-v').textContent=player.gold;
         addLog(`+${p.amount}g`, 'loot');
         SFX.pickup_coin();          // Phase G
@@ -3547,6 +3898,7 @@ function update(dt) {
         const it=p.itemDef;
         addLog(`Found: ${it.icon} ${it.name}`, 'loot');
         SFX.pickup_item();          // Phase G
+        updateBestItem(it);         // Phase L
         if(it.dAtk) { player.atk+=it.dAtk; }
         if(it.dDef) { player.def+=it.dDef; }
         if(it.dHp)  { player.maxHp+=it.dHp; player.hp=Math.min(player.hp+it.dHp,player.maxHp); }
@@ -3873,6 +4225,7 @@ function selectChestItem(idx) {
   if (!offer || !offer.items[idx]) return;
   const it = offer.items[idx];
   _applyItemToPlayer(it);
+  updateBestItem(it);                  // Phase L — chest items count too
   addLog(`Equipped: ${it.icon} ${it.name}`, 'loot');
   SFX.pickup_item();
   updateHUD();
@@ -4101,6 +4454,7 @@ function startGame() {
   GameState.floorNum = 1;
   GameState.transitioning = false;
 
+  resetRunStats();                 // Phase L — fresh run telemetry
   loadFloor();
 
   updateHUD(); updateHotbar();
