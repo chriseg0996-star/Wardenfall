@@ -340,6 +340,13 @@ const VIEW_TY = 8;
 const VIEW_W  = VIEW_TX * TILE;   // 384
 const VIEW_H  = VIEW_TY * TILE;   // 256
 
+// ── Phase H: A* pathfinding tuning ──
+const PATH_RECOMPUTE_MS       = 400;       // base interval before A* re-runs
+const PATH_RECOMPUTE_JITTER_MS = 200;      // randomised per enemy so they don't all recompute on the same frame
+const PATH_WAYPOINT_REACHED_PX = 6;        // distance to current waypoint that counts as "arrived"
+const PATH_MAX_ITERATIONS     = 800;       // A* node-expansion safety cap (40×30 grid worst case ≈ 1200)
+const LOS_STEP_PX             = TILE / 3;  // line-of-sight sample density
+
 // ─────────────────────────────────────────────
 // MODULE: RNG (seeded, mulberry32 — reproducible floors)
 // ─────────────────────────────────────────────
@@ -1120,6 +1127,10 @@ function spawnEnemy(tx, ty, type) {
     iframes:0, alive:true, facing:1,
     walkPhase:0,
     aggro:false,       // Phase B: drives skeleton bone-rattle jitter
+    // Phase H: pathfinding state — null path means "no waypoint queue".
+    path:null,
+    pathTimer:0,       // ms until next A* re-run
+    losClear:false,    // last LOS sample result (also drives close-range slowdown)
   });
 }
 
@@ -1565,6 +1576,116 @@ function moveEntity(ent, dx, dy, dt) {
 function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh) {
   return ax-aw/2 < bx+bw/2 && ax+aw/2 > bx-bw/2 &&
          ay-ah/2 < by+bh/2 && ay+ah/2 > by-bh/2;
+}
+
+// ─────────────────────────────────────────────
+// MODULE: PATHFINDING (Phase H)
+// A* on the 40×30 tile grid, 8-connected with diagonal-cut prevention,
+// octile heuristic. Walkability uses the same isSolid() predicate as
+// movement so walls + pillars + future solid tile types are handled
+// uniformly.
+//
+// Callers use the chain: hasLOS() → if clear, chase directly (cheap);
+// if blocked, aStar() → waypoint list, refreshed every PATH_RECOMPUTE_MS.
+// Path waypoints are tile-centre world coordinates (computed by callers
+// from the {tx,ty} entries).
+// ─────────────────────────────────────────────
+
+// Line-of-sight between two world points. Conservative: any solid sample
+// kills the line. Sample density is LOS_STEP_PX (~1/3 tile) — enough to
+// catch 1-tile walls without exploding cost for long ranges.
+function hasLOS(x1, y1, x2, y2) {
+  const dist  = Math.hypot(x2 - x1, y2 - y1);
+  const steps = Math.max(1, Math.ceil(dist / LOS_STEP_PX));
+  for (let i = 1; i <= steps; i++) {
+    const t  = i / steps;
+    const sx = x1 + (x2 - x1) * t;
+    const sy = y1 + (y2 - y1) * t;
+    if (isSolid(tileAt(sx, sy))) return false;
+  }
+  return true;
+}
+
+// 8-connected neighbour offsets — last column is the per-step cost.
+const _A_NEIGHBORS = [
+  [-1,  0, 1     ], [ 1,  0, 1     ], [ 0, -1, 1     ], [ 0,  1, 1     ],
+  [-1, -1, 1.4142], [ 1, -1, 1.4142], [-1,  1, 1.4142], [ 1,  1, 1.4142],
+];
+
+function _aHeuristic(x1, y1, x2, y2) {
+  // Octile distance — admissible + tight for 8-connected grids.
+  const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+  return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+}
+
+// Returns an array of {tx, ty} waypoints from start (exclusive) to goal
+// (inclusive), or null if no path exists / iteration cap hit.
+function aStar(sx, sy, gx, gy) {
+  if (!dungeon) return null;
+  if (sx === gx && sy === gy) return [];
+  if (sx < 0 || sy < 0 || sx >= COLS || sy >= ROWS) return null;
+  if (gx < 0 || gy < 0 || gx >= COLS || gy >= ROWS) return null;
+  if (isSolid(dungeon.map[gy][gx])) return null;     // goal unreachable
+
+  const key = (x, y) => y * COLS + x;
+  const startKey = key(sx, sy);
+  const goalKey  = key(gx, gy);
+
+  // openSet kept as a Set + linear scan for lowest f. With ≤ ~200 open
+  // nodes in practice on a 40×30 grid, this beats a heap's overhead.
+  const openSet  = new Set([startKey]);
+  const cameFrom = new Map();
+  const gScore   = new Map([[startKey, 0]]);
+  const fScore   = new Map([[startKey, _aHeuristic(sx, sy, gx, gy)]]);
+
+  let iter = 0;
+  while (openSet.size > 0 && iter++ < PATH_MAX_ITERATIONS) {
+    // Pop lowest-f node.
+    let currentKey = -1, currentF = Infinity;
+    for (const k of openSet) {
+      const f = fScore.get(k);
+      if (f !== undefined && f < currentF) { currentF = f; currentKey = k; }
+    }
+    if (currentKey < 0) break;
+
+    if (currentKey === goalKey) {
+      // Reconstruct waypoint list.
+      const path = [];
+      let k = currentKey;
+      while (cameFrom.has(k)) {
+        const x = k % COLS, y = (k - x) / COLS;
+        path.unshift({ tx: x, ty: y });
+        k = cameFrom.get(k);
+      }
+      return path;
+    }
+
+    openSet.delete(currentKey);
+    const cx = currentKey % COLS;
+    const cy = (currentKey - cx) / COLS;
+    const cG = gScore.get(currentKey);
+
+    for (let i = 0; i < _A_NEIGHBORS.length; i++) {
+      const dx = _A_NEIGHBORS[i][0], dy = _A_NEIGHBORS[i][1], cost = _A_NEIGHBORS[i][2];
+      const nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
+      if (isSolid(dungeon.map[ny][nx])) continue;
+      // Prevent slipping through diagonal corner gaps.
+      if (dx !== 0 && dy !== 0) {
+        if (isSolid(dungeon.map[cy][nx]) || isSolid(dungeon.map[ny][cx])) continue;
+      }
+      const nk    = key(nx, ny);
+      const tentG = cG + cost;
+      const prevG = gScore.get(nk);
+      if (prevG === undefined || tentG < prevG) {
+        cameFrom.set(nk, currentKey);
+        gScore.set(nk, tentG);
+        fScore.set(nk, tentG + _aHeuristic(nx, ny, gx, gy));
+        openSet.add(nk);
+      }
+    }
+  }
+  return null;   // no path within iter cap
 }
 
 // ─────────────────────────────────────────────
@@ -2201,21 +2322,73 @@ function update(dt) {
     const dist = Math.hypot(player.x-e.x, player.y-e.y);
 
     if(dist < e.aggroR) {
-      // Chase
+      // ── Phase H: LOS-gated A* chase ──
       e.aggro = true;
-      const angle = Math.atan2(player.y-e.y, player.x-e.x);
-      const spd = e.speed*(dist<50?0.4:1);
+      // Step pathing cooldown regardless of which branch we take below.
+      e.pathTimer = Math.max(0, e.pathTimer - dt);
+
+      // Cheap line-of-sight check. If clear, go straight at the player
+      // (preserves the snappy pre-Phase-H feel in open rooms).
+      const losClear = hasLOS(e.x, e.y, player.x, player.y);
+      e.losClear = losClear;
+
+      let targetX = player.x, targetY = player.y;
+      if (losClear) {
+        e.path = null;          // drop any stale path; direct chase is fine
+      } else {
+        // Need a path. Recompute when stale OR when the cooldown ticks down.
+        if (!e.path || e.path.length === 0 || e.pathTimer <= 0) {
+          const sx = Math.floor(e.x / TILE);
+          const sy = Math.floor(e.y / TILE);
+          const gx = Math.floor(player.x / TILE);
+          const gy = Math.floor(player.y / TILE);
+          e.path = aStar(sx, sy, gx, gy);
+          // Jitter so 5+ enemies don't all recompute on the same frame.
+          e.pathTimer = PATH_RECOMPUTE_MS + Math.random() * PATH_RECOMPUTE_JITTER_MS;
+        }
+        if (e.path && e.path.length > 0) {
+          // Aim at the first waypoint; pop it when reached.
+          const wp = e.path[0];
+          targetX = wp.tx * TILE + TILE / 2;
+          targetY = wp.ty * TILE + TILE / 2;
+          if (Math.hypot(targetX - e.x, targetY - e.y) < PATH_WAYPOINT_REACHED_PX) {
+            e.path.shift();
+            if (e.path.length > 0) {
+              const nwp = e.path[0];
+              targetX = nwp.tx * TILE + TILE / 2;
+              targetY = nwp.ty * TILE + TILE / 2;
+            } else {
+              targetX = player.x; targetY = player.y;
+            }
+          }
+        } else {
+          // A* failed (player unreachable, isolated region, etc.).
+          // Fall back to direct heading — moveEntity will at least slide
+          // along the obstacle rather than producing visible stalls.
+          targetX = player.x; targetY = player.y;
+        }
+      }
+
+      const angle  = Math.atan2(targetY - e.y, targetX - e.x);
+      // Close-range slowdown only kicks in when we have LOS to the player
+      // (the "circling for a swing" feel). Pathfinding away from a wall
+      // shouldn't tax the enemy's pace.
+      const closeIn = losClear && dist < 50;
+      const spd    = e.speed * (closeIn ? 0.4 : 1);
       moveEntity(e, Math.cos(angle)*spd, Math.sin(angle)*spd, dt*0.001);
-      e.facing = player.x>e.x?1:-1;
-      e.walkPhase += dt*0.006;
-      // Attack
-      if(dist < 28 && e.attackCd<=0) {
+      e.facing = player.x > e.x ? 1 : -1;
+      e.walkPhase += dt * 0.006;
+
+      // Attack (unchanged — still based on true distance to player).
+      if (dist < 28 && e.attackCd <= 0) {
         e.attackCd = 1100;
         enemyAttackPlayer(e);
       }
     } else {
+      // Out of aggro range — wander (unchanged). Drop any cached path so
+      // it doesn't carry stale waypoints into the next chase cycle.
       e.aggro = false;
-      // Wander
+      e.path = null;
       e.wanderTimer -= dt;
       if(e.wanderTimer<=0) {
         const a = Math.random()*Math.PI*2;
