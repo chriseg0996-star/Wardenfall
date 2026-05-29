@@ -751,6 +751,164 @@ function buildSprites() {
     g.fillStyle = PAL.gold.base;g.fillRect(18, 14, 5, 1);
   });
 
+  // Phase I — Enemy Variety: ARCHER (skeletal ranged variant)
+  // Same skull / spine / rags as the melee skeleton; swap sword for shortbow.
+  makeSprite('archer', 24, 32, (g) => {
+    const Bn = PAL.bone, R = PAL.rag;
+    // Legs / pelvis / waist rag / spine / ribs / shoulder rag / arms / skull
+    // (identical layout to the skeleton sprite for visual family consistency).
+    g.fillStyle = Bn.sh;   g.fillRect( 7, 22, 3, 10); g.fillRect(14, 22, 3, 10);
+    g.fillStyle = Bn.base; g.fillRect( 7, 22, 2, 10); g.fillRect(14, 22, 2, 10);
+    g.fillStyle = Bn.hi;   g.fillRect( 7, 22, 1,  8); g.fillRect(14, 22, 1,  8);
+    g.fillStyle = '#0a0a0a'; g.fillRect( 7, 30, 3, 2); g.fillRect(14, 30, 3, 2);
+    g.fillStyle = Bn.sh;   g.fillRect(5, 19, 14, 4);
+    g.fillStyle = Bn.base; g.fillRect(6, 20, 12, 2);
+    g.fillStyle = R.sh;
+    g.fillRect(4, 18, 16, 4);
+    g.fillRect(4, 22, 2, 3); g.fillRect( 8, 22, 2, 2);
+    g.fillRect(11, 22, 1, 3); g.fillRect(14, 22, 2, 2);
+    g.fillRect(17, 22, 1, 3); g.fillRect(19, 22, 1, 2);
+    g.fillStyle = R.base;
+    g.fillRect(4, 18, 16, 3);
+    g.fillRect(5, 22, 1, 2); g.fillRect(12, 22, 1, 2); g.fillRect(18, 22, 1, 2);
+    g.fillStyle = Bn.sh;   g.fillRect(11, 13, 2, 7);
+    g.fillStyle = Bn.base; g.fillRect(11, 13, 1, 6);
+    for (let i=0; i<3; i++) {
+      const ry = 13 + i*2;
+      g.fillStyle = Bn.sh;   g.fillRect(6, ry+1, 12, 1);
+      g.fillStyle = Bn.base; g.fillRect(6, ry,   12, 1);
+    }
+    g.fillStyle = R.sh;
+    g.fillRect(1, 12, 5, 8); g.fillRect(18, 12, 5, 8);
+    g.fillRect(0, 17, 1, 2); g.fillRect(2, 19, 1, 2);
+    g.fillRect(4, 19, 1, 2); g.fillRect(22, 19, 1, 2);
+    g.fillRect(20, 19, 1, 2); g.fillRect(18, 19, 1, 2);
+    g.fillStyle = R.base;
+    g.fillRect(1, 12, 5, 5); g.fillRect(18, 12, 5, 5);
+    g.fillStyle = R.hi;
+    g.fillRect(1, 12, 5, 1); g.fillRect(18, 12, 5, 1);
+    g.fillStyle = Bn.sh;   g.fillRect(3, 14, 2, 6); g.fillRect(19, 14, 2, 6);
+    g.fillStyle = Bn.base; g.fillRect(3, 14, 1, 6); g.fillRect(19, 14, 1, 6);
+    g.fillStyle = Bn.sh;   g.fillRect(4, 1, 16, 12);
+    g.fillStyle = Bn.base; g.fillRect(5, 2, 14, 10);
+    g.fillStyle = Bn.hi;   g.fillRect(5, 2, 14,  2);
+    g.fillStyle = Bn.hi;   g.fillRect(5, 2,  1, 10);
+    g.fillStyle = Bn.sh;
+    g.fillRect(11, 3, 1, 3); g.fillRect(12, 5, 1, 1); g.fillRect(11, 6, 1, 1);
+    g.fillStyle = '#000';
+    g.fillRect(7,  5, 4, 4);
+    g.fillRect(13, 5, 4, 4);
+    g.fillStyle = Bn.sh;
+    g.fillRect(6, 4, 6, 1); g.fillRect(12, 4, 6, 1);
+    g.fillStyle = '#3a0a00';
+    g.fillRect(8, 7, 1, 1); g.fillRect(15, 7, 1, 1);
+    g.fillStyle = '#000'; g.fillRect(11, 9, 2, 2);
+    g.fillStyle = Bn.sh;   g.fillRect(7, 11, 10, 1);
+    g.fillStyle = Bn.base; g.fillRect(7, 12, 10, 1);
+    g.fillStyle = '#000';
+    g.fillRect(8,  12, 1, 1); g.fillRect(10, 12, 1, 1);
+    g.fillRect(12, 12, 1, 1); g.fillRect(14, 12, 1, 1); g.fillRect(16, 12, 1, 1);
+
+    // ── shortbow (right hand) — replaces the melee skeleton's sword ──
+    g.fillStyle = '#5a3618'; g.fillRect(20,  7, 2, 18);     // bow back (dark wood)
+    g.fillStyle = '#7c4e22'; g.fillRect(20,  7, 1, 18);     // bow front (lit wood)
+    g.fillStyle = '#caa078'; g.fillRect(21,  8, 1, 16);     // bowstring (pale, taut)
+    // Nocked arrow, mid-draw
+    g.fillStyle = '#8a5e3a'; g.fillRect(17, 15, 5, 1);      // arrow shaft
+    g.fillStyle = '#2a2018'; g.fillRect(17, 15, 1, 1);      // arrow tip
+    g.fillStyle = '#caa078'; g.fillRect(21, 14, 1, 1); g.fillRect(21, 16, 1, 1);  // fletching
+  });
+
+  // Phase I — Enemy Variety: SHIELDER (stocky skeleton w/ tower shield + short sword)
+  makeSprite('shielder', 28, 32, (g) => {
+    const Bn = PAL.bone, R = PAL.rag, M = PAL.metal, GP = PAL.gold;
+    // Wider legs / stance — pushed 1px outward vs. skeleton
+    g.fillStyle = Bn.sh;   g.fillRect( 9, 22, 3, 10); g.fillRect(16, 22, 3, 10);
+    g.fillStyle = Bn.base; g.fillRect( 9, 22, 2, 10); g.fillRect(16, 22, 2, 10);
+    g.fillStyle = Bn.hi;   g.fillRect( 9, 22, 1,  8); g.fillRect(16, 22, 1,  8);
+    g.fillStyle = '#0a0a0a'; g.fillRect( 9, 30, 3, 2); g.fillRect(16, 30, 3, 2);
+    // Pelvis + waist rag
+    g.fillStyle = Bn.sh;   g.fillRect(7, 19, 14, 4);
+    g.fillStyle = Bn.base; g.fillRect(8, 20, 12, 2);
+    g.fillStyle = R.sh;    g.fillRect(6, 18, 16, 4);
+    g.fillStyle = R.base;  g.fillRect(6, 18, 16, 3);
+    // Spine + ribs (broader chest)
+    g.fillStyle = Bn.sh;   g.fillRect(13, 13, 2, 7);
+    g.fillStyle = Bn.base; g.fillRect(13, 13, 1, 6);
+    for (let i=0; i<3; i++) {
+      const ry = 13 + i*2;
+      g.fillStyle = Bn.sh;   g.fillRect(8, ry+1, 12, 1);
+      g.fillStyle = Bn.base; g.fillRect(8, ry,   12, 1);
+    }
+    // Skull
+    g.fillStyle = Bn.sh;   g.fillRect(8, 1, 14, 12);
+    g.fillStyle = Bn.base; g.fillRect(9, 2, 12, 10);
+    g.fillStyle = Bn.hi;   g.fillRect(9, 2, 12,  2);
+    g.fillStyle = '#000';  g.fillRect(11, 5, 3, 4); g.fillRect(16, 5, 3, 4);
+    g.fillStyle = Bn.sh;   g.fillRect(10, 4, 5, 1); g.fillRect(15, 4, 5, 1);
+    g.fillStyle = '#3a0a00'; g.fillRect(12, 7, 1, 1); g.fillRect(17, 7, 1, 1);
+    g.fillStyle = '#000';  g.fillRect(14, 9, 2, 2);
+    g.fillStyle = Bn.base; g.fillRect(10, 12, 10, 1);
+    g.fillStyle = '#000';  g.fillRect(11, 12, 1, 1); g.fillRect(13, 12, 1, 1);
+                           g.fillRect(15, 12, 1, 1); g.fillRect(17, 12, 1, 1);
+    // ── short sword (right hand, shorter than archer's bow) ──
+    g.fillStyle = M.sh;    g.fillRect(22, 13, 2, 10);
+    g.fillStyle = M.hi;    g.fillRect(22, 13, 1, 10);
+    g.fillStyle = GP.sh;   g.fillRect(21, 16, 4, 2);
+    g.fillStyle = GP.base; g.fillRect(21, 16, 4, 1);
+    // ── tower shield (left arm, big rectangular slab) ──
+    g.fillStyle = M.sh;    g.fillRect(1, 11, 7, 18);            // shield outer shadow
+    g.fillStyle = M.base;  g.fillRect(2, 12, 5, 16);            // body
+    g.fillStyle = M.hi;    g.fillRect(2, 12, 2, 16);            // catchlight strip
+    g.fillStyle = GP.sh;   g.fillRect(3, 18, 3, 4);             // boss (raised emblem)
+    g.fillStyle = GP.base; g.fillRect(3, 18, 3, 3);
+    g.fillStyle = GP.hi;   g.fillRect(3, 18, 1, 1);
+    g.fillStyle = '#0a0a14'; g.fillRect(1, 11, 1, 1); g.fillRect(7, 11, 1, 1); // rivets
+    g.fillStyle = '#0a0a14'; g.fillRect(1, 28, 1, 1); g.fillRect(7, 28, 1, 1);
+  });
+
+  // Phase I — Enemy Variety: NECROMANCER (robed caster, staff, single purple eye)
+  makeSprite('necromancer', 24, 34, (g) => {
+    const H = PAL.hood, C = PAL.cloak, B = PAL.belt;
+    const purple    = '#a040c0';
+    const purpleHot = '#e080ff';
+    // Robe (full silhouette, no boots — hem hangs)
+    g.fillStyle = C.sh;   g.fillRect(3, 11, 18, 22);
+    g.fillStyle = C.base; g.fillRect(4, 12, 16, 20);
+    g.fillStyle = C.hi;   g.fillRect(5, 14, 3, 16);
+    g.fillStyle = C.hi;   g.fillRect(15, 14, 1, 16);
+    // Hem with irregular bottom (rag-like)
+    g.fillStyle = H.sh;
+    g.fillRect(3, 30, 18, 3);
+    g.fillRect(3, 32, 2, 2); g.fillRect(7, 32, 2, 2);
+    g.fillRect(11, 32, 2, 2); g.fillRect(15, 32, 2, 2); g.fillRect(18, 32, 2, 2);
+    // Belt with embedded purple gem
+    g.fillStyle = B.sh;   g.fillRect(4, 20, 16, 2);
+    g.fillStyle = B.base; g.fillRect(4, 20, 16, 1);
+    g.fillStyle = purple; g.fillRect(11, 20, 2, 2);
+    g.fillStyle = purpleHot; g.fillRect(11, 20, 1, 1);
+    // Hood (overhangs the face deeper than the player's)
+    g.fillStyle = H.sh;   g.fillRect(2,  2, 20, 13);
+    g.fillStyle = H.base; g.fillRect(3,  3, 18, 11);
+    g.fillStyle = H.hi;   g.fillRect(3,  3, 18,  2);
+    g.fillStyle = H.hi;   g.fillRect(3,  4,  2,  9);
+    // Face — pure shadow (only the eye reads)
+    g.fillStyle = '#000'; g.fillRect(8, 9, 8, 5);
+    // SINGLE purple eye — the necromancer signature
+    g.fillStyle = purple;    g.fillRect(11, 10, 2, 2);
+    g.fillStyle = purpleHot; g.fillRect(11, 10, 1, 1);
+    g.fillStyle = '#5a1880'; g.fillRect(10, 12, 4, 1);   // dim glow halo below
+    // STAFF (right side) — tall shaft + crystal orb on top
+    g.fillStyle = '#3a2618'; g.fillRect(20,  5, 2, 25);
+    g.fillStyle = '#5a3a22'; g.fillRect(20,  5, 1, 25);
+    g.fillStyle = '#1c1208'; g.fillRect(19, 27, 4, 2);   // grip wrap
+    // Crystal orb (glowing)
+    g.fillStyle = purple;    g.fillRect(19,  1, 4, 4);
+    g.fillStyle = purpleHot; g.fillRect(20,  1, 2, 1);
+    g.fillStyle = purpleHot; g.fillRect(19,  2, 1, 2);
+    g.fillStyle = '#fff';    g.fillRect(20,  2, 1, 1);   // pin-prick highlight
+  });
+
   // GOLD COIN
   makeSprite('coin', 12, 12, (g) => {
     g.fillStyle = '#e0b820'; g.beginPath(); g.ellipse(6,6,5,5,0,0,Math.PI*2); g.fill();
@@ -1038,9 +1196,31 @@ const RARITY_COL = {common:'#aaa', uncommon:'#4caf50', rare:'#2196f3', epic:'#9c
 // ENEMY DEFS
 // ─────────────────────────────────────────────
 const ENEMY_DEFS = {
-  spider: { sprite:'spider', name:'Giant Spider', hp:40, atk:8, xp:25, gold:[5,15], speed:55, aggroR:110, w:22, h:22 },
-  skeleton:{ sprite:'skeleton', name:'Skeleton Warrior', hp:65, atk:14, xp:45, gold:[10,28], speed:40, aggroR:130, w:20, h:28 },
+  spider:      { sprite:'spider',      name:'Giant Spider',     hp:40,  atk:8,  xp:25, gold:[5,15],  speed:55, aggroR:110, w:22, h:22 },
+  skeleton:    { sprite:'skeleton',    name:'Skeleton Warrior', hp:65,  atk:14, xp:45, gold:[10,28], speed:40, aggroR:130, w:20, h:28 },
+  // Phase I — Enemy Variety
+  archer:      { sprite:'archer',      name:'Bone Archer',      hp:45,  atk:12, xp:40, gold:[8,22],  speed:30, aggroR:160, w:20, h:28 },
+  shielder:    { sprite:'shielder',    name:'Shield Bearer',    hp:110, atk:18, xp:60, gold:[15,35], speed:28, aggroR:120, w:22, h:28 },
+  necromancer: { sprite:'necromancer', name:'Necromancer',      hp:80,  atk:10, xp:80, gold:[20,50], speed:22, aggroR:180, w:20, h:30 },
 };
+
+// Phase I — Enemy Variety: weighted spawn table per floor tier. Returns the
+// chosen type id. Uses RNG so the per-floor enemy mix is reproducible from
+// the run seed.
+function pickEnemyType(floorNum) {
+  let table;
+  if      (floorNum <= 2) table = [['spider',0.60], ['skeleton',0.40]];
+  else if (floorNum <= 4) table = [['spider',0.40], ['skeleton',0.35], ['archer',0.25]];
+  else if (floorNum <= 6) table = [['spider',0.25], ['skeleton',0.30], ['archer',0.25], ['shielder',0.15], ['necromancer',0.05]];
+  else                    table = [['spider',0.15], ['skeleton',0.20], ['archer',0.25], ['shielder',0.25], ['necromancer',0.15]];
+  const roll = RNG.next();
+  let acc = 0;
+  for (let i = 0; i < table.length; i++) {
+    acc += table[i][1];
+    if (roll < acc) return table[i][0];
+  }
+  return table[table.length - 1][0];
+}
 
 const SPAWN_POINTS = []; // legacy — replaced by room-based spawning (see populateFloor)
 
@@ -1091,7 +1271,8 @@ const SPELLS = {
         if(!e.alive) return;
         const d = Math.hypot(e.x-p.x, e.y-p.y);
         if(d < radius) {
-          const dmg = Math.max(1, Math.round(p.atk*1.3 + p.level*2));
+          const rawDmg = Math.max(1, Math.round(p.atk*1.3 + p.level*2));
+          const dmg = shieldedDamage(e, rawDmg);   // Phase I — shielder block
           e.hp -= dmg;
           e.iframes = 280;
           hits++;
@@ -1138,6 +1319,14 @@ function spawnEnemy(tx, ty, type) {
     pathCache:  null,                                              // [{tx,ty},...] or null
     pathTarget: null,                                              // {tx,ty} player tile last queried
     pathTimer:  enemies.length * PATH_STAGGER_PER_INDEX_MS,        // ms until next A* re-run
+    // Phase I — Enemy Variety state (only used by the relevant types)
+    bashCd:       0,        // shielder: separate cooldown for bash vs. melee swing
+    shieldedNow:  false,    // shielder: render-time flag for shield-up overlay
+    strafeDir:    1,        // archer: +1/-1, flipped every PATH_STRAFE_FLIP_MS
+    strafeTimer:  600,
+    summonTimer:  4000,     // necromancer: ms until next spider summon
+    summonCount:  0,        // necromancer: alive summons it currently owns
+    summonerRef:  null,     // summoned enemies: backref so killEnemy can decrement
   });
 }
 
@@ -1156,9 +1345,8 @@ function populateFloor() {
     const ty = r.y + RNG.int(0, r.h-1);
     const t = dungeon.map[ty][tx];
     if (t !== T.FLOOR && t !== T.TORCH) continue;
-    // Deeper floors bias toward tougher skeletons
-    const skelBias = Math.min(0.7, 0.35 + GameState.floorNum*0.05);
-    spawnEnemy(tx, ty, RNG.chance(skelBias) ? 'skeleton' : 'spider');
+    // Phase I — Enemy Variety: weighted pick per floor tier.
+    spawnEnemy(tx, ty, pickEnemyType(GameState.floorNum));
     placed++;
   }
 }
@@ -1306,10 +1494,11 @@ function updateProjectiles(dt) {
         if (!e.alive || consumed) continue;
         if (pr.hitSet.has(e)) continue;
         if (rectsOverlap(pr.x,pr.y,pr.w,pr.h, e.x,e.y,e.w,e.h)) {
-          e.hp -= pr.damage;
+          const dmg = shieldedDamage(e, pr.damage);   // Phase I — shielder block
+          e.hp -= dmg;
           e.iframes = 300;
           pr.hitSet.add(e);
-          addLog(`Firebolt — ${e.name} -${pr.damage}`, 'dmg');
+          addLog(`Firebolt — ${e.name} -${dmg}`, 'dmg');
           spawnParticles(e.x, e.y, 6, '#ff8030');
           // small knockback along projectile heading
           const sp = Math.hypot(pr.vx, pr.vy) || 1;
@@ -1514,6 +1703,11 @@ const SFX = {
                          setTimeout(()=>playTone({ type:'triangle', freq:659, dur:0.12, gain:0.14 }), 90);
                          setTimeout(()=>playTone({ type:'triangle', freq:784, dur:0.20, gain:0.14 }), 180); },
   descend:       () => playTone({ type:'sawtooth', freq:200, freqEnd:60,  dur:0.50, gain:0.16 }),
+  // Phase I — Enemy Variety
+  arrow_fire:    () => playTone({ type:'sawtooth', freq:720, freqEnd:360, dur:0.10, gain:0.10 }),
+  shielder_bash: () => { playNoise({ dur:0.12, gain:0.26, lowpass:600 });
+                         playTone({ type:'square', freq:130, freqEnd:55, dur:0.18, gain:0.18 }); },
+  summon:        () => playTone({ type:'sine',     freq:220, freqEnd:660, dur:0.45, gain:0.12 }),
 };
 
 // Load persisted audio settings as soon as the script runs.
@@ -1533,6 +1727,19 @@ function drawProjectiles() {
       ctx.beginPath(); ctx.ellipse(pr.x, pr.y, 5, 5, 0, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = '#fff080';
       ctx.beginPath(); ctx.ellipse(pr.x, pr.y, 2.5, 2.5, 0, 0, Math.PI*2); ctx.fill();
+    } else if (pr.kind === 'arrow') {
+      // Phase I — thin rotated rectangle, no glow halo
+      ctx.save();
+      ctx.translate(pr.x, pr.y);
+      ctx.rotate(Math.atan2(pr.vy, pr.vx));
+      ctx.fillStyle = '#8a5e3a';                 // shaft (wood)
+      ctx.fillRect(-7, -1, 12, 2);
+      ctx.fillStyle = '#2a2018';                 // dark steel tip
+      ctx.fillRect( 4, -1,  3, 2);
+      ctx.fillStyle = '#caa078';                 // fletching
+      ctx.fillRect(-7, -2,  3, 1);
+      ctx.fillRect(-7,  1,  3, 1);
+      ctx.restore();
     } else {
       ctx.fillStyle = '#c0a0ff';
       ctx.fillRect(pr.x-pr.w/2, pr.y-pr.h/2, pr.w, pr.h);
@@ -1734,6 +1941,22 @@ function updateCamera() {
 // ─────────────────────────────────────────────
 // COMBAT
 // ─────────────────────────────────────────────
+// Phase I — Enemy Variety: shielder damage gate.
+// 70% incoming-damage reduction when the shielder is facing the player and
+// within 90 px. Also sets e.shieldedNow so the render pass can draw the
+// shield-up overlay on the matching frame.
+function shieldedDamage(e, dmg) {
+  if (e.type !== 'shielder') return dmg;
+  const facingPlayer = (player.x - e.x) * e.facing > 0;
+  const dist = Math.hypot(player.x - e.x, player.y - e.y);
+  if (dist < 90 && facingPlayer) {
+    e.shieldedNow = true;
+    return Math.max(1, Math.round(dmg * 0.3));
+  }
+  e.shieldedNow = false;
+  return dmg;
+}
+
 function doAttack() {
   if(player.attackCd > 0) return;
   player.attackCd = player.attackCdMax;   // BUG-4 FIXED — was hardcoded 480
@@ -1757,7 +1980,8 @@ function doAttack() {
   enemies.forEach(e => {
     if(!e.alive) return;
     if(Math.hypot(ax-e.x, ay-e.y) < 44) {
-      const dmg = Math.max(1, player.atk + Math.floor(Math.random()*5-2));
+      const rawDmg = Math.max(1, player.atk + Math.floor(Math.random()*5-2));
+      const dmg = shieldedDamage(e, rawDmg);   // Phase I — shielder block
       e.hp -= dmg;
       e.iframes = 300;
       hit = true;
@@ -1781,20 +2005,47 @@ function killEnemy(e) {
   addLog(`Defeated ${e.name}! +${e.xp} XP`, 'kill');
   player.xp += e.xp;
 
-  // Phase B: per-type death dissolve
+  // Phase I — if this enemy was a Necromancer's summon, free its slot so
+  // the necromancer can summon again. Safe even if necromancer is already
+  // dead (no AI runs after alive=false).
+  if (e.summonerRef && e.summonerRef.summonCount > 0) {
+    e.summonerRef.summonCount--;
+  }
+
+  // Phase B + Phase I: per-type death dissolve
   if (e.type === 'spider') {
     spawnParticleBurst(e.x, e.y, 22,
       ['#2e1414', '#5a1818', '#0a0408', '#1e0c0c'],
       { speed:140, upBias:40, lifeMul:1.8, sizeMin:2, sizeMax:5 });
-  } else if (e.type === 'skeleton') {
+  } else if (e.type === 'skeleton' || e.type === 'archer') {
+    // Archer reuses the skeleton bone burst (per spec).
     spawnParticleBurst(e.x, e.y, 18,
       ['#c8bea0', '#b8ad8c', '#d4cab0', '#6e6450', '#0a0a0a'],
       { speed:110, upBias:30, lifeMul:1.6, sizeMin:2, sizeMax:4 });
+  } else if (e.type === 'shielder') {
+    // Bone burst + metal sparks (shield + sword shattering).
+    spawnParticleBurst(e.x, e.y, 16,
+      ['#c8bea0', '#b8ad8c', '#6e6450', '#0a0a0a'],
+      { speed:110, upBias:30, lifeMul:1.6, sizeMin:2, sizeMax:4 });
+    spawnParticleBurst(e.x, e.y, 10,
+      ['#cfd4e0', '#9aa0b0', '#4a4e58', '#ffffff'],
+      { speed:160, upBias:50, lifeMul:1.4, sizeMin:1, sizeMax:3 });
+  } else if (e.type === 'necromancer') {
+    // Purple/dark arcane dissolve.
+    spawnParticleBurst(e.x, e.y, 26,
+      ['#5a1880', '#a040c0', '#e080ff', '#1c0a28', '#0a0408'],
+      { speed:150, upBias:50, lifeMul:2.0, sizeMin:2, sizeMax:5 });
   } else {
     spawnParticles(e.x, e.y, 8, '#cc4420');
   }
-  // Phase G: per-type death sound
-  if (SFX['death_' + e.type]) SFX['death_' + e.type]();
+  // Phase G + Phase I: death sound. New skeletal variants share the
+  // skeleton crunch; necromancer uses spider (deeper, organic) as the
+  // closest existing match.
+  const deathSfxKey =
+    (e.type === 'archer' || e.type === 'shielder')   ? 'death_skeleton' :
+    (e.type === 'necromancer')                        ? 'death_spider'  :
+    ('death_' + e.type);
+  if (SFX[deathSfxKey]) SFX[deathSfxKey]();
 
   const g = Math.floor(Math.random()*(e.gold[1]-e.gold[0])+e.gold[0]);
   spawnGold(e.x, e.y, g);
@@ -2155,9 +2406,9 @@ function drawGame(dt) {
         p.y - sprites[p.sprite].height/2 + bob);
     } else if (d.kind === 'enemy') {
       const e = d.ref;
-      // Phase B: bone-rattle jitter on aggro'd skeletons.
+      // Phase B + Phase I: bone-rattle jitter on aggro'd skeletal variants.
       let jx = 0, jy = 0;
-      if (e.type === 'skeleton' && e.aggro) {
+      if ((e.type === 'skeleton' || e.type === 'archer' || e.type === 'shielder') && e.aggro) {
         jx = Math.sin(torchPhase*38 + e.x*0.13) * 1.4;
         jy = Math.cos(torchPhase*42 + e.y*0.11) * 0.9;
       }
@@ -2171,6 +2422,17 @@ function drawGame(dt) {
         ctx.restore();
       } else {
         drawSprite(e.sprite, sx, sy, false, alpha);
+      }
+      // Phase I — shielder: highlight when actively blocking.
+      if (e.type === 'shielder' && e.shieldedNow) {
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = '#80c0ff';
+        // Overlay a thin slab in front of the shielder, on its facing side,
+        // to read as the raised tower shield.
+        const ox = e.facing < 0 ? (e.x - e.w/2 - 6) : (e.x + e.w/2 - 2);
+        ctx.fillRect(ox, e.y - e.h/2 + 2, 8, e.h - 6);
+        ctx.restore();
       }
       // HP bar — anchored to true position (no jitter).
       const bw=26, bh=4;
@@ -2258,6 +2520,80 @@ function drawGame(dt) {
     ctx.fillStyle='#888'; ctx.font='9px Courier New';
     ctx.fillText('Refresh to try again', VIEW_W/2, VIEW_H/2+14);
   }
+}
+
+// ─────────────────────────────────────────────
+// Phase I — Enemy Variety: per-type AI helpers
+// (kept out of the main update() loop so the chase branch stays readable)
+// ─────────────────────────────────────────────
+
+// Archer fires an arrow projectile straight at the player's current position.
+// Reuses the existing spawnProjectile({owner:'enemy'}) damage path wired in
+// Phase 3, so collision with the player runs through the standard
+// updateProjectiles enemy-owned branch.
+function archerFire(e) {
+  const ang = Math.atan2(player.y - e.y, player.x - e.x);
+  spawnProjectile({
+    x: e.x + Math.cos(ang)*10,
+    y: e.y + Math.sin(ang)*10,
+    vx: Math.cos(ang)*200, vy: Math.sin(ang)*200,
+    w: 8, h: 6, life: 1800,
+    owner: 'enemy',
+    damage: e.atk,
+    kind: 'arrow',
+  });
+  SFX.arrow_fire();
+  e.attackCd = 1800;
+}
+
+// Shielder bash: heavier damage, brief player iframes, and a 40-px knockback
+// stepped through moveEntity so the player respects collision (no tunnelling
+// through walls/pillars).
+function shielderBash(e) {
+  if (player.iframes <= 0) {
+    const dmg = Math.max(1, Math.round(e.atk * 1.5) - Math.floor(player.def * 0.5));
+    player.hp = Math.max(0, player.hp - dmg);
+    player.iframes = 800;
+    addLog(`${e.name} bashes you for ${dmg}!`, 'dmg');
+    triggerDamageVignette();
+    triggerShake(5, 200);
+    updateHUD();
+    if (player.hp <= 0) playerDie();
+    const ang = Math.atan2(player.y - e.y, player.x - e.x);
+    const stepPx = 8, totalPx = 40;
+    const steps = Math.ceil(totalPx / stepPx);
+    for (let s = 0; s < steps; s++) {
+      moveEntity(player, Math.cos(ang) * stepPx, Math.sin(ang) * stepPx, 1);
+    }
+  }
+  SFX.shielder_bash();
+  e.bashCd = 2200;
+}
+
+// Necromancer summons a single spider at a random walkable tile within ~2
+// tiles. Tags the spider with summonerRef so killEnemy() can decrement the
+// necromancer's summonCount on death.
+function necromancerSummon(e) {
+  if (!dungeon || !dungeon.walkGrid) return;
+  const eTX = Math.floor(e.x / TILE), eTY = Math.floor(e.y / TILE);
+  const candidates = [];
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+    if (dx === 0 && dy === 0) continue;
+    const tx = eTX + dx, ty = eTY + dy;
+    if (!walkAt(tx, ty)) continue;
+    const wx = tx * TILE + TILE/2, wy = ty * TILE + TILE/2;
+    if (Math.hypot(wx - e.x, wy - e.y) > 64) continue;
+    candidates.push({ tx, ty, wx, wy });
+  }
+  if (candidates.length === 0) return;
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  spawnEnemy(pick.tx, pick.ty, 'spider');
+  const summon = enemies[enemies.length - 1];
+  summon.summonerRef = e;
+  e.summonCount++;
+  SFX.summon();
+  spawnParticles(pick.wx, pick.wy, 14, '#a040c0');   // arrival cloud
+  spawnParticles(e.x, e.y - 8,        6,  '#e080ff');// cast tell at staff
 }
 
 // ─────────────────────────────────────────────
@@ -2364,25 +2700,26 @@ function update(dt) {
   // ── ENEMIES ──
   enemies.forEach(e => {
     if(!e.alive) return;
-    e.attackCd = Math.max(0, e.attackCd-dt);
-    e.iframes = Math.max(0, e.iframes-dt);
-    const dist = Math.hypot(player.x-e.x, player.y-e.y);
+    e.attackCd = Math.max(0, e.attackCd - dt);
+    e.bashCd   = Math.max(0, e.bashCd   - dt);     // Phase I (shielder)
+    e.iframes  = Math.max(0, e.iframes  - dt);
+    // Phase I: clear the shield-up render flag — shieldedDamage() will
+    // set it back to true on the same frame the shielder actually blocks.
+    if (e.type === 'shielder' && e.shieldedNow) e.shieldedNow = false;
+    const dist = Math.hypot(player.x - e.x, player.y - e.y);
 
     if(dist < e.aggroR) {
       // ── Phase H — A* Pathfinding chase ──
       e.aggro = true;
       e.pathTimer -= dt;
 
-      // Tile coords for both ends of the pursuit (cheap; reused below).
       const eTX = Math.floor(e.x / TILE);
       const eTY = Math.floor(e.y / TILE);
       const pTX = Math.floor(player.x / TILE);
       const pTY = Math.floor(player.y / TILE);
       const tileDist = Math.abs(pTX - eTX) + Math.abs(pTY - eTY);
 
-      // Decide: direct chase vs. follow a path.
-      // - Within PATH_DIRECT_CHASE_TILES → no pathfinding overhead.
-      // - LOS clear via Bresenham over walkGrid → no pathfinding either.
+      // Direct chase vs. A* path (LOS-gated).
       let usePath = false;
       if (tileDist >= PATH_DIRECT_CHASE_TILES && !losTiles(eTX, eTY, pTX, pTY)) {
         usePath = true;
@@ -2390,9 +2727,6 @@ function update(dt) {
 
       let targetX = player.x, targetY = player.y;
       if (usePath) {
-        // Recalc when: cache empty, timer expired, OR player tile changed
-        // since the last query (so player darting across a doorway forces
-        // an immediate re-plan).
         const targetMoved = !e.pathTarget || e.pathTarget.tx !== pTX || e.pathTarget.ty !== pTY;
         if (!e.pathCache || e.pathCache.length === 0 || e.pathTimer <= 0 || targetMoved) {
           e.pathCache  = aStar(eTX, eTY, pTX, pTY);
@@ -2410,33 +2744,90 @@ function update(dt) {
               targetX = nwp.tx * TILE + TILE / 2;
               targetY = nwp.ty * TILE + TILE / 2;
             }
-            // else: cache emptied this frame — targetX/Y stay on player as fallback
           } else {
             targetX = wpX;
             targetY = wpY;
           }
         }
-        // pathCache null → A* found no path (isolated region etc.).
-        // targetX/Y stay on player; moveEntity will at least slide along
-        // the obstacle rather than visibly stalling.
       } else {
-        // Direct chase — drop any stale path so it doesn't reappear later.
         e.pathCache = null;
       }
 
+      // ── Phase I — per-type movement target overrides ──
+      // Decide if this enemy wants to "hold position" this frame.
+      let holdPosition = false;
+
+      if (e.type === 'archer') {
+        // Preferred range: 80–140 px. Strafe perpendicular when too close,
+        // approach (via path/direct) when too far, hold position in band.
+        if (dist < 80) {
+          e.strafeTimer -= dt;
+          if (e.strafeTimer <= 0) { e.strafeDir *= -1; e.strafeTimer = 600; }
+          // Perpendicular vector to (player→archer), times strafe sign.
+          const ang = Math.atan2(player.y - e.y, player.x - e.x);
+          const px  = -Math.sin(ang) * e.strafeDir;
+          const py  =  Math.cos(ang) * e.strafeDir;
+          targetX = e.x + px * 64;
+          targetY = e.y + py * 64;
+          e.pathCache = null;                        // strafe overrides pathing
+        } else if (dist <= 140) {
+          holdPosition = true;                       // in preferred band — stand and shoot
+        }
+        // dist > 140 → fall through to the existing path/direct target
+      } else if (e.type === 'necromancer') {
+        // Stays > 100 px. If too close, retreat directly away from player.
+        if (dist < 100) {
+          const ang = Math.atan2(e.y - player.y, e.x - player.x);   // away from player
+          targetX = e.x + Math.cos(ang) * 64;
+          targetY = e.y + Math.sin(ang) * 64;
+          e.pathCache = null;
+        } else if (dist < 180) {
+          holdPosition = true;                       // safe distance — cast and summon
+        }
+      }
+
       const angle   = Math.atan2(targetY - e.y, targetX - e.x);
-      // Close-range slowdown only when chasing directly (the "circling for
-      // a swing" feel). Mid-pathing through a corridor stays at full speed.
-      const closeIn = !usePath && dist < 50;
-      const spd     = e.speed * (closeIn ? 0.4 : 1);
-      moveEntity(e, Math.cos(angle)*spd, Math.sin(angle)*spd, dt*0.001);
+      const closeIn = !usePath && dist < 50 && (e.type === 'spider' || e.type === 'skeleton' || e.type === 'shielder');
+      const spd     = holdPosition ? 0 : e.speed * (closeIn ? 0.4 : 1);
+      if (spd > 0) moveEntity(e, Math.cos(angle)*spd, Math.sin(angle)*spd, dt*0.001);
       e.facing = player.x > e.x ? 1 : -1;
       e.walkPhase += dt * 0.006;
 
-      // Attack — based on true (world-space) distance to player.
-      if (dist < 28 && e.attackCd <= 0) {
-        e.attackCd = 1100;
-        enemyAttackPlayer(e);
+      // ── Phase I — per-type attack / ability dispatch ──
+      switch (e.type) {
+        case 'archer':
+          // Fire when in preferred range and the bow is ready.
+          if (dist >= 80 && dist <= 140 && e.attackCd <= 0) {
+            archerFire(e);
+          }
+          break;
+
+        case 'shielder':
+          // Bash takes priority when in bash range AND the bash is off CD.
+          if (dist < 32 && e.bashCd <= 0) {
+            shielderBash(e);
+          } else if (dist < 28 && e.attackCd <= 0) {
+            e.attackCd = 1400;
+            enemyAttackPlayer(e);
+          }
+          break;
+
+        case 'necromancer':
+          // Tick summon timer regardless of distance (cast happens at
+          // safe stand-off). Cap at 2 alive summons per necromancer.
+          e.summonTimer -= dt;
+          if (e.summonTimer <= 0 && e.summonCount < 2) {
+            necromancerSummon(e);
+            e.summonTimer = 4000;
+          }
+          break;
+
+        default:
+          // spider / skeleton — original melee swing.
+          if (dist < 28 && e.attackCd <= 0) {
+            e.attackCd = 1100;
+            enemyAttackPlayer(e);
+          }
       }
     } else {
       // Out of aggro range — wander unchanged. Drop any cached path so
@@ -2466,7 +2857,7 @@ function update(dt) {
       if (t!==T.FLOOR && t!==T.TORCH) continue;
       const wx = tx*TILE+TILE/2, wy = ty*TILE+TILE/2;
       if (Math.hypot(wx-player.x, wy-player.y) < 200) continue; // not on top of player
-      spawnEnemy(tx, ty, Math.random()<0.5?'spider':'skeleton');
+      spawnEnemy(tx, ty, pickEnemyType(GameState.floorNum));   // Phase I — weighted by floor
       break;
     }
   }
