@@ -306,6 +306,26 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   .inventory-cards { flex-direction: column; align-items:stretch; max-width:300px; }
   .item-card { max-width:none; flex:0 0 auto; }
 }
+
+/* Phase K — Boss Floors: full-width boss health bar at top of screen */
+#boss-hp {
+  position:absolute; top:34px; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,0.86); border:1px solid #6a3030; border-radius:3px;
+  padding:4px 12px 5px; min-width:260px; max-width:80vw;
+  z-index:5; pointer-events:none; display:none;
+  font-family:'Courier New',monospace;
+}
+#boss-hp.show { display:block; }
+.boss-name  { color:#ff7060; font-size:11px; letter-spacing:3px; text-align:center; }
+.boss-bar-bg {
+  height:9px; background:#1a0000; border:1px solid #3a1010;
+  margin:4px 0 2px; border-radius:2px; overflow:hidden;
+}
+.boss-bar-fill {
+  height:100%; background:linear-gradient(90deg,#7a1a1a,#e03030);
+  transition:width 0.18s;
+}
+.boss-stats { color:#aaa; font-size:9px; text-align:center; }
 </style>
 </head>
 <body>
@@ -334,6 +354,12 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
       <div class="stat-row">ATK:<span id="atk-v"> 12</span> &nbsp;DEF:<span id="def-v"> 5</span></div>
     </div>
     <div id="floor-label">☠ The Cursed Keep — Floor 1</div>
+    <!-- Phase K — Boss Floors: shown only when a boss is alive on this floor -->
+    <div id="boss-hp">
+      <div class="boss-name"></div>
+      <div class="boss-bar-bg"><div class="boss-bar-fill" style="width:100%"></div></div>
+      <div class="boss-stats"></div>
+    </div>
     <div id="minimap-wrap"><canvas id="minimap" width="72" height="72"></canvas></div>
     <div id="log-panel" style="display:none"></div>
     <div id="hotbar-panel">
@@ -986,6 +1012,147 @@ function buildSprites() {
     g.fillStyle = '#fff';    g.fillRect(20,  2, 1, 1);   // pin-prick highlight
   });
 
+  // Phase K — Boss Floors: BONE COLOSSUS (giant skeleton, two-handed maul,
+  // cracked skull crown, red ember eyes)
+  makeSprite('colossus', 48, 56, (g) => {
+    const Bn = PAL.bone, R = PAL.rag, M = PAL.metal, GP = PAL.gold;
+    // Massive legs
+    g.fillStyle = Bn.sh;   g.fillRect(13, 40, 5, 16); g.fillRect(30, 40, 5, 16);
+    g.fillStyle = Bn.base; g.fillRect(13, 40, 4, 16); g.fillRect(30, 40, 4, 16);
+    g.fillStyle = Bn.hi;   g.fillRect(13, 40, 1, 14); g.fillRect(30, 40, 1, 14);
+    g.fillStyle = '#0a0a0a'; g.fillRect(13, 54, 5, 2); g.fillRect(30, 54, 5, 2);
+    // Wide pelvis
+    g.fillStyle = Bn.sh;   g.fillRect(8, 34, 32, 7);
+    g.fillStyle = Bn.base; g.fillRect(9, 35, 30, 4);
+    // Tattered waist rag
+    g.fillStyle = R.sh;   g.fillRect(6, 33, 36, 8);
+    g.fillRect(6, 41, 4, 4); g.fillRect(13, 41, 3, 3);
+    g.fillRect(22, 41, 3, 4); g.fillRect(30, 41, 3, 3); g.fillRect(38, 41, 4, 4);
+    g.fillStyle = R.base; g.fillRect(6, 33, 36, 5);
+    // Massive ribcage
+    g.fillStyle = Bn.sh;   g.fillRect(8, 18, 32, 18);
+    g.fillStyle = Bn.base; g.fillRect(9, 19, 30, 14);
+    // Spine
+    g.fillStyle = Bn.sh;   g.fillRect(23, 18, 4, 16);
+    g.fillStyle = Bn.base; g.fillRect(23, 18, 2, 16);
+    // Ribs
+    for (let i = 0; i < 5; i++) {
+      const ry = 19 + i*3;
+      g.fillStyle = Bn.sh;   g.fillRect(10, ry+2, 28, 1);
+      g.fillStyle = Bn.base; g.fillRect(10, ry,   28, 2);
+    }
+    // Massive shoulder pauldrons
+    g.fillStyle = M.sh;   g.fillRect(2, 16, 10, 12); g.fillRect(36, 16, 10, 12);
+    g.fillStyle = M.base; g.fillRect(3, 17, 8, 10);  g.fillRect(37, 17, 8, 10);
+    g.fillStyle = M.hi;   g.fillRect(3, 17, 8, 2);   g.fillRect(37, 17, 8, 2);
+    // Arms (thick bone)
+    g.fillStyle = Bn.sh;   g.fillRect(4, 24, 6, 14); g.fillRect(38, 24, 6, 14);
+    g.fillStyle = Bn.base; g.fillRect(4, 24, 4, 14); g.fillRect(40, 24, 4, 14);
+    // Skull (large, wider)
+    g.fillStyle = Bn.sh;   g.fillRect(11, 0, 26, 20);
+    g.fillStyle = Bn.base; g.fillRect(12, 1, 24, 18);
+    g.fillStyle = Bn.hi;   g.fillRect(12, 1, 24,  3);
+    g.fillStyle = Bn.hi;   g.fillRect(12, 1,  2, 18);
+    // Cracked crown — jagged shards on top of skull
+    g.fillStyle = GP.sh;   g.fillRect(13, 0, 22, 3);
+    g.fillStyle = GP.base; g.fillRect(13, 0, 22, 2);
+    g.fillStyle = GP.hi;
+    // Five jagged points
+    g.fillRect(14, -0, 2, 2); g.fillRect(19, -0, 2, 3);
+    g.fillRect(23, -0, 2, 4); g.fillRect(28, -0, 2, 3); g.fillRect(33, -0, 2, 2);
+    // Skull cracks
+    g.fillStyle = Bn.sh;
+    g.fillRect(22, 4, 1, 6); g.fillRect(23, 8, 1, 1); g.fillRect(22, 11, 1, 2);
+    g.fillRect(30, 5, 1, 5);
+    // Hollow eye sockets (giant)
+    g.fillStyle = '#000';
+    g.fillRect(15, 7, 7, 6);
+    g.fillRect(26, 7, 7, 6);
+    // Brow shadow
+    g.fillStyle = Bn.sh;
+    g.fillRect(14, 6, 9, 2); g.fillRect(25, 6, 9, 2);
+    // RED EMBER GLOW (the menacing tell)
+    g.fillStyle = '#ff2020'; g.fillRect(17, 9, 3, 2); g.fillRect(28, 9, 3, 2);
+    g.fillStyle = '#ff8080'; g.fillRect(18, 9, 1, 1); g.fillRect(29, 9, 1, 1);
+    // Nasal cavity
+    g.fillStyle = '#000'; g.fillRect(22, 14, 4, 3);
+    // Teeth grimace
+    g.fillStyle = Bn.sh;   g.fillRect(14, 17, 20, 2);
+    g.fillStyle = Bn.base; g.fillRect(14, 18, 20, 1);
+    g.fillStyle = '#000';
+    for (let i = 0; i < 7; i++) g.fillRect(15 + i*3, 18, 1, 1);
+    // TWO-HANDED MAUL (right side, big stone hammer)
+    g.fillStyle = '#3a2618'; g.fillRect(43, 8, 3, 30);   // shaft
+    g.fillStyle = '#5a3a22'; g.fillRect(43, 8, 1, 30);
+    g.fillStyle = M.sh;      g.fillRect(40, 4, 8, 10);   // hammer head outer
+    g.fillStyle = M.base;    g.fillRect(41, 5, 6,  8);
+    g.fillStyle = M.hi;      g.fillRect(41, 5, 6,  2);
+    g.fillStyle = GP.sh;     g.fillRect(43, 7, 2, 2);    // band
+    g.fillStyle = '#0a0a14'; g.fillRect(41, 6, 1, 1); g.fillRect(46, 6, 1, 1);  // rivets
+  });
+
+  // Phase K — Boss Floors: BROOD MOTHER (massive spider, swollen abdomen
+  // with egg-sac dots, multiple eye rows, thick articulated legs)
+  makeSprite('broodmother', 44, 44, (g) => {
+    const Ch = PAL.chitin;
+    // 8 thick articulated legs (2-pixel width via two parallel strokes)
+    g.strokeStyle = Ch.sh; g.lineWidth = 2;
+    const legsL = [
+      [[15,12],[ 4, 6],[ 0,12]],
+      [[15,17],[ 2,12],[-1,18]],
+      [[15,22],[ 2,24],[-1,30]],
+      [[15,27],[ 5,32],[ 1,40]],
+    ];
+    const legsR = [
+      [[29,12],[40, 6],[44,12]],
+      [[29,17],[42,12],[45,18]],
+      [[29,22],[42,24],[45,30]],
+      [[29,27],[39,32],[43,40]],
+    ];
+    function drawLeg(seg) {
+      g.beginPath();
+      g.moveTo(seg[0][0]+0.5, seg[0][1]+0.5);
+      g.lineTo(seg[1][0]+0.5, seg[1][1]+0.5);
+      g.lineTo(seg[2][0]+0.5, seg[2][1]+0.5);
+      g.stroke();
+      // joint nubs
+      g.fillStyle = Ch.sh; g.fillRect(seg[1][0]-1, seg[1][1]-1, 3, 3);
+    }
+    legsL.forEach(drawLeg);
+    legsR.forEach(drawLeg);
+    // ABDOMEN (huge, egg-swollen)
+    g.fillStyle = Ch.sh;   g.beginPath(); g.ellipse(22, 28, 13, 12, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = Ch.base; g.beginPath(); g.ellipse(22, 28, 11, 10, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = Ch.hi;   g.beginPath(); g.ellipse(19, 25,  5,  3, 0, 0, Math.PI*2); g.fill();
+    // Egg-sac dots (red eggs visible through abdomen)
+    g.fillStyle = '#5a1818'; g.fillRect(17,28,2,2); g.fillRect(22,30,2,2); g.fillRect(26,28,2,2);
+    g.fillStyle = '#5a1818'; g.fillRect(19,33,2,2); g.fillRect(24,33,2,2); g.fillRect(20,26,2,2);
+    g.fillStyle = '#a04040'; g.fillRect(17,28,1,1); g.fillRect(22,30,1,1); g.fillRect(26,28,1,1);
+    // Segmentation
+    g.fillStyle = Ch.sh;
+    g.fillRect(12, 28, 20, 1); g.fillRect(14, 32, 16, 1);
+    // CEPHALOTHORAX (smaller, front)
+    g.fillStyle = Ch.sh;   g.beginPath(); g.ellipse(22, 14, 10, 7, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = Ch.base; g.beginPath(); g.ellipse(22, 14,  8, 5, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = Ch.hi;   g.fillRect(18, 10, 8, 1);
+    // MULTIPLE EYE ROWS — top row of 4, bottom row of 2
+    g.fillStyle = '#1a0404';
+    g.fillRect(15, 10, 3, 2); g.fillRect(19, 10, 3, 2);
+    g.fillRect(23, 10, 3, 2); g.fillRect(27, 10, 3, 2);
+    g.fillRect(18, 14, 3, 2); g.fillRect(24, 14, 3, 2);
+    // Glowing red cores
+    g.fillStyle = PAL.bloodE;
+    g.fillRect(16, 11, 1, 1); g.fillRect(20, 11, 1, 1);
+    g.fillRect(24, 11, 1, 1); g.fillRect(28, 11, 1, 1);
+    g.fillRect(19, 15, 1, 1); g.fillRect(25, 15, 1, 1);
+    g.fillStyle = PAL.bloodH;
+    g.fillRect(20, 10, 1, 1); g.fillRect(24, 10, 1, 1);
+    // Massive fangs
+    g.fillStyle = Ch.sh;  g.fillRect(18, 18, 2, 4); g.fillRect(25, 18, 2, 4);
+    g.fillStyle = '#caa078'; g.fillRect(18, 18, 1, 2); g.fillRect(25, 18, 1, 2);
+    g.fillStyle = '#caa078'; g.fillRect(19, 22, 1, 1); g.fillRect(26, 22, 1, 1);  // dripping tips
+  });
+
   // GOLD COIN
   makeSprite('coin', 12, 12, (g) => {
     g.fillStyle = '#e0b820'; g.beginPath(); g.ellipse(6,6,5,5,0,0,Math.PI*2); g.fill();
@@ -1237,6 +1404,8 @@ const player = {
   hotTimer:0,        // ms until next HoT tick
   hotInterval:500,   // ms between HoT ticks
   hotHeal:0,         // HP per HoT tick
+  // Phase K — Boss Floors: slow debuff (Brood Mother web hits set this)
+  slowTimer:0,       // ms remaining of 50% movement-speed reduction
 };
 
 let enemies = [];
@@ -1289,7 +1458,14 @@ const ENEMY_DEFS = {
   archer:      { sprite:'archer',      name:'Bone Archer',      hp:45,  atk:12, xp:40, gold:[8,22],  speed:30, aggroR:160, w:20, h:28 },
   shielder:    { sprite:'shielder',    name:'Shield Bearer',    hp:110, atk:18, xp:60, gold:[15,35], speed:28, aggroR:120, w:22, h:28 },
   necromancer: { sprite:'necromancer', name:'Necromancer',      hp:80,  atk:10, xp:80, gold:[20,50], speed:22, aggroR:180, w:20, h:30 },
+  // Phase K — Boss Floors (isBoss flag drives the boss HP bar, stair gating, death rewards).
+  colossus:    { sprite:'colossus',    name:'Bone Colossus',    hp:800, atk:35, xp:500, gold:[150,300], speed:22, aggroR:9999, w:40, h:48, isBoss:true },
+  broodmother: { sprite:'broodmother', name:'Brood Mother',     hp:650, atk:28, xp:500, gold:[120,260], speed:35, aggroR:9999, w:38, h:38, isBoss:true },
 };
+
+function isBossEnemy(e) {
+  return !!(e && ENEMY_DEFS[e.type] && ENEMY_DEFS[e.type].isBoss);
+}
 
 // Phase I — Enemy Variety: weighted spawn table per floor tier. Returns the
 // chosen type id. Uses RNG so the per-floor enemy mix is reproducible from
@@ -1414,6 +1590,8 @@ function spawnEnemy(tx, ty, type) {
     summonTimer:  4000,     // necromancer: ms until next spider summon
     summonCount:  0,        // necromancer: alive summons it currently owns
     summonerRef:  null,     // summoned enemies: backref so killEnemy can decrement
+    // Phase K — Boss Floors: phase tracking for multi-stage HP threshold AI
+    phase: 1,
   });
 }
 
@@ -1421,6 +1599,7 @@ function spawnEnemy(tx, ty, type) {
 function populateFloor() {
   enemies = [];
   const spawnRoom = dungeon.rooms[0];
+  const bossRoom  = dungeon.bossRoom;     // Phase K
   // Enemy budget grows with floor depth
   const budget = 6 + Math.floor(GameState.floorNum * 1.5);
   const types = ['spider','skeleton'];
@@ -1432,9 +1611,20 @@ function populateFloor() {
     const ty = r.y + RNG.int(0, r.h-1);
     const t = dungeon.map[ty][tx];
     if (t !== T.FLOOR && t !== T.TORCH) continue;
+    // Phase K — never place trash mobs inside the boss arena.
+    if (bossRoom &&
+        tx >= bossRoom.x && tx < bossRoom.x + bossRoom.w &&
+        ty >= bossRoom.y && ty < bossRoom.y + bossRoom.h) continue;
     // Phase I — Enemy Variety: weighted pick per floor tier.
     spawnEnemy(tx, ty, pickEnemyType(GameState.floorNum));
     placed++;
+  }
+  // Phase K — spawn the boss at the centre of its arena.
+  if (bossRoom) {
+    const bx = bossRoom.x + Math.floor(bossRoom.w / 2);
+    const by = bossRoom.y + Math.floor(bossRoom.h / 2);
+    const bossType = ((GameState.floorNum / 5) % 2 === 1) ? 'colossus' : 'broodmother';
+    spawnEnemy(bx, by, bossType);
   }
 }
 
@@ -1598,19 +1788,29 @@ function updateProjectiles(dt) {
       toKill.forEach(killEnemy);
       if (consumed) projectiles.splice(i,1);
     } else if (pr.owner==='enemy') {
-      // Reserved for Phase 4 ranged enemies — already wired
-      if (player.iframes<=0 &&
-          rectsOverlap(pr.x,pr.y,pr.w,pr.h, player.x,player.y,player.w,player.h)) {
-        const dmg = Math.max(1, pr.damage - Math.floor(player.def*0.5));
-        player.hp = Math.max(0, player.hp - dmg);
-        player.iframes = 700;
-        addLog(`Hit for ${dmg}!`, 'dmg');
-        triggerDamageVignette();
-        triggerShake(4, 160);
-        spawnParticles(player.x, player.y, 6, '#e04040');
-        updateHUD();
-        if (player.hp<=0) playerDie();
-        projectiles.splice(i,1);
+      // Phase I + Phase K — enemy-owned projectiles. Web is a special-case
+      // that bypasses the damage path entirely (no HP loss, no iframes —
+      // it's a debuff applier, not a hit).
+      if (rectsOverlap(pr.x,pr.y,pr.w,pr.h, player.x,player.y,player.w,player.h)) {
+        if (pr.kind === 'web') {
+          // Apply slow regardless of iframes; web is utility, not damage.
+          player.slowTimer = 2000;
+          addLog('Webbed! Slowed.', 'dmg');
+          spawnParticles(player.x, player.y, 16, '#d0d0e0');
+          spawnParticles(player.x, player.y, 8,  '#7080a0');
+          projectiles.splice(i,1);
+        } else if (player.iframes <= 0) {
+          const dmg = Math.max(1, pr.damage - Math.floor(player.def*0.5));
+          player.hp = Math.max(0, player.hp - dmg);
+          player.iframes = 700;
+          addLog(`Hit for ${dmg}!`, 'dmg');
+          triggerDamageVignette();
+          triggerShake(4, 160);
+          spawnParticles(player.x, player.y, 6, '#e04040');
+          updateHUD();
+          if (player.hp<=0) playerDie();
+          projectiles.splice(i,1);
+        }
       }
     }
   }
@@ -1799,6 +1999,14 @@ const SFX = {
   shielder_bash: () => { playNoise({ dur:0.12, gain:0.26, lowpass:600 });
                          playTone({ type:'square', freq:130, freqEnd:55, dur:0.18, gain:0.18 }); },
   summon:        () => playTone({ type:'sine',     freq:220, freqEnd:660, dur:0.45, gain:0.12 }),
+  // Phase K — Boss Floors
+  boss_slam:     () => { playNoise({ dur:0.45, gain:0.30, lowpass:380 });
+                         playTone({ type:'square',   freq:70,  freqEnd:30, dur:0.50, gain:0.22 }); },
+  boss_roar:     () => playTone({ type:'sawtooth', freq:300, freqEnd:55,  dur:0.70, gain:0.22 }),
+  boss_phase:    () => { playTone({ type:'square', freq:660, dur:0.14, gain:0.18 });
+                         setTimeout(()=>playTone({ type:'square', freq:440, dur:0.14, gain:0.18 }), 170);
+                         setTimeout(()=>playTone({ type:'square', freq:660, dur:0.14, gain:0.18 }), 340);
+                         setTimeout(()=>playTone({ type:'square', freq:440, dur:0.20, gain:0.18 }), 510); },
 };
 
 // Load persisted audio settings as soon as the script runs.
@@ -1830,6 +2038,36 @@ function drawProjectiles() {
       ctx.fillStyle = '#caa078';                 // fletching
       ctx.fillRect(-7, -2,  3, 1);
       ctx.fillRect(-7,  1,  3, 1);
+      ctx.restore();
+    } else if (pr.kind === 'bone') {
+      // Phase K — Colossus phase 2 ranged: tumbling bone shard
+      ctx.save();
+      ctx.translate(pr.x, pr.y);
+      ctx.rotate(Math.atan2(pr.vy, pr.vx) + pr.spinPhase);
+      ctx.fillStyle = '#d4cab0';
+      ctx.fillRect(-6, -2, 12, 4);
+      ctx.fillStyle = '#6e6450';
+      ctx.fillRect(-6, -2,  1, 4);
+      ctx.fillRect( 5, -2,  1, 4);
+      // Knobs at ends
+      ctx.fillRect(-6, -3,  3, 6);
+      ctx.fillRect( 3, -3,  3, 6);
+      ctx.restore();
+    } else if (pr.kind === 'web') {
+      // Phase K — Brood Mother web: gray crosshatch blob, no damage on hit (sets slowTimer instead)
+      ctx.save();
+      ctx.translate(pr.x, pr.y);
+      ctx.fillStyle = 'rgba(200,210,225,0.85)';
+      ctx.beginPath(); ctx.ellipse(0, 0, 8, 8, 0, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#5a6878';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a)*-8, Math.sin(a)*-8);
+        ctx.lineTo(Math.cos(a)* 8, Math.sin(a)* 8);
+        ctx.stroke();
+      }
       ctx.restore();
     } else {
       ctx.fillStyle = '#c0a0ff';
@@ -2096,11 +2334,37 @@ function killEnemy(e) {
   addLog(`Defeated ${e.name}! +${e.xp} XP`, 'kill');
   player.xp += e.xp;
 
-  // Phase I — if this enemy was a Necromancer's summon, free its slot so
-  // the necromancer can summon again. Safe even if necromancer is already
-  // dead (no AI runs after alive=false).
+  // Phase I — if this enemy was a Necromancer's summon (or a Brood Mother
+  // summon in Phase K), free the slot so the summoner can summon again.
+  // Safe even if the summoner is already dead.
   if (e.summonerRef && e.summonerRef.summonCount > 0) {
     e.summonerRef.summonCount--;
+  }
+
+  // Phase K — Boss Floors: death rewards + stair reveal. Guaranteed
+  // rarity-floor drop, gold bonus, full player HP, big roar.
+  if (isBossEnemy(e)) {
+    dungeon.bossDefeated = true;
+    revealBossStair();
+    SFX.boss_roar();
+    triggerShake(8, 500);
+    // Drop pool: epic+ for colossus, rare+ for broodmother.
+    const minTiers = (e.type === 'colossus')
+      ? ['epic','legendary']
+      : ['rare','epic','legendary'];
+    let pool = LOOT.filter(it => minTiers.includes(it.rarity));
+    if (pool.length === 0) pool = LOOT.filter(it => it.rarity === 'rare');
+    if (pool.length === 0) pool = LOOT;
+    const drop = pool[Math.floor(Math.random() * pool.length)];
+    spawnItem(e.x, e.y - 18, drop);
+    // Gold bonus on top of the rolled drop.
+    const bonusGold = (e.type === 'colossus') ? 300 : 250;
+    spawnGold(e.x, e.y + 6, bonusGold);
+    // Full player heal as a victory mercy.
+    player.hp = player.maxHp;
+    updateHUD();
+    updateBossHP();
+    addLog(`${e.name} falls. HP restored.`, 'lvl');
   }
 
   // Phase B + Phase I: per-type death dissolve
@@ -2241,6 +2505,12 @@ function loadFloor() {
     }
   }
   dungeon.walkGrid = wg;
+  // Phase K — Boss Floors: every 5th floor. Carve a guaranteed boss
+  // arena and hide the stair until the boss dies. setupBossFloor()
+  // patches the walkGrid too, so this stays consistent.
+  dungeon.bossRoom     = null;
+  dungeon.bossDefeated = false;
+  if (GameState.floorNum % 5 === 0) setupBossFloor();
   player.x = dungeon.spawn.x*TILE + TILE/2;
   player.y = dungeon.spawn.y*TILE + TILE/2;
   // snap camera so we don't slide in from old position
@@ -2252,8 +2522,16 @@ function loadFloor() {
   projectiles = [];
   populateFloor();
   drawMinimap();
-  document.getElementById('floor-label').textContent =
-    `☠ The Cursed Keep — Floor ${GameState.floorNum}`;
+  // Phase K — boss-themed floor label when this is a boss floor.
+  if (dungeon.bossRoom) {
+    const bossName = ((GameState.floorNum / 5) % 2 === 1) ? 'Bone Colossus' : 'Brood Mother';
+    document.getElementById('floor-label').textContent =
+      `☠ BOSS FLOOR — ${bossName}`;
+  } else {
+    document.getElementById('floor-label').textContent =
+      `☠ The Cursed Keep — Floor ${GameState.floorNum}`;
+  }
+  updateBossHP();   // immediately sync the boss HP bar (hide on non-boss floors)
 }
 
 function descendFloor() {
@@ -2304,6 +2582,24 @@ function updateHUD() {
   document.getElementById('def-v').textContent = ' '+p.def;
   document.getElementById('gold-v').textContent = p.gold;
 }
+// Phase K — Boss Floors: top-of-screen boss HP bar. Hidden when no boss
+// is alive on the current floor; shows name, hp/maxHp, and current phase.
+function updateBossHP() {
+  const bar = document.getElementById('boss-hp');
+  if (!bar) return;
+  const boss = enemies && enemies.find(e => e.alive && isBossEnemy(e));
+  if (!boss) {
+    bar.classList.remove('show');
+    return;
+  }
+  bar.classList.add('show');
+  bar.querySelector('.boss-name').textContent = boss.name.toUpperCase();
+  const pct = Math.max(0, boss.hp / boss.maxHp);
+  bar.querySelector('.boss-bar-fill').style.width = (pct * 100).toFixed(1) + '%';
+  bar.querySelector('.boss-stats').textContent =
+    `${Math.max(0, boss.hp | 0)} / ${boss.maxHp} — Phase ${boss.phase || 1}`;
+}
+
 function updateHotbar() {
   const hb = document.getElementById('hotbar');
   const slots = [];
@@ -2497,9 +2793,13 @@ function drawGame(dt) {
         p.y - sprites[p.sprite].height/2 + bob);
     } else if (d.kind === 'enemy') {
       const e = d.ref;
-      // Phase B + Phase I: bone-rattle jitter on aggro'd skeletal variants.
+      // Phase B + Phase I + Phase K: bone-rattle jitter on aggro'd skeletal
+      // variants. Colossus (boss) gets a heavier, slower wobble for weight.
       let jx = 0, jy = 0;
-      if ((e.type === 'skeleton' || e.type === 'archer' || e.type === 'shielder') && e.aggro) {
+      if (e.type === 'colossus' && e.aggro) {
+        jx = Math.sin(torchPhase*22 + e.x*0.09) * 2.2;
+        jy = Math.cos(torchPhase*26 + e.y*0.07) * 1.4;
+      } else if ((e.type === 'skeleton' || e.type === 'archer' || e.type === 'shielder') && e.aggro) {
         jx = Math.sin(torchPhase*38 + e.x*0.13) * 1.4;
         jy = Math.cos(torchPhase*42 + e.y*0.11) * 0.9;
       }
@@ -2525,14 +2825,18 @@ function drawGame(dt) {
         ctx.fillRect(ox, e.y - e.h/2 + 2, 8, e.h - 6);
         ctx.restore();
       }
-      // HP bar — anchored to true position (no jitter).
-      const bw=26, bh=4;
-      const bx=e.x-bw/2, by=e.y-e.h/2-8;
-      ctx.fillStyle='#2a0000'; ctx.fillRect(bx,by,bw,bh);
-      const pct=Math.max(0, e.hp/e.maxHp);
-      ctx.fillStyle = pct>0.5 ? '#20cc40' : pct>0.25 ? '#e0a020' : '#e02020';
-      ctx.fillRect(bx, by, bw*pct, bh);
-      ctx.strokeStyle='#000'; ctx.lineWidth=0.5; ctx.strokeRect(bx,by,bw,bh);
+      // HP bar — anchored to true position (no jitter). Skipped for
+      // bosses because the dedicated top-of-screen #boss-hp bar is the
+      // canonical readout (Phase K).
+      if (!isBossEnemy(e)) {
+        const bw=26, bh=4;
+        const bx=e.x-bw/2, by=e.y-e.h/2-8;
+        ctx.fillStyle='#2a0000'; ctx.fillRect(bx,by,bw,bh);
+        const pct=Math.max(0, e.hp/e.maxHp);
+        ctx.fillStyle = pct>0.5 ? '#20cc40' : pct>0.25 ? '#e0a020' : '#e02020';
+        ctx.fillRect(bx, by, bw*pct, bh);
+        ctx.strokeStyle='#000'; ctx.lineWidth=0.5; ctx.strokeRect(bx,by,bw,bh);
+      }
     } else if (d.kind === 'player') {
       const bob = player.idle ? Math.sin(player.breathPhase) * 0.6 : 0;
       // Phase D: attack lunge — forward bob peaks mid-swing.
@@ -2661,6 +2965,235 @@ function shielderBash(e) {
   e.bashCd = 2200;
 }
 
+// ─────────────────────────────────────────────
+// Phase K — Boss Floors
+// Per-boss AI helpers + boss-room setup. Bosses share the standard chase
+// pathing (aggroR is huge, so they're always pursuing) but override the
+// attack/ability dispatch in the enemies.forEach switch with phase-aware
+// logic. Phase transitions key off the e.phase field initialised in
+// spawnEnemy and checked each frame against HP %.
+// ─────────────────────────────────────────────
+
+// Brief full-screen flash via the damage-vignette element. Used for boss
+// phase transitions — the existing red/blue vignette restorer in update()
+// takes over once the timeout fires.
+function triggerPhaseFlash() {
+  const v = document.getElementById('damage-vignette');
+  if (!v) return;
+  v.style.boxShadow = 'inset 0 0 220px rgba(255,255,255,0.78)';
+  setTimeout(() => {
+    // Revert. update()'s vignette routine will re-paint next frame based on
+    // current vigTimer / slowTimer state.
+    v.style.boxShadow = 'inset 0 0 60px rgba(200,30,30,0)';
+  }, 180);
+}
+
+// Check + advance boss phase based on HP%. Fires phase-transition SFX,
+// shake, flash, and a log line. Idempotent (only fires on the actual
+// 1→2 transition because e.phase becomes 2 afterwards).
+function checkBossPhase(e) {
+  if (e.phase !== 1) return;
+  const pct = e.hp / e.maxHp;
+  if (e.type === 'colossus' && pct <= 0.5) {
+    e.phase = 2;
+    e.speed = 38;
+    triggerShake(8, 400);
+    triggerPhaseFlash();
+    SFX.boss_phase();
+    SFX.boss_roar();
+    addLog('The Colossus enters a rage!', 'lvl');
+  } else if (e.type === 'broodmother' && pct <= 0.4) {
+    e.phase = 2;
+    e.speed = 50;
+    triggerShake(6, 350);
+    triggerPhaseFlash();
+    SFX.boss_phase();
+    SFX.boss_roar();
+    addLog('The Brood Mother calls her children!', 'lvl');
+  }
+}
+
+// Colossus slam: 60-px AoE, atk×2 damage to player if within radius.
+// Strong screenshake + bone-particle ring + boss_slam SFX.
+function colossusSlam(e) {
+  e.attackCd = 2500;
+  SFX.boss_slam();
+  triggerShake(7, 350);
+  for (let i = 0; i < 28; i++) {
+    const ang = (i / 28) * Math.PI * 2;
+    const spd = 130 + Math.random()*45;
+    particles.push({
+      x: e.x, y: e.y,
+      vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd,
+      life: 1.6, maxLife: 1.6,
+      col: ['#c8bea0','#b8ad8c','#d4cab0','#6e6450'][i % 4],
+      size: 3 + Math.random()*2,
+    });
+  }
+  hitFlashes.push({ x: e.x, y: e.y, life: 1, maxLife: 1, scale: 4 });
+  // Damage check
+  const d = Math.hypot(player.x - e.x, player.y - e.y);
+  if (d < 60 && player.iframes <= 0) {
+    const dmg = Math.max(1, e.atk * 2 - Math.floor(player.def * 0.5));
+    player.hp = Math.max(0, player.hp - dmg);
+    player.iframes = 700;
+    addLog(`SLAM! -${dmg} HP`, 'dmg');
+    triggerDamageVignette();
+    updateHUD();
+    if (player.hp <= 0) playerDie();
+  }
+}
+
+// Colossus phase-2 ranged attack: thrown bone shard. Uses bashCd as the
+// secondary cooldown slot so it stays independent of slam timing.
+function colossusBoneThrow(e) {
+  e.bashCd = 1800;
+  const ang = Math.atan2(player.y - e.y, player.x - e.x);
+  spawnProjectile({
+    x: e.x + Math.cos(ang)*22,
+    y: e.y + Math.sin(ang)*22,
+    vx: Math.cos(ang)*180, vy: Math.sin(ang)*180,
+    w: 12, h: 8, life: 1800,
+    owner: 'enemy',
+    damage: Math.round(e.atk * 1.2),
+    kind: 'bone',
+  });
+  SFX.arrow_fire();   // closest reusable "ranged release" tone
+}
+
+// Brood Mother web spit: utility projectile, no damage, applies slow on hit.
+function broodmotherWebSpit(e) {
+  e.bashCd = 3000;
+  const ang = Math.atan2(player.y - e.y, player.x - e.x);
+  spawnProjectile({
+    x: e.x + Math.cos(ang)*22,
+    y: e.y + Math.sin(ang)*22,
+    vx: Math.cos(ang)*140, vy: Math.sin(ang)*140,
+    w: 14, h: 14, life: 1600,
+    owner: 'enemy',
+    damage: 0,
+    kind: 'web',
+  });
+  SFX.arrow_fire();
+}
+
+// Brood Mother phase-2 summon: 2 spiders per cast, max 4 active. Tags each
+// with summonerRef so killEnemy decrements summonCount on summon death.
+function broodmotherSummon(e) {
+  if (!dungeon || !dungeon.walkGrid) return;
+  const eTX = Math.floor(e.x / TILE), eTY = Math.floor(e.y / TILE);
+  // Spawn up to 2 per call (but never exceed the cap of 4).
+  const toSpawn = Math.min(2, 4 - e.summonCount);
+  for (let n = 0; n < toSpawn; n++) {
+    const candidates = [];
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const tx = eTX + dx, ty = eTY + dy;
+      if (!walkAt(tx, ty)) continue;
+      const wx = tx * TILE + TILE/2, wy = ty * TILE + TILE/2;
+      if (Math.hypot(wx - e.x, wy - e.y) > 96) continue;
+      candidates.push({ tx, ty, wx, wy });
+    }
+    if (candidates.length === 0) break;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    spawnEnemy(pick.tx, pick.ty, 'spider');
+    const sp = enemies[enemies.length - 1];
+    sp.summonerRef = e;
+    e.summonCount++;
+    spawnParticles(pick.wx, pick.wy, 12, '#5a1818');
+    spawnParticles(pick.wx, pick.wy,  6, '#a04040');
+  }
+  if (toSpawn > 0) SFX.summon();
+}
+
+// Carve out a guaranteed boss room (min 12×10) on boss floors, hide stair
+// until kill, rebuild walkGrid afterward. Returns the boss room rect.
+function setupBossFloor() {
+  if (!dungeon || !dungeon.rooms || dungeon.rooms.length < 2) return null;
+  const spawnRoom = dungeon.rooms[0];
+  // Pick the candidate furthest from spawn (most likely the existing stair
+  // room) — biggest distance keeps the boss fight feeling like an arrival.
+  let best = null, bestD = -1;
+  for (const r of dungeon.rooms) {
+    if (r === spawnRoom) continue;
+    const cx = r.x + r.w/2, cy = r.y + r.h/2;
+    const d = Math.abs(cx - dungeon.spawn.x) + Math.abs(cy - dungeon.spawn.y);
+    if (d > bestD) { bestD = d; best = r; }
+  }
+  if (!best) return null;
+
+  const minW = 12, minH = 10;
+  const cx = best.x + best.w/2;
+  const cy = best.y + best.h/2;
+  let nw = Math.max(best.w, minW);
+  let nh = Math.max(best.h, minH);
+  let nx = Math.floor(cx - nw / 2);
+  let ny = Math.floor(cy - nh / 2);
+  // Clamp to map interior (keep 1-tile border for wall sealing).
+  nw = Math.min(nw, COLS - 2);
+  nh = Math.min(nh, ROWS - 2);
+  if (nx < 1) nx = 1;
+  if (ny < 1) ny = 1;
+  if (nx + nw > COLS - 1) nx = COLS - 1 - nw;
+  if (ny + nh > ROWS - 1) ny = ROWS - 1 - nh;
+
+  // Carve the boss room — clear walls, pillars, spikes inside the rect.
+  for (let y = ny; y < ny + nh; y++) {
+    for (let x = nx; x < nx + nw; x++) {
+      const t = dungeon.map[y][x];
+      if (t === T.WALL || t === T.PILLAR || t === T.SPIKE) {
+        dungeon.map[y][x] = T.FLOOR;
+      }
+    }
+  }
+
+  dungeon.bossRoom      = { x: nx, y: ny, w: nw, h: nh };
+  dungeon.bossDefeated  = false;
+
+  // Hide stair until the boss dies. Save its position; relocate it if it
+  // ended up inside the boss room (otherwise stepping on the boss tile
+  // would auto-descend the moment it dies, before the player can react).
+  if (dungeon.stairPos) {
+    const sp = dungeon.stairPos;
+    if (dungeon.map[sp.y][sp.x] === T.STAIR) {
+      dungeon.map[sp.y][sp.x] = T.FLOOR;
+    }
+    if (sp.x >= nx && sp.x < nx + nw && sp.y >= ny && sp.y < ny + nh) {
+      // Relocate to the farthest non-boss-room room from spawn.
+      let alt = null, altD = -1;
+      for (const r of dungeon.rooms) {
+        if (r === spawnRoom) continue;
+        const rcx = Math.floor(r.x + r.w/2), rcy = Math.floor(r.y + r.h/2);
+        if (rcx >= nx && rcx < nx+nw && rcy >= ny && rcy < ny+nh) continue;
+        const d = Math.abs(rcx - dungeon.spawn.x) + Math.abs(rcy - dungeon.spawn.y);
+        if (d > altD) { altD = d; alt = { x: rcx, y: rcy }; }
+      }
+      if (alt) dungeon.stairPos = alt;
+    }
+  }
+
+  // Rebuild walkGrid since we may have flipped wall/pillar tiles.
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      dungeon.walkGrid[y * COLS + x] = isSolid(dungeon.map[y][x]) ? 0 : 1;
+    }
+  }
+  return dungeon.bossRoom;
+}
+
+// Reveal stair on boss kill with a particle burst at its tile.
+function revealBossStair() {
+  if (!dungeon || !dungeon.stairPos) return;
+  const sp = dungeon.stairPos;
+  dungeon.map[sp.y][sp.x] = T.STAIR;
+  if (dungeon.walkGrid) dungeon.walkGrid[sp.y * COLS + sp.x] = 1;
+  const wx = sp.x * TILE + TILE/2, wy = sp.y * TILE + TILE/2;
+  spawnParticleBurst(wx, wy, 28, ['#a080ff','#8060ff','#c0a0ff','#ffd040','#fff080'],
+    { speed:220, upBias:60, lifeMul:1.8, sizeMin:3, sizeMax:6 });
+  spawnParticles(wx, wy, 18, '#a080ff');
+  addLog('The staircase materializes!', 'lvl');
+}
+
 // Necromancer summons a single spider at a random walkable tile within ~2
 // tiles. Tags the spider with summonerRef so killEnemy() can decrement the
 // necromancer's summonCount on death.
@@ -2733,9 +3266,11 @@ function update(dt) {
   if(dx!==0) player.facing = dx>0?1:-1;
 
   player.idle = (dx===0 && dy===0);
+  // Phase K — Brood Mother web slow: halves movement speed while slowTimer > 0.
+  const effSpeed = player.slowTimer > 0 ? player.speed * 0.5 : player.speed;
   if(dx!==0||dy!==0) {
     player.walkPhase += dt*0.008;
-    moveEntity(player, dx*player.speed, dy*player.speed, dt*0.001);
+    moveEntity(player, dx*effSpeed, dy*effSpeed, dt*0.001);
   } else {
     // Idle breathing — advance only when not moving (visual-only, draw-time bob).
     player.breathPhase += dt*0.003;
@@ -2891,7 +3426,7 @@ function update(dt) {
       e.facing = player.x > e.x ? 1 : -1;
       e.walkPhase += dt * 0.006;
 
-      // ── Phase I — per-type attack / ability dispatch ──
+      // ── Phase I + Phase K — per-type attack / ability dispatch ──
       switch (e.type) {
         case 'archer':
           // Fire when in preferred range and the bow is ready.
@@ -2917,6 +3452,40 @@ function update(dt) {
           if (e.summonTimer <= 0 && e.summonCount < 2) {
             necromancerSummon(e);
             e.summonTimer = 4000;
+          }
+          break;
+
+        case 'colossus':
+          // Phase K — boss. Tick phase transition then dispatch abilities.
+          checkBossPhase(e);
+          // Slam (always available, 2500ms cd, 60-px AoE).
+          if (dist < 60 && e.attackCd <= 0) colossusSlam(e);
+          // Phase 2 only: ranged bone throw on the secondary cooldown.
+          if (e.phase === 2) {
+            e.bashCd = Math.max(0, e.bashCd - 0); // already ticked at top
+            if (dist > 50 && e.bashCd <= 0) colossusBoneThrow(e);
+          }
+          break;
+
+        case 'broodmother':
+          // Phase K — boss. Phase check + abilities.
+          checkBossPhase(e);
+          // Standard melee bite when close.
+          if (dist < 28 && e.attackCd <= 0) {
+            e.attackCd = 1100;
+            enemyAttackPlayer(e);
+          }
+          // Web spit — both phases, 3000ms cd. Use bashCd as the cd slot.
+          if (dist >= 40 && dist <= 200 && e.bashCd <= 0) {
+            broodmotherWebSpit(e);
+          }
+          // Phase 2: summon spiders on summonTimer (every 2500ms).
+          if (e.phase === 2) {
+            e.summonTimer -= dt;
+            if (e.summonTimer <= 0 && e.summonCount < 4) {
+              broodmotherSummon(e);
+              e.summonTimer = 2500;
+            }
           }
           break;
 
@@ -3016,14 +3585,26 @@ function update(dt) {
 
   // ── HOTBAR / SPELL BUTTON FX (throttled DOM refresh for CD overlays) ──
   hotbarTimer -= dt;
-  if (hotbarTimer <= 0) { updateHotbar(); hotbarTimer = 150; }
+  if (hotbarTimer <= 0) { updateHotbar(); updateBossHP(); hotbarTimer = 150; }
   refreshSpellButtons();
 
   // ── SHAKE / VIG ──
   shakeTimer -= dt;
   if(shakeTimer<=0) shakeAmt=0;
+  // Phase K — Brood Mother slow: tick the timer and override the vignette
+  // to a blue tint while it's active. Damage vignette (red) wins when both
+  // overlap because vigTimer is checked first.
+  player.slowTimer = Math.max(0, player.slowTimer - dt);
   vigTimer -= dt;
-  if(vigTimer<=0) document.getElementById('damage-vignette').style.boxShadow='inset 0 0 60px rgba(200,30,30,0)';
+  if (vigTimer <= 0) {
+    if (player.slowTimer > 0) {
+      const a = Math.min(0.55, (player.slowTimer / 2000) * 0.55);
+      document.getElementById('damage-vignette').style.boxShadow =
+        `inset 0 0 70px rgba(60,140,220,${a})`;
+    } else {
+      document.getElementById('damage-vignette').style.boxShadow = 'inset 0 0 60px rgba(200,30,30,0)';
+    }
+  }
 
   // ── TOOLTIP TIMER ──
   tooltipTimer -= dt;
