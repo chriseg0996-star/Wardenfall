@@ -565,7 +565,11 @@ const RNG = (() => {
   const int = (a, b) => Math.floor(a + next() * (b - a + 1)); // inclusive
   const pick = (arr) => arr[Math.floor(next() * arr.length)];
   const chance = (p) => next() < p;
-  return { seed, next, range, int, pick, chance };
+  // Phase N — state save/restore so callers (e.g. buildSprites) can use the
+  // seeded RNG without polluting dungeon-gen state.
+  const getState = () => state;
+  const setState = (s) => { state = s >>> 0; };
+  return { seed, next, range, int, pick, chance, getState, setState };
 })();
 
 // ─────────────────────────────────────────────
@@ -742,7 +746,7 @@ function buildSprites() {
     g.beginPath(); g.moveTo(TILE/2,0); g.lineTo(TILE/2,TILE); g.stroke();
     // grunge dots
     g.fillStyle = 'rgba(0,0,0,0.2)';
-    for(let i=0;i<5;i++) g.fillRect(Math.random()*28+2, Math.random()*28+2, 1, 1);
+    for(let i=0;i<5;i++) g.fillRect(RNG.next()*28+2, RNG.next()*28+2, 1, 1);   // BUG-4 FIXED — reproducible grunge
   });
 
   // WALL
@@ -1634,6 +1638,8 @@ const player = {
   hotHeal:0,         // HP per HoT tick
   // Phase K — Boss Floors: slow debuff (Brood Mother web hits set this)
   slowTimer:0,       // ms remaining of 50% movement-speed reduction
+  // Phase N — Polish: footstep dust pacing
+  footstepTimer:0,
 };
 
 let enemies = [];
@@ -1782,6 +1788,7 @@ const SPELLS = {
           const dmg = shieldedDamage(e, rawDmg);   // Phase I — shielder block
           e.hp -= dmg;
           RunStats.damageDealt += dmg;             // Phase L
+          spawnFloatingText(e.x, e.y - e.h/2, dmg, '#fff');   // Phase N
           e.iframes = 280;
           hits++;
           spawnParticles(e.x, e.y, 6, '#a0d8ff');
@@ -1837,6 +1844,9 @@ function spawnEnemy(tx, ty, type) {
     summonerRef:  null,     // summoned enemies: backref so killEnemy can decrement
     // Phase K — Boss Floors: phase tracking for multi-stage HP threshold AI
     phase: 1,
+    // Phase N — attack telegraph
+    windupTimer:   0,       // ms remaining of pre-attack flash
+    pendingAttack: null,    // 'melee'|'bash'|'slam'|'bone'|'arrow'|'web' or null
   });
 }
 
@@ -1955,6 +1965,50 @@ function spawnParticleBurst(x, y, count, cols, opts) {
       size: sMin + Math.random()*(sMax - sMin),
     });
   }
+}
+
+// ─────────────────────────────────────────────
+// Phase N — Polish: floating damage/heal numbers above entities.
+// Drawn in world space (inside camera transform) so they sit above the
+// fight and get masked by the fog of war like everything else. Capped at
+// 30 entries to keep the draw cost stable even during AoE chains.
+// ─────────────────────────────────────────────
+let floatingTexts = [];
+const FLOATING_TEXT_MAX = 30;
+
+function spawnFloatingText(x, y, text, color) {
+  floatingTexts.push({
+    x, y: y - 4,
+    vy: -30,                  // px/s upward
+    text: String(text),
+    life: 1.0,
+    color: color || '#fff',
+  });
+  if (floatingTexts.length > FLOATING_TEXT_MAX) floatingTexts.shift();
+}
+
+function updateFloatingTexts(dt) {
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const t = floatingTexts[i];
+    t.y   += t.vy * dt * 0.001;
+    t.life -= dt * 0.00125;   // 800ms lifetime
+    if (t.life <= 0) floatingTexts.splice(i, 1);
+  }
+}
+
+function drawFloatingTexts() {
+  if (floatingTexts.length === 0) return;
+  ctx.save();
+  ctx.font = 'bold 10px Courier New';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  for (let i = 0; i < floatingTexts.length; i++) {
+    const t = floatingTexts[i];
+    ctx.globalAlpha = Math.max(0, Math.min(1, t.life));
+    ctx.fillStyle = t.color;
+    ctx.fillText(t.text, t.x, t.y);
+  }
+  ctx.restore();
 }
 
 // ─────────────────────────────────────────────
@@ -2078,6 +2132,7 @@ function updateProjectiles(dt) {
           e.iframes = 300;
           pr.hitSet.add(e);
           RunStats.damageDealt += dmg;                // Phase L
+          spawnFloatingText(e.x, e.y - e.h/2, dmg, '#fff');   // Phase N
           addLog(`Firebolt — ${e.name} -${dmg}`, 'dmg');
           spawnParticles(e.x, e.y, 6, '#ff8030');
           // small knockback along projectile heading
@@ -2101,12 +2156,14 @@ function updateProjectiles(dt) {
           addLog('Webbed! Slowed.', 'dmg');
           spawnParticles(player.x, player.y, 16, '#d0d0e0');
           spawnParticles(player.x, player.y, 8,  '#7080a0');
+          spawnFloatingText(player.x, player.y - player.h/2, 'SLOW', '#a0c0ff');  // Phase N
           projectiles.splice(i,1);
         } else if (player.iframes <= 0) {
           const dmg = Math.max(1, pr.damage - Math.floor(player.def*0.5));
           player.hp = Math.max(0, player.hp - dmg);
           player.iframes = 700;
           RunStats.damageTaken += dmg;    // Phase L
+          spawnFloatingText(player.x, player.y - player.h/2, dmg, '#e05050');   // Phase N
           addLog(`Hit for ${dmg}!`, 'dmg');
           triggerDamageVignette();
           triggerShake(4, 160);
@@ -2299,6 +2356,10 @@ const SFX = {
   chest_open:    () => { playTone({ type:'triangle', freq:440, dur:0.10, gain:0.13 });
                          setTimeout(()=>playTone({ type:'triangle', freq:587, dur:0.10, gain:0.13 }),  80);
                          setTimeout(()=>playTone({ type:'triangle', freq:784, dur:0.18, gain:0.13 }), 160); },
+  // Phase N — Polish
+  chest_shimmer: (g) => playTone({ type:'triangle', freq:1320, dur:0.20, gain: (g != null ? g : 0.04) }),
+  footstep:      () => playNoise({ dur:0.03, gain:0.04, lowpass:300 }),
+  ui_select:     () => playTone({ type:'square', freq:880, freqEnd:1180, dur:0.05, gain:0.10 }),
   // Phase I — Enemy Variety
   arrow_fire:    () => playTone({ type:'sawtooth', freq:720, freqEnd:360, dur:0.10, gain:0.10 }),
   shielder_bash: () => { playNoise({ dur:0.12, gain:0.26, lowpass:600 });
@@ -2624,6 +2685,7 @@ function doAttack() {
       const dmg = shieldedDamage(e, rawDmg);   // Phase I — shielder block
       e.hp -= dmg;
       RunStats.damageDealt += dmg;             // Phase L
+      spawnFloatingText(e.x, e.y - e.h/2, dmg, '#fff');   // Phase N
       e.iframes = 300;
       hit = true;
       addLog(`Hit ${e.name} for ${dmg}`, 'dmg');
@@ -2733,6 +2795,7 @@ function enemyAttackPlayer(e) {
   player.hp = Math.max(0, player.hp-dmg);
   player.iframes = 700;
   RunStats.damageTaken += dmg;             // Phase L
+  spawnFloatingText(player.x, player.y - player.h/2, dmg, '#e05050');   // Phase N
   addLog(`${e.name} hits you for ${dmg}!`, 'dmg');
   triggerDamageVignette();
   triggerShake(5, 200);
@@ -2747,6 +2810,7 @@ function usePotion() {
   player.hp = Math.min(player.maxHp, player.hp+heal);
   addLog(`Used potion. +${heal} HP`, 'heal');
   spawnParticles(player.x, player.y, 10, '#40ee70');
+  spawnFloatingText(player.x, player.y - player.h/2, `+${heal}`, '#40cc70');   // Phase N
   SFX.potion_drink();              // Phase G
   updateHUD(); updateHotbar();
 }
@@ -2793,7 +2857,7 @@ function checkLevelUp() {
     addLog(`LEVEL UP! Lv.${player.level} — ATK+4 DEF+2 HP full`, 'lvl');
     document.getElementById('lvl-span').textContent = `Lv.${player.level}`;
     spawnParticles(player.x, player.y, 16, '#c060ff');
-    triggerShake(4, 300);
+    triggerShake(3, 200);          // Phase N — tuned down from 4/300
     SFX.level_up();                // Phase G
     updateHUD();
   }
@@ -3074,6 +3138,7 @@ function loadFloor() {
   // motes don't bleed into the new one.
   ambientParticles = [];
   ambientSpawnTimer = 0;
+  floatingTexts    = [];        // Phase N — clear stale dmg numbers across floor changes
   // Phase H — A* Pathfinding: bake walkability once per floor. Flat typed
   // array for fast index lookups; 1 = walkable, 0 = solid. Rebuilt every
   // loadFloor() and read-only afterwards (chest opens flip CHEST→FLOOR
@@ -3126,7 +3191,8 @@ function descendFloor() {
   addLog(`Descending to Floor ${GameState.floorNum}...`, 'lvl');
   // Small reward for clearing a floor
   player.hp = Math.min(player.maxHp, player.hp + Math.round(player.maxHp*0.25));
-  player.potions++;
+  // BUG-3 (Phase N) FIXED — potion stockpile capped at 5 so descents don't snowball.
+  if (player.potions < 5) player.potions++;
   // Phase M — transition card shows the NEW floor's biome banner.
   {
     const cycle = ((GameState.floorNum - 1) % 10);
@@ -3354,8 +3420,27 @@ function drawGame(dt) {
         ctx.drawImage(bs.floor, px, py);
         const bob = Math.sin(torchPhase*2)*1.5;
         ctx.drawImage(sprites.chest, px, py-2+bob);
+        // Phase N — chest shimmer: 1px highlight slides across the lid on
+        // a ~3s sin period. Per-tile phase offset so multiple chests don't
+        // shimmer in unison.
+        const shPhase = torchPhase * 2.1 + tx*0.3 + ty*0.3;
+        const shimX   = (Math.sin(shPhase) * 0.5 + 0.5) * (TILE - 10);
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle   = '#ffe080';
+        ctx.fillRect(px + 5 + shimX, py + 13 + bob, 1, 5);
+        ctx.restore();
       } else if(t===T.STAIR) {
         ctx.drawImage(sprites.stair, px, py);
+        // Phase N — stair pulse: purple radial halo, period 2s,
+        // radius 20→40 px. Guides the eye toward the exit.
+        const sp = (Math.sin(torchPhase * Math.PI) + 1) * 0.5;     // 0..1, 2s period
+        const sr = 20 + sp * 20;
+        const sg = ctx.createRadialGradient(px+16, py+16, 4, px+16, py+16, sr);
+        sg.addColorStop(0, 'rgba(160,80,255,0.40)');
+        sg.addColorStop(1, 'rgba(160,80,255,0)');
+        ctx.fillStyle = sg;
+        ctx.fillRect(px+16-sr, py+16-sr, sr*2, sr*2);
       }
     }
   }
@@ -3422,6 +3507,15 @@ function drawGame(dt) {
         ctx.restore();
       } else {
         drawSprite(e.sprite, sx, sy, false, alpha);
+      }
+      // Phase N — attack telegraph: yellow flash strobing at 25Hz during
+      // the 180ms wind-up so the player has a clear "incoming attack" tell.
+      if (e.windupTimer > 0 && Math.floor(e.windupTimer/40) % 2 === 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle   = '#ffe040';
+        ctx.fillRect(sx, sy, sprites[e.sprite].width, sprites[e.sprite].height);
+        ctx.restore();
       }
       // Phase I — shielder: highlight when actively blocking.
       if (e.type === 'shielder' && e.shieldedNow) {
@@ -3515,6 +3609,9 @@ function drawGame(dt) {
   // camera transform so they live in world space and get masked by the
   // fog of war like everything else.
   drawAmbientParticles();
+  // Phase N — floating damage/heal numbers. Inside the camera transform
+  // so they track the action; outside lighting so they read clearly.
+  drawFloatingTexts();
 
   ctx.restore(); // end camera transform
 
@@ -3527,6 +3624,35 @@ function drawGame(dt) {
   // frame between playerDie() and the overlay's 800ms fade-in.
   if(player.dead) {
     ctx.fillStyle='rgba(60,0,0,0.45)'; ctx.fillRect(0,0,VIEW_W,VIEW_H);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Phase N — Enemy attack telegraph system.
+// Wind-up window (180ms by default) between the AI deciding to attack
+// and the attack landing. Gives the player time to react / dodge / kite.
+// queueAttack() stores the pending action in e.pendingAttack; executeQueued-
+// Attack() runs the matching function when e.windupTimer hits 0. The
+// existing per-type attack functions (enemyAttackPlayer, shielderBash,
+// colossusSlam, archerFire, etc.) still set their own cooldowns inside,
+// so AI loops are naturally guarded against double-queueing.
+// ─────────────────────────────────────────────
+const ATTACK_WINDUP_MS = 180;
+function queueAttack(e, kind) {
+  if (!e || e.windupTimer > 0 || e.pendingAttack) return;   // already winding up
+  e.windupTimer    = ATTACK_WINDUP_MS;
+  e.pendingAttack  = kind;
+}
+function executeQueuedAttack(e) {
+  const kind = e.pendingAttack;
+  e.pendingAttack = null;
+  switch (kind) {
+    case 'melee': enemyAttackPlayer(e); break;
+    case 'bash':  shielderBash(e); break;
+    case 'slam':  colossusSlam(e); break;
+    case 'bone':  colossusBoneThrow(e); break;
+    case 'arrow': archerFire(e); break;
+    case 'web':   broodmotherWebSpit(e); break;
   }
 }
 
@@ -3563,6 +3689,7 @@ function shielderBash(e) {
     player.hp = Math.max(0, player.hp - dmg);
     player.iframes = 800;
     RunStats.damageTaken += dmg;        // Phase L
+    spawnFloatingText(player.x, player.y - player.h/2, dmg, '#e05050');   // Phase N
     addLog(`${e.name} bashes you for ${dmg}!`, 'dmg');
     triggerDamageVignette();
     triggerShake(5, 200);
@@ -3632,7 +3759,7 @@ function checkBossPhase(e) {
 function colossusSlam(e) {
   e.attackCd = 2500;
   SFX.boss_slam();
-  triggerShake(7, 350);
+  triggerShake(10, 500);           // Phase N — bumped from 7/350 for boss weight
   for (let i = 0; i < 28; i++) {
     const ang = (i / 28) * Math.PI * 2;
     const spd = 130 + Math.random()*45;
@@ -3652,6 +3779,7 @@ function colossusSlam(e) {
     player.hp = Math.max(0, player.hp - dmg);
     player.iframes = 700;
     RunStats.damageTaken += dmg;        // Phase L
+    spawnFloatingText(player.x, player.y - player.h/2, dmg, '#e05050');   // Phase N
     addLog(`SLAM! -${dmg} HP`, 'dmg');
     triggerDamageVignette();
     updateHUD();
@@ -3839,6 +3967,24 @@ function necromancerSummon(e) {
 // UPDATE
 // ─────────────────────────────────────────────
 let lastTime=0, mmTimer=0, regenTimer=0, hotbarTimer=0;
+let chestShimmerTimer = 0;        // Phase N — positional chest_shimmer SFX cadence
+
+// Phase N — kicked from update() when the player is actively moving. Spawns
+// two small downward dust motes from the player's feet on a 300 ms cadence,
+// alongside a very-quiet footstep noise.
+function spawnFootstepDust(x, y) {
+  for (let i = 0; i < 2; i++) {
+    particles.push({
+      x: x + (Math.random()-0.5)*6,
+      y,
+      vx: (Math.random()-0.5)*15,
+      vy: 5 + Math.random()*10,
+      life: 0.4, maxLife: 0.4,
+      col: ['#6a5848', '#5a4a3a', '#4a3a28'][Math.floor(Math.random()*3)],
+      size: 1 + Math.random(),
+    });
+  }
+}
 const spellPressed      = [false,false,false];
 const spellPressed_prev = [false,false,false];
 let potionKey_prev = false;       // Phase F: edge-detect for actionActive('potion')
@@ -3886,7 +4032,16 @@ function update(dt) {
   if(dx!==0||dy!==0) {
     player.walkPhase += dt*0.008;
     moveEntity(player, dx*effSpeed, dy*effSpeed, dt*0.001);
+    // Phase N — footstep dust + tiny SFX every 300ms of continuous motion.
+    player.footstepTimer -= dt;
+    if (player.footstepTimer <= 0) {
+      spawnFootstepDust(player.x, player.y + player.h/2);
+      SFX.footstep();
+      player.footstepTimer = 300;
+    }
   } else {
+    player.footstepTimer = 0;   // reset so the next step fires immediately
+    // (original idle branch continues below)
     // Idle breathing — advance only when not moving (visual-only, draw-time bob).
     player.breathPhase += dt*0.003;
   }
@@ -3924,7 +4079,10 @@ function update(dt) {
     if (player.hotTimer <= 0) {
       const before = player.hp;
       player.hp = Math.min(player.maxHp, player.hp + player.hotHeal);
-      if (player.hp > before) spawnParticles(player.x, player.y-6, 3, '#40ee70');
+      if (player.hp > before) {
+        spawnParticles(player.x, player.y-6, 3, '#40ee70');
+        spawnFloatingText(player.x, player.y - player.h/2, `+${player.hp - before}`, '#40cc70');  // Phase N
+      }
       player.hotTicksLeft--;
       player.hotTimer = player.hotInterval;
     }
@@ -3940,6 +4098,8 @@ function update(dt) {
       RunStats.damageTaken += hz.dmg;
       addLog(`${hz.label} -${hz.dmg} HP`, 'dmg');
       triggerDamageVignette();
+      triggerShake(2, 80);                // Phase N — light tactile hazard tell
+      spawnFloatingText(player.x, player.y - player.h/2, hz.dmg, '#e05050');  // Phase N
       updateHUD();
       if (player.hp <= 0) playerDie();
     }
@@ -3956,6 +4116,11 @@ function update(dt) {
     e.attackCd = Math.max(0, e.attackCd - dt);
     e.bashCd   = Math.max(0, e.bashCd   - dt);     // Phase I (shielder)
     e.iframes  = Math.max(0, e.iframes  - dt);
+    // Phase N — telegraph: tick the windup; fire the queued attack on expiry.
+    if (e.windupTimer > 0) {
+      e.windupTimer = Math.max(0, e.windupTimer - dt);
+      if (e.windupTimer === 0 && e.pendingAttack) executeQueuedAttack(e);
+    }
     // Phase I: clear the shield-up render flag — shieldedDamage() will
     // set it back to true on the same frame the shielder actually blocks.
     if (e.type === 'shielder' && e.shieldedNow) e.shieldedNow = false;
@@ -4042,32 +4207,37 @@ function update(dt) {
       const angle   = Math.atan2(targetY - e.y, targetX - e.x);
       const closeIn = !usePath && dist < 50 && (e.type === 'spider' || e.type === 'skeleton' || e.type === 'shielder');
       const spd     = holdPosition ? 0 : e.speed * (closeIn ? 0.4 : 1);
-      if (spd > 0) moveEntity(e, Math.cos(angle)*spd, Math.sin(angle)*spd, dt*0.001);
+      // Phase N — freeze during windup so the yellow telegraph reads.
+      if (spd > 0 && e.windupTimer <= 0) {
+        moveEntity(e, Math.cos(angle)*spd, Math.sin(angle)*spd, dt*0.001);
+      }
       e.facing = player.x > e.x ? 1 : -1;
       e.walkPhase += dt * 0.006;
 
       // ── Phase I + Phase K — per-type attack / ability dispatch ──
+      // Phase N: attacks are now queued via queueAttack() so each one has a
+      // 180ms wind-up tell. queueAttack guards against re-queue during the
+      // active windup, and the queued attack function sets its own cooldown
+      // on execution. Utility abilities (necromancer / broodmother summon)
+      // are NOT telegraphed — they have their own particle tells.
       switch (e.type) {
         case 'archer':
-          // Fire when in preferred range and the bow is ready.
           if (dist >= 80 && dist <= 140 && e.attackCd <= 0) {
-            archerFire(e);
+            queueAttack(e, 'arrow');
           }
           break;
 
         case 'shielder':
-          // Bash takes priority when in bash range AND the bash is off CD.
           if (dist < 32 && e.bashCd <= 0) {
-            shielderBash(e);
+            queueAttack(e, 'bash');
           } else if (dist < 28 && e.attackCd <= 0) {
-            e.attackCd = 1400;
-            enemyAttackPlayer(e);
+            e.attackCd = 1400;          // melee uses inline cd (no helper fn sets it)
+            queueAttack(e, 'melee');
           }
           break;
 
         case 'necromancer':
-          // Tick summon timer regardless of distance (cast happens at
-          // safe stand-off). Cap at 2 alive summons per necromancer.
+          // Summon timer ticks regardless of distance; no telegraph.
           e.summonTimer -= dt;
           if (e.summonTimer <= 0 && e.summonCount < 2) {
             necromancerSummon(e);
@@ -4076,30 +4246,20 @@ function update(dt) {
           break;
 
         case 'colossus':
-          // Phase K — boss. Tick phase transition then dispatch abilities.
           checkBossPhase(e);
-          // Slam (always available, 2500ms cd, 60-px AoE).
-          if (dist < 60 && e.attackCd <= 0) colossusSlam(e);
-          // Phase 2 only: ranged bone throw on the secondary cooldown.
-          if (e.phase === 2) {
-            e.bashCd = Math.max(0, e.bashCd - 0); // already ticked at top
-            if (dist > 50 && e.bashCd <= 0) colossusBoneThrow(e);
-          }
+          if (dist < 60 && e.attackCd <= 0) queueAttack(e, 'slam');
+          if (e.phase === 2 && dist > 50 && e.bashCd <= 0) queueAttack(e, 'bone');
           break;
 
         case 'broodmother':
-          // Phase K — boss. Phase check + abilities.
           checkBossPhase(e);
-          // Standard melee bite when close.
           if (dist < 28 && e.attackCd <= 0) {
             e.attackCd = 1100;
-            enemyAttackPlayer(e);
+            queueAttack(e, 'melee');
           }
-          // Web spit — both phases, 3000ms cd. Use bashCd as the cd slot.
           if (dist >= 40 && dist <= 200 && e.bashCd <= 0) {
-            broodmotherWebSpit(e);
+            queueAttack(e, 'web');
           }
-          // Phase 2: summon spiders on summonTimer (every 2500ms).
           if (e.phase === 2) {
             e.summonTimer -= dt;
             if (e.summonTimer <= 0 && e.summonCount < 4) {
@@ -4113,7 +4273,7 @@ function update(dt) {
           // spider / skeleton — original melee swing.
           if (dist < 28 && e.attackCd <= 0) {
             e.attackCd = 1100;
-            enemyAttackPlayer(e);
+            queueAttack(e, 'melee');
           }
       }
     } else {
@@ -4193,6 +4353,9 @@ function update(dt) {
   // ── Phase M — AMBIENT PARTICLES (bone dust / embers) ──
   updateAmbientParticles(dt);
 
+  // ── Phase N — FLOATING TEXTS (damage / heal numbers) ──
+  updateFloatingTexts(dt);
+
   // ── PROJECTILES ──
   updateProjectiles(dt);
 
@@ -4204,7 +4367,11 @@ function update(dt) {
   regenTimer -= dt;
   if(regenTimer<=0) {
     regenTimer=2500;
-    if(player.mp<player.maxMp) player.mp=Math.min(player.maxMp,player.mp+4);
+    // BUG-2 (Phase N) FIXED — MP regen scales with level (was flat +4/tick).
+    if (player.mp < player.maxMp) {
+      const mpRegen = 4 + Math.floor(player.level * 0.8);
+      player.mp = Math.min(player.maxMp, player.mp + mpRegen);
+    }
     updateHUD();
   }
 
@@ -4219,6 +4386,9 @@ function update(dt) {
   // Phase K — Brood Mother slow: tick the timer and override the vignette
   // to a blue tint while it's active. Damage vignette (red) wins when both
   // overlap because vigTimer is checked first.
+  // Phase N — adds a low-HP pulse (red sin wave @ 1Hz) when player HP < 25%
+  // of maxHp, layered AFTER damage flash + slow tint so it doesn't override
+  // those higher-priority cues.
   player.slowTimer = Math.max(0, player.slowTimer - dt);
   vigTimer -= dt;
   if (vigTimer <= 0) {
@@ -4226,8 +4396,38 @@ function update(dt) {
       const a = Math.min(0.55, (player.slowTimer / 2000) * 0.55);
       document.getElementById('damage-vignette').style.boxShadow =
         `inset 0 0 70px rgba(60,140,220,${a})`;
+    } else if (!player.dead && player.hp > 0 && player.hp < player.maxHp * 0.25) {
+      // 1Hz sin pulse, alpha 0.10 → 0.40
+      const pulse = 0.10 + 0.30 * (0.5 + 0.5 * Math.sin(torchPhase * Math.PI * 2));
+      document.getElementById('damage-vignette').style.boxShadow =
+        `inset 0 0 80px rgba(220,30,30,${pulse.toFixed(3)})`;
     } else {
       document.getElementById('damage-vignette').style.boxShadow = 'inset 0 0 60px rgba(200,30,30,0)';
+    }
+  }
+
+  // Phase N — chest_shimmer SFX cadence. Every 4s, find the nearest chest
+  // and ping a high triangle blip with distance-based gain (max 0.05 at
+  // ≤10 px, fading to 0 at ≥80 px).
+  chestShimmerTimer -= dt;
+  if (chestShimmerTimer <= 0) {
+    chestShimmerTimer = 4000;
+    if (dungeon && dungeon.map) {
+      let bestD = Infinity;
+      for (let yy = 0; yy < ROWS; yy++) {
+        const row = dungeon.map[yy]; if (!row) continue;
+        for (let xx = 0; xx < COLS; xx++) {
+          if (row[xx] === T.CHEST) {
+            const cx = xx*TILE + TILE/2, cy = yy*TILE + TILE/2;
+            const d = Math.hypot(cx - player.x, cy - player.y);
+            if (d < bestD) bestD = d;
+          }
+        }
+      }
+      if (bestD < 80) {
+        const g = 0.05 * (1 - bestD / 80);
+        SFX.chest_shimmer(g);
+      }
     }
   }
 
@@ -4500,6 +4700,7 @@ function selectChestItem(idx) {
   _applyItemToPlayer(it);
   updateBestItem(it);                  // Phase L — chest items count too
   addLog(`Equipped: ${it.icon} ${it.name}`, 'loot');
+  SFX.ui_select();                     // Phase N — UI click feedback
   SFX.pickup_item();
   updateHUD();
   showItemTooltip(it);
@@ -4650,6 +4851,9 @@ for (let i=0; i<3; i++) {
 
 // Chest tap on canvas
 canvas.addEventListener('pointerdown', e => {
+  // BUG-1 (Phase N) FIXED — block chest taps while the game is paused,
+  // dead, mid-transition, or already showing an inventory/death modal.
+  if (!gameRunning || player.dead || GameState.transitioning || inventoryOpen) return;
   const rect = canvas.getBoundingClientRect();
   const scaleX = VIEW_W/rect.width, scaleY = VIEW_H/rect.height;
   const cx = (e.clientX-rect.left)*scaleX + camera.x;
@@ -4720,7 +4924,13 @@ window.addEventListener('pointerup', e=>{
 function startGame() {
   document.getElementById('overlay').style.display='none';
   ensureAudio();                   // Phase G: unlock AudioContext on user gesture
+  // BUG-4 FIXED — isolate buildSprites' RNG.next() calls so they don't pollute
+  // dungeon-gen RNG state. Seed to a fixed constant so sprite grunge is
+  // visually identical every run.
+  const _rngStateBefore = RNG.getState();
+  RNG.seed(0xDECAFBAD);
   buildSprites();
+  RNG.setState(_rngStateBefore);
 
   // Seed the whole run; each floor derives deterministically from this.
   GameState.runSeed = (Date.now() ^ (Math.random()*0xFFFFFFFF)) >>> 0;
@@ -4737,6 +4947,11 @@ function startGame() {
   gameRunning=true;
   requestAnimationFrame(ts=>{ lastTime=ts; requestAnimationFrame(loop); });
 }
+
+// ─────────────────────────────────────────────
+// Phase N — Polish (COMPLETE)
+// ─────────────────────────────────────────────
+// Wardenfall — all phases A through N complete.
 </script>
 </body>
 </html>
