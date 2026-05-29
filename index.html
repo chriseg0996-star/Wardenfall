@@ -1,0 +1,2633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Wardenfall</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; background:#0a0a0f; overflow:hidden; touch-action:none; }
+#wrapper { position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-edges; cursor:crosshair; }
+
+/* HUD */
+#hud {
+  position:absolute; top:0; left:0; width:100%; pointer-events:none;
+  font-family:'Courier New',monospace;
+}
+#stats-panel {
+  position:absolute; top:8px; left:8px;
+  background:rgba(0,0,0,0.82); border:1px solid #3a3a4a;
+  border-radius:4px; padding:7px 10px; min-width:150px;
+  pointer-events:none;
+}
+.hero-name { color:#f0c060; font-size:12px; font-weight:bold; margin-bottom:5px; }
+.bar-row { display:flex; align-items:center; gap:5px; margin:2px 0; }
+.bar-lbl { font-size:9px; width:18px; font-family:'Courier New',monospace; }
+.bar-bg { flex:1; height:7px; background:#1a1a22; border-radius:2px; overflow:hidden; border:1px solid #333; }
+.bar-fill { height:100%; border-radius:1px; transition:width 0.15s; }
+.hp-f { background:linear-gradient(90deg,#8b1a1a,#e03030); }
+.mp-f { background:linear-gradient(90deg,#1a3a8b,#3060e0); }
+.xp-f { background:linear-gradient(90deg,#5a1a8b,#9030e0); }
+.bar-val { font-size:9px; color:#777; width:46px; text-align:right; font-family:'Courier New',monospace; }
+.stat-row { font-size:9px; color:#888; margin-top:4px; }
+.stat-row span { color:#f0c060; }
+
+#floor-label {
+  position:absolute; top:8px; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,0.75); border:1px solid #3a3a4a;
+  border-radius:3px; padding:3px 12px;
+  font-size:10px; color:#b090d0; font-family:'Courier New',monospace;
+  pointer-events:none;
+}
+#minimap-wrap {
+  position:absolute; top:8px; right:8px;
+  background:rgba(0,0,0,0.85); border:1px solid #3a3a4a; border-radius:3px; padding:3px;
+  pointer-events:none;
+}
+#minimap { display:block; image-rendering:pixelated; }
+
+#gold-panel {
+  position:absolute; bottom:56px; right:8px;
+  background:rgba(0,0,0,0.8); border:1px solid #3a3a4a;
+  border-radius:3px; padding:5px 10px;
+  font-size:12px; color:#f0c060; font-family:'Courier New',monospace;
+  pointer-events:none;
+}
+#log-panel {
+  position:absolute; bottom:56px; left:8px;
+  background:rgba(0,0,0,0.75); border:1px solid #2a2a3a;
+  border-radius:3px; padding:4px 8px; max-width:260px;
+  pointer-events:none;
+}
+.log-line { font-size:9px; font-family:'Courier New',monospace; margin:1px 0; }
+.log-dmg { color:#e05050; }
+.log-loot { color:#f0c060; }
+.log-heal { color:#40cc70; }
+.log-kill { color:#e08030; }
+.log-sys  { color:#8080a0; }
+.log-lvl  { color:#c060ff; }
+
+#hotbar-panel {
+  position:absolute; bottom:8px; left:8px;
+  background:rgba(0,0,0,0.8); border:1px solid #3a3a4a;
+  border-radius:3px; padding:5px 7px;
+  pointer-events:none;
+}
+.hb-title { font-size:9px; color:#f0c060; font-family:'Courier New',monospace; margin-bottom:4px; }
+#hotbar { display:flex; gap:3px; }
+.hb-slot {
+  width:34px; height:34px; background:#111118; border:1px solid #444;
+  border-radius:3px; display:flex; align-items:center; justify-content:center;
+  font-size:16px; position:relative;
+}
+.hb-slot.active { border-color:#f0c060; }
+.hb-key { position:absolute; top:1px; left:3px; font-size:7px; color:#555; font-family:'Courier New',monospace; }
+.hb-cnt { position:absolute; bottom:1px; right:3px; font-size:8px; color:#ffd; font-family:'Courier New',monospace; }
+
+/* Tooltip */
+#tooltip {
+  position:absolute; display:none; z-index:50;
+  background:rgba(8,6,18,0.97); border:1px solid #6040a0;
+  border-radius:4px; padding:8px 10px; max-width:190px;
+  box-shadow:0 0 14px rgba(80,40,160,0.5); pointer-events:none;
+  font-family:'Courier New',monospace;
+}
+.tip-name { font-size:12px; font-weight:bold; margin-bottom:1px; }
+.tip-type { font-size:9px; color:#8060a0; margin-bottom:6px; }
+.tip-stat { font-size:10px; color:#60cc80; margin:1px 0; }
+.tip-val  { font-size:10px; color:#f0c060; margin-top:4px; }
+.tip-desc { font-size:9px; color:#666; margin-top:5px; border-top:1px solid #222; padding-top:4px; font-style:italic; }
+
+/* Touch joystick */
+#joystick-zone { position:absolute; bottom:0; left:0; width:50%; height:45%; }
+#joystick-base {
+  position:absolute; border-radius:50%;
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  display:none; pointer-events:none;
+}
+#joystick-knob {
+  position:absolute; border-radius:50%;
+  background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3);
+  display:none; pointer-events:none;
+}
+#attack-btn {
+  position:absolute; bottom:20px; right:20px;
+  width:56px; height:56px; border-radius:50%;
+  background:rgba(200,60,60,0.3); border:2px solid rgba(220,80,80,0.6);
+  color:#ff8080; font-size:20px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; user-select:none; -webkit-user-select:none;
+  font-family:'Courier New',monospace; font-weight:bold;
+  z-index:10;
+}
+#attack-btn:active { background:rgba(200,60,60,0.6); transform:scale(0.95); }
+#potion-btn {
+  position:absolute; bottom:86px; right:20px;
+  width:42px; height:42px; border-radius:50%;
+  background:rgba(60,180,60,0.25); border:2px solid rgba(80,200,80,0.5);
+  color:#80ff80; font-size:18px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; user-select:none; -webkit-user-select:none; z-index:10;
+}
+#potion-btn:active { background:rgba(60,180,60,0.5); transform:scale(0.95); }
+
+/* Spell touch buttons (right side, stacked above potion).
+   Phase E: shrunk from 42→32 to reclaim viewport real estate. */
+#spell-btns {
+  position:absolute; right:12px; bottom:118px;
+  display:flex; flex-direction:column; gap:6px; z-index:10;
+}
+.spell-btn {
+  width:32px; height:32px; border-radius:50%;
+  background:rgba(60,80,180,0.25); border:1px solid rgba(100,140,220,0.5);
+  color:#a0c0ff; font-size:13px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; user-select:none; -webkit-user-select:none;
+  font-family:'Courier New',monospace; position:relative; overflow:hidden;
+}
+.spell-btn:active { background:rgba(60,80,180,0.55); transform:scale(0.95); }
+.spell-btn.disabled { opacity:0.4; filter:grayscale(0.4); }
+.spell-btn .cd-mask {
+  position:absolute; left:0; bottom:0; width:100%;
+  background:rgba(0,0,0,0.55); pointer-events:none;
+}
+.spell-btn .mp-cost {
+  position:absolute; bottom:0; right:1px; font-size:7px;
+  color:#80a8ff; font-family:'Courier New',monospace;
+  text-shadow:0 0 2px #000, 0 0 2px #000; z-index:2;
+}
+
+/* Hotbar cooldown overlay (fills bottom-up) */
+.hb-cd-fill {
+  position:absolute; left:0; bottom:0; width:100%;
+  background:rgba(0,0,0,0.55); pointer-events:none; border-radius:2px;
+}
+.hb-mp { color:#6090ff !important; }
+.hb-slot.cooldown { border-color:#334; }
+
+/* Overlay screens */
+#overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,0.88);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:100; font-family:'Courier New',monospace;
+}
+#overlay h1 { color:#f0c060; font-size:22px; margin-bottom:6px; letter-spacing:3px; }
+#overlay .sub { color:#8080a0; font-size:11px; margin-bottom:20px; }
+.ctrl-row { color:#aaa; font-size:10px; margin:3px 0; }
+.ctrl-row .key { background:#222; border:1px solid #555; border-radius:2px; padding:1px 6px; color:#eee; }
+#start-btn {
+  margin-top:20px; padding:10px 28px;
+  background:linear-gradient(135deg,#3a2060,#6030a0);
+  border:1px solid #8050c0; border-radius:4px;
+  color:#e0c0ff; font-size:13px; cursor:pointer; letter-spacing:2px;
+  font-family:'Courier New',monospace;
+}
+#start-btn:hover { background:linear-gradient(135deg,#4a30a0,#7040c0); }
+#damage-vignette {
+  position:absolute; inset:0; pointer-events:none;
+  box-shadow:inset 0 0 60px rgba(200,30,30,0);
+  transition:box-shadow 0.1s; z-index:80;
+}
+#floor-fade {
+  position:absolute; inset:0; pointer-events:none; z-index:90;
+  background:#000; opacity:0; transition:opacity 0.45s;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Courier New',monospace; color:#b090d0; font-size:18px; letter-spacing:3px;
+}
+
+/* Phase F: settings / pause overlay */
+#settings-overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,0.86);
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  z-index:200; font-family:'Courier New',monospace; color:#aaa;
+}
+#settings-overlay.open { display:flex; }
+.settings-panel {
+  background:#0a0a14; border:1px solid #3a3a4a; border-radius:4px;
+  padding:14px 18px; min-width:300px; max-width:90vw; max-height:80vh; overflow-y:auto;
+  box-shadow:0 0 30px rgba(80,40,160,0.25);
+}
+.settings-title {
+  color:#f0c060; font-size:14px; margin-bottom:10px; letter-spacing:2px;
+  border-bottom:1px solid #3a3a4a; padding-bottom:6px;
+}
+.settings-section { color:#8080a0; font-size:9px; letter-spacing:2px; margin:10px 0 4px; }
+.kb-row {
+  display:flex; justify-content:space-between; align-items:center;
+  gap:8px; margin:3px 0; font-size:11px;
+}
+.kb-row .lbl   { color:#aaa; min-width:88px; }
+.kb-row .keys  { color:#a0c0ff; flex:1; font-weight:bold; }
+.kb-btn {
+  background:#222; border:1px solid #555; border-radius:2px;
+  padding:2px 8px; color:#eee; cursor:pointer; font-size:10px;
+  font-family:'Courier New',monospace;
+}
+.kb-btn:hover { background:#333; }
+.kb-btn.listening { background:#604020; color:#fff; border-color:#a06030; }
+.preset-row { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+.preset-btn {
+  flex:1; background:linear-gradient(135deg,#2a1840,#4a2870);
+  border:1px solid #6040a0; border-radius:3px; padding:5px 8px;
+  color:#e0c0ff; font-size:10px; cursor:pointer; letter-spacing:1px;
+  font-family:'Courier New',monospace; min-width:70px;
+}
+.preset-btn:hover { background:linear-gradient(135deg,#3a2060,#5a30a0); }
+.preset-btn.reset {
+  background:#1a1a22; border-color:#555; color:#aaa;
+}
+.settings-close {
+  margin-top:10px; padding:6px 16px; background:#222; border:1px solid #555;
+  border-radius:3px; color:#eee; cursor:pointer; font-size:11px;
+  font-family:'Courier New',monospace; letter-spacing:2px;
+  display:block; margin-left:auto; margin-right:auto;
+}
+.settings-close:hover { background:#333; }
+.settings-hint { color:#666; font-size:9px; margin-top:8px; text-align:center; }
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <canvas id="game"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="stats-panel">
+      <div class="hero-name">Hero <span id="lvl-span" style="color:#a0c0ff;font-size:10px">Lv.1</span></div>
+      <div class="bar-row">
+        <span class="bar-lbl" style="color:#e03030">HP</span>
+        <div class="bar-bg"><div class="bar-fill hp-f" id="hp-bar" style="width:100%"></div></div>
+        <span class="bar-val" id="hp-val">100/100</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-lbl" style="color:#3060e0">MP</span>
+        <div class="bar-bg"><div class="bar-fill mp-f" id="mp-bar" style="width:100%"></div></div>
+        <span class="bar-val" id="mp-val">50/50</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-lbl" style="color:#9030e0">XP</span>
+        <div class="bar-bg"><div class="bar-fill xp-f" id="xp-bar" style="width:0%"></div></div>
+        <span class="bar-val" id="xp-val">0/100</span>
+      </div>
+      <div class="stat-row">ATK:<span id="atk-v"> 12</span> &nbsp;DEF:<span id="def-v"> 5</span></div>
+    </div>
+    <div id="floor-label">☠ The Cursed Keep — Floor 1</div>
+    <div id="minimap-wrap"><canvas id="minimap" width="72" height="72"></canvas></div>
+    <div id="log-panel" style="display:none"></div>
+    <div id="hotbar-panel">
+      <div class="hb-title">Quick Items</div>
+      <div id="hotbar"></div>
+    </div>
+    <div id="gold-panel">🪙 <span id="gold-v">0</span></div>
+    <div id="tooltip"></div>
+  </div>
+
+  <!-- Touch controls -->
+  <div id="joystick-zone"></div>
+  <div id="joystick-base"></div>
+  <div id="joystick-knob"></div>
+  <div id="attack-btn">⚔</div>
+  <div id="potion-btn">🧪</div>
+  <div id="spell-btns">
+    <div class="spell-btn" id="spell-btn-0" title="Firebolt (2)">🔥<span class="mp-cost">10</span><div class="cd-mask"></div></div>
+    <div class="spell-btn" id="spell-btn-1" title="Mend (3)">✚<span class="mp-cost">15</span><div class="cd-mask"></div></div>
+    <div class="spell-btn" id="spell-btn-2" title="Nova (4)">💥<span class="mp-cost">25</span><div class="cd-mask"></div></div>
+  </div>
+  <div id="damage-vignette"></div>
+  <div id="floor-fade"></div>
+
+  <!-- Overlay -->
+  <div id="overlay">
+    <h1>WARDENFALL</h1>
+    <div class="sub">The Cursed Keep — Descend or Perish</div>
+    <div class="ctrl-row"><span class="key">WASD</span> / <span class="key">↑↓←→</span> Move</div>
+    <div class="ctrl-row"><span class="key">SPACE</span> Attack &nbsp; <span class="key">H</span> Potion</div>
+    <div class="ctrl-row"><span class="key">2</span> Firebolt &nbsp; <span class="key">3</span> Mend &nbsp; <span class="key">4</span> Nova</div>
+    <div class="ctrl-row" style="margin-top:4px"><span class="key">ESC</span> Settings (rebind keys)</div>
+    <div class="ctrl-row" style="margin-top:6px;color:#666">Mobile: joystick + buttons</div>
+    <button id="start-btn" onclick="startGame()">ENTER DUNGEON</button>
+  </div>
+
+  <!-- Phase F: settings / pause overlay -->
+  <div id="settings-overlay">
+    <div class="settings-panel">
+      <div class="settings-title">⚙ SETTINGS</div>
+      <div class="settings-section">PRESETS</div>
+      <div class="preset-row" id="preset-row"></div>
+      <div class="settings-section">KEY BINDINGS</div>
+      <div id="kb-list"></div>
+      <div class="settings-hint">Click <b>Rebind</b>, then press the new key. ESC cancels rebind.</div>
+      <div class="settings-section">AUDIO</div>
+      <div id="audio-list"></div>
+      <button class="settings-close" onclick="closeSettings()">RESUME</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────
+const TILE = 32;
+const COLS = 40;
+const ROWS = 30;
+const WW = COLS * TILE;    // world width  (1280)
+const WH = ROWS * TILE;    // world height (960)
+// Viewport — what the player actually sees. Canvas internal pixels match
+// this; CSS upscales with image-rendering:pixelated → crisp zoom.
+// Phase D: tightened from 15×10 to 12×8 so sprites read bigger on screen
+// and the lantern cone covers a more meaningful share of the viewport.
+const VIEW_TX = 12;
+const VIEW_TY = 8;
+const VIEW_W  = VIEW_TX * TILE;   // 384
+const VIEW_H  = VIEW_TY * TILE;   // 256
+
+// ─────────────────────────────────────────────
+// MODULE: RNG (seeded, mulberry32 — reproducible floors)
+// ─────────────────────────────────────────────
+const RNG = (() => {
+  let state = 0;
+  function seed(s) { state = s >>> 0; }
+  function next() {
+    state |= 0; state = (state + 0x6D2B79F5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  const range = (a, b) => a + next() * (b - a);
+  const int = (a, b) => Math.floor(a + next() * (b - a + 1)); // inclusive
+  const pick = (arr) => arr[Math.floor(next() * arr.length)];
+  const chance = (p) => next() < p;
+  return { seed, next, range, int, pick, chance };
+})();
+
+// ─────────────────────────────────────────────
+// CANVAS SETUP
+// ─────────────────────────────────────────────
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+function resize() {
+  const wrap = document.getElementById('wrapper');
+  const ww = wrap.clientWidth, wh = wrap.clientHeight;
+  const scale = Math.min(ww / VIEW_W, wh / VIEW_H);
+  canvas.width = VIEW_W; canvas.height = VIEW_H;
+  canvas.style.width  = (VIEW_W * scale) + 'px';
+  canvas.style.height = (VIEW_H * scale) + 'px';
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ─────────────────────────────────────────────
+// TILE TYPES
+// ─────────────────────────────────────────────
+const T = { WALL:0, FLOOR:1, TORCH:2, CHEST:3, SPIKE:4, STAIR:5, PILLAR:6 };
+
+// ─────────────────────────────────────────────
+// MODULE: PALETTE — shared {base, hi, sh} per material.
+// Used by Phase A player sprite; reused by future enemy/environment redesigns
+// so the whole game drifts toward one cohesive dark-fantasy look.
+// ─────────────────────────────────────────────
+const PAL = {
+  hood:   { base:'#1a1822', hi:'#2a2838', sh:'#0c0a14' },
+  cloak:  { base:'#2a2030', hi:'#3a2e40', sh:'#180e1c' },
+  belt:   { base:'#3a2618', hi:'#5a3a22', sh:'#1c1208' },
+  skin:   { base:'#caa078', hi:'#e0b890', sh:'#8a5e3a' },
+  metal:  { base:'#9aa0b0', hi:'#cfd4e0', sh:'#4a4e58' },
+  gold:   { base:'#c08020', hi:'#e8c038', sh:'#6a4010' },
+  emberE: '#ff8a40',   // warm eye glow (matches torch hue)
+  // Phase B materials
+  bone:   { base:'#b8ad8c', hi:'#d4cab0', sh:'#6e6450' },
+  rag:    { base:'#2a1d1a', hi:'#3a2a26', sh:'#14100e' },
+  chitin: { base:'#1e0c0c', hi:'#3a1414', sh:'#0a0408' },
+  bloodE: '#ff2020',   // spider eye core
+  bloodH: '#ff8080',   // spider eye hot center
+};
+
+// ─────────────────────────────────────────────
+// PROCEDURAL SPRITE CACHE
+// ─────────────────────────────────────────────
+const sprites = {};
+function makeSprite(id, w, h, fn) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  fn(c.getContext('2d'), w, h);
+  sprites[id] = c;
+  return c;
+}
+
+function buildSprites() {
+  // FLOOR
+  makeSprite('floor', TILE, TILE, (g) => {
+    g.fillStyle = '#221c10'; g.fillRect(0,0,TILE,TILE);
+    g.fillStyle = '#2c2418'; g.fillRect(1,1,TILE-2,TILE-2);
+    g.strokeStyle = '#1a1408'; g.lineWidth = 0.5;
+    g.beginPath(); g.moveTo(0,TILE/2); g.lineTo(TILE,TILE/2); g.stroke();
+    g.beginPath(); g.moveTo(TILE/2,0); g.lineTo(TILE/2,TILE); g.stroke();
+    // grunge dots
+    g.fillStyle = 'rgba(0,0,0,0.2)';
+    for(let i=0;i<5;i++) g.fillRect(Math.random()*28+2, Math.random()*28+2, 1, 1);
+  });
+
+  // WALL
+  makeSprite('wall', TILE, TILE, (g) => {
+    g.fillStyle = '#12121e'; g.fillRect(0,0,TILE,TILE);
+    g.fillStyle = '#1c1c2e'; g.fillRect(0,0,TILE,15);
+    g.fillStyle = '#161628'; g.fillRect(0,16,TILE,TILE-16);
+    g.fillStyle = '#0a0a14'; g.fillRect(0,14,TILE,3);
+    g.fillStyle = 'rgba(255,255,255,0.03)';
+    g.fillRect(2,2,13,11); g.fillRect(17,2,13,11);
+    g.fillRect(2,18,TILE-4,11);
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 1;
+    g.strokeRect(0,0,TILE,TILE);
+  });
+
+  // WALL TOP (darker cap for depth)
+  makeSprite('wall_top', TILE, 6, (g) => {
+    g.fillStyle = '#2a2a3e'; g.fillRect(0,0,TILE,6);
+    g.fillStyle = '#3a3a50'; g.fillRect(0,0,TILE,2);
+  });
+
+  // TORCH FLOOR
+  makeSprite('tfloor', TILE, TILE, (g) => {
+    g.fillStyle = '#221c10'; g.fillRect(0,0,TILE,TILE);
+    g.fillStyle = '#2c2418'; g.fillRect(1,1,TILE-2,TILE-2);
+    const grad = g.createRadialGradient(16,16,2,16,16,14);
+    grad.addColorStop(0,'rgba(255,160,60,0.18)');
+    grad.addColorStop(1,'rgba(255,100,0,0)');
+    g.fillStyle = grad; g.fillRect(0,0,TILE,TILE);
+  });
+
+  // TORCH SPRITE
+  makeSprite('torch', 10, 22, (g) => {
+    g.fillStyle = '#6b3a10'; g.fillRect(3,10,4,12);
+    g.fillStyle = '#ff9020';
+    g.beginPath(); g.ellipse(5,8,5,7,0,0,Math.PI*2); g.fill();
+    g.fillStyle = '#ffdd40';
+    g.beginPath(); g.ellipse(5,6,3,5,0,0,Math.PI*2); g.fill();
+    g.fillStyle = '#fff8c0';
+    g.beginPath(); g.ellipse(5,5,1.5,2.5,0,0,Math.PI*2); g.fill();
+  });
+
+  // CHEST
+  makeSprite('chest', TILE, TILE, (g) => {
+    g.fillStyle = '#2c2418'; g.fillRect(1,1,TILE-2,TILE-2);
+    g.fillStyle = '#5a3510'; g.fillRect(4,9,24,17);
+    g.fillStyle = '#7a4f18'; g.fillRect(5,10,22,15);
+    g.fillStyle = '#b07820'; g.fillRect(4,9,24,5);
+    g.fillStyle = '#d4a030'; g.fillRect(5,10,22,3);
+    g.fillStyle = '#ffd040'; g.fillRect(12,15,8,5);
+    g.fillStyle = '#c08020'; g.fillRect(14,16,4,3);
+    g.fillStyle = '#8a6010'; g.fillRect(4,24,24,2);
+  });
+
+  // SPIKE
+  makeSprite('spike', TILE, TILE, (g) => {
+    g.fillStyle = '#221c10'; g.fillRect(0,0,TILE,TILE);
+    g.fillStyle = '#2c2418'; g.fillRect(1,1,TILE-2,TILE-2);
+    g.fillStyle = '#708090';
+    for(let i=0;i<4;i++){
+      const x = 4+i*7;
+      g.beginPath(); g.moveTo(x,28); g.lineTo(x+6,28); g.lineTo(x+3,10); g.closePath(); g.fill();
+      g.fillStyle='#a0b0c0';
+      g.beginPath(); g.moveTo(x+1,28); g.lineTo(x+3,12); g.lineTo(x+2,28); g.closePath(); g.fill();
+      g.fillStyle='#708090';
+    }
+  });
+
+  // PILLAR — Phase C tall prop (32 wide × 64 tall). Anchored so its base
+  // sits on the tile's bottom edge; renders during the Y-sort pass so the
+  // player can stand both in front of and behind it.
+  makeSprite('pillar', 32, 64, (g) => {
+    const Bn = PAL.bone, M = PAL.metal;
+    // Base block (wider, sits on floor)
+    g.fillStyle = Bn.sh;   g.fillRect(2, 56, 28, 8);
+    g.fillStyle = Bn.base; g.fillRect(3, 57, 26, 5);
+    g.fillStyle = Bn.hi;   g.fillRect(3, 57, 26, 1);
+    // Shaft
+    g.fillStyle = Bn.sh;   g.fillRect(8, 14, 16, 44);
+    g.fillStyle = Bn.base; g.fillRect(9, 14, 14, 44);
+    g.fillStyle = Bn.hi;   g.fillRect(9, 14,  2, 44);   // left catchlight strip
+    // Iron bands top + bottom of shaft
+    g.fillStyle = M.sh;   g.fillRect(7, 20, 18, 3); g.fillRect(7, 44, 18, 3);
+    g.fillStyle = M.base; g.fillRect(7, 20, 18, 1); g.fillRect(7, 44, 18, 1);
+    g.fillStyle = '#1a1a22'; g.fillRect(11, 21, 1, 1); g.fillRect(20, 21, 1, 1);
+    g.fillStyle = '#1a1a22'; g.fillRect(11, 45, 1, 1); g.fillRect(20, 45, 1, 1);
+    // Capital (carved cap)
+    g.fillStyle = Bn.sh;   g.fillRect(4,  6, 24, 10);
+    g.fillStyle = Bn.base; g.fillRect(5,  7, 22,  7);
+    g.fillStyle = Bn.hi;   g.fillRect(5,  7, 22,  2);
+    // Top trim
+    g.fillStyle = Bn.sh;   g.fillRect(3,  0, 26, 6);
+    g.fillStyle = Bn.base; g.fillRect(4,  0, 24, 4);
+    g.fillStyle = Bn.hi;   g.fillRect(4,  0, 24, 1);
+    // Carved ember rune mid-shaft
+    g.fillStyle = '#aa4020'; g.fillRect(14, 31, 4, 1); g.fillRect(15, 30, 2, 3);
+    g.fillStyle = PAL.emberE; g.fillRect(15, 31, 2, 1);
+  });
+
+  // STAIR
+  makeSprite('stair', TILE, TILE, (g) => {
+    g.fillStyle = '#1c1828'; g.fillRect(0,0,TILE,TILE);
+    g.fillStyle = '#2c2840';
+    for(let i=0;i<4;i++) {
+      g.fillRect(4+i*3, 8+i*5, TILE-8-i*6, 4);
+    }
+    g.fillStyle = '#8060ff';
+    g.beginPath(); g.ellipse(16,16,6,3,0,0,Math.PI*2); g.fill();
+    g.fillStyle = '#a080ff'; g.fillRect(15,4,2,12);
+    g.beginPath(); g.ellipse(16,4,4,2,0,0,Math.PI*2); g.fill();
+  });
+
+  // PLAYER — hooded silhouette (Phase A visual overhaul)
+  // Silhouette-first: dark cloak/hood dominates; only the face wedge,
+  // hand, and sword blade catch real light. Two ember-eye dots inside
+  // the hood give it the "cursed wanderer" read at small scale.
+  makeSprite('player', 24, 32, (g) => {
+    const H = PAL.hood, C = PAL.cloak, B = PAL.belt,
+          S = PAL.skin, M = PAL.metal, GP = PAL.gold;
+
+    // ── cloak (full body silhouette) ──
+    g.fillStyle = C.sh;  g.fillRect(3, 11, 18, 21);          // outer shadow flare
+    g.fillStyle = C.base;g.fillRect(4, 12, 16, 19);          // body
+    g.fillStyle = C.hi;  g.fillRect(5, 14, 4,  14);          // left highlight strip
+    g.fillStyle = C.hi;  g.fillRect(14,14, 1,  14);          // center pleat
+
+    // ── boots peek ──
+    g.fillStyle = '#0a0810'; g.fillRect(6, 30, 4, 2);
+    g.fillStyle = '#0a0810'; g.fillRect(13,30, 4, 2);
+
+    // ── belt ──
+    g.fillStyle = B.sh;  g.fillRect(4, 21, 16, 2);
+    g.fillStyle = B.base;g.fillRect(4, 21, 16, 1);
+    g.fillStyle = GP.base; g.fillRect(11,21, 2, 2);          // buckle
+
+    // ── hood (overhangs head; cast shadow on face) ──
+    g.fillStyle = H.sh;  g.fillRect(2,  3, 20, 12);          // hood drop
+    g.fillStyle = H.base;g.fillRect(3,  4, 18, 10);
+    g.fillStyle = H.hi;  g.fillRect(3,  4, 18,  2);          // top rim catch-light
+    g.fillStyle = H.hi;  g.fillRect(3,  5,  2,  9);          // left side rim
+
+    // ── face wedge (deep in shadow) ──
+    g.fillStyle = S.sh;  g.fillRect(8,  9,  8,  5);
+    g.fillStyle = S.base;g.fillRect(9, 10,  6,  3);
+
+    // ── ember eyes ──
+    g.fillStyle = PAL.emberE; g.fillRect(10,11, 1, 1); g.fillRect(13,11, 1, 1);
+
+    // ── sword arm (right side; bracer + hilt + blade) ──
+    g.fillStyle = H.sh;  g.fillRect(18,15, 4, 6);            // bracer shadow
+    g.fillStyle = M.sh;  g.fillRect(19,16, 3, 4);            // bracer
+    g.fillStyle = M.hi;  g.fillRect(19,16, 1, 4);            // bracer edge
+    g.fillStyle = GP.sh; g.fillRect(18,20, 5, 2);            // crossguard sh
+    g.fillStyle = GP.base;g.fillRect(18,20, 5, 1);           // crossguard
+    g.fillStyle = M.sh;  g.fillRect(20, 6, 2, 14);           // blade core
+    g.fillStyle = M.hi;  g.fillRect(20, 6, 1, 14);           // blade edge
+    g.fillStyle = '#fff'; g.fillRect(20, 7, 1, 2);           // glint
+
+    // ── left hand barely visible at cloak edge ──
+    g.fillStyle = S.sh;  g.fillRect(3, 18, 2, 3);
+  });
+
+  // SPIDER — organic redesign (Phase B)
+  // 8 single-pixel articulated legs (body→knee→foot), bulbous segmented
+  // abdomen, smaller cephalothorax, glowing 4-pixel red eye cluster.
+  makeSprite('spider', 28, 28, (g) => {
+    const Ch = PAL.chitin;
+
+    // ── 8 articulated legs (4 per side, single-pixel polylines) ──
+    // Each entry: [bodyAnchor, knee, foot] — knees offset for the "spider crouch"
+    const legsL = [
+      [[10,10],[ 3, 6],[ 1,11]],   // front-top
+      [[10,12],[ 2,10],[ 0,14]],   // front-mid
+      [[10,15],[ 2,15],[ 0,18]],   // back-mid
+      [[10,17],[ 4,20],[ 2,24]],   // back-bottom
+    ];
+    const legsR = [
+      [[18,10],[25, 6],[27,11]],
+      [[18,12],[26,10],[27,14]],
+      [[18,15],[26,15],[27,18]],
+      [[18,17],[24,20],[26,24]],
+    ];
+    g.strokeStyle = Ch.sh; g.lineWidth = 1;
+    function drawLeg(seg) {
+      g.beginPath();
+      g.moveTo(seg[0][0] + 0.5, seg[0][1] + 0.5);
+      g.lineTo(seg[1][0] + 0.5, seg[1][1] + 0.5);
+      g.lineTo(seg[2][0] + 0.5, seg[2][1] + 0.5);
+      g.stroke();
+      // 1-px joint nub
+      g.fillStyle = Ch.sh;
+      g.fillRect(seg[1][0], seg[1][1], 1, 1);
+    }
+    legsL.forEach(drawLeg);
+    legsR.forEach(drawLeg);
+
+    // ── abdomen (rear, bulbous) ──
+    g.fillStyle = Ch.sh;   g.beginPath(); g.ellipse(14, 19, 7, 6, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = Ch.base; g.beginPath(); g.ellipse(14, 19, 6, 5, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = Ch.hi;   g.beginPath(); g.ellipse(13, 17, 2, 1, 0, 0, Math.PI*2); g.fill();
+    // segmentation (2 thin shadow lines)
+    g.fillStyle = Ch.sh;
+    g.fillRect( 9, 19, 10, 1);
+    g.fillRect(10, 21,  8, 1);
+
+    // ── cephalothorax (front, smaller) ──
+    g.fillStyle = Ch.sh;   g.beginPath(); g.ellipse(14, 11, 5, 4, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = Ch.base; g.beginPath(); g.ellipse(14, 11, 4, 3, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = Ch.hi;   g.fillRect(12,  9, 4, 1);
+
+    // ── eye cluster (4 dots, asymmetric — 2 with hot core) ──
+    g.fillStyle = '#1a0404';                              // socket halos
+    g.fillRect(10,  9, 3, 2);
+    g.fillRect(15,  9, 3, 2);
+    g.fillStyle = PAL.bloodE;                             // red glow
+    g.fillRect(11, 10, 1, 1);
+    g.fillRect(12, 10, 1, 1);
+    g.fillRect(15, 10, 1, 1);
+    g.fillRect(16, 10, 1, 1);
+    g.fillStyle = PAL.bloodH;                             // hot center on outer pair
+    g.fillRect(11,  9, 1, 1);
+    g.fillRect(16,  9, 1, 1);
+
+    // ── fangs (pale, just below cephalothorax) ──
+    g.fillStyle = Ch.sh;   g.fillRect(12, 13, 1, 2); g.fillRect(15, 13, 1, 2);
+    g.fillStyle = '#caa078'; g.fillRect(12, 13, 1, 1); g.fillRect(15, 13, 1, 1);
+  });
+
+  // SKELETON — menacing redesign (Phase B)
+  // Wide skull, hollow black sockets w/ brow shadow, exposed spine/ribs,
+  // jagged tattered cloth at shoulders + waist for irregular silhouette.
+  makeSprite('skeleton', 24, 32, (g) => {
+    const Bn = PAL.bone, R = PAL.rag;
+
+    // ── thin bone legs ──
+    g.fillStyle = Bn.sh;   g.fillRect( 7, 22, 3, 10); g.fillRect(14, 22, 3, 10);
+    g.fillStyle = Bn.base; g.fillRect( 7, 22, 2, 10); g.fillRect(14, 22, 2, 10);
+    g.fillStyle = Bn.hi;   g.fillRect( 7, 22, 1,  8); g.fillRect(14, 22, 1,  8);
+    g.fillStyle = '#0a0a0a'; g.fillRect( 7, 30, 3, 2); g.fillRect(14, 30, 3, 2);
+
+    // ── pelvis ──
+    g.fillStyle = Bn.sh;   g.fillRect(5, 19, 14, 4);
+    g.fillStyle = Bn.base; g.fillRect(6, 20, 12, 2);
+
+    // ── tattered waist rag (jagged, hangs below) ──
+    g.fillStyle = R.sh;
+    g.fillRect(4, 18, 16, 4);                                  // band
+    g.fillRect(4, 22, 2, 3); g.fillRect( 8, 22, 2, 2);
+    g.fillRect(11, 22, 1, 3); g.fillRect(14, 22, 2, 2);
+    g.fillRect(17, 22, 1, 3); g.fillRect(19, 22, 1, 2);
+    g.fillStyle = R.base;
+    g.fillRect(4, 18, 16, 3);
+    g.fillRect(5, 22, 1, 2); g.fillRect(12, 22, 1, 2); g.fillRect(18, 22, 1, 2);
+
+    // ── spine ──
+    g.fillStyle = Bn.sh;   g.fillRect(11, 13, 2, 7);
+    g.fillStyle = Bn.base; g.fillRect(11, 13, 1, 6);
+
+    // ── ribs (3 horizontal bone strips w/ shadow under each) ──
+    for (let i=0; i<3; i++) {
+      const ry = 13 + i*2;
+      g.fillStyle = Bn.sh;   g.fillRect(6, ry+1, 12, 1);
+      g.fillStyle = Bn.base; g.fillRect(6, ry,   12, 1);
+    }
+
+    // ── shoulder tattered cloth (jagged edges) ──
+    g.fillStyle = R.sh;
+    g.fillRect(1, 12, 5, 8); g.fillRect(18, 12, 5, 8);
+    g.fillRect(0, 17, 1, 2); g.fillRect(2, 19, 1, 2);
+    g.fillRect(4, 19, 1, 2); g.fillRect(22, 19, 1, 2);
+    g.fillRect(20, 19, 1, 2); g.fillRect(18, 19, 1, 2);
+    g.fillStyle = R.base;
+    g.fillRect(1, 12, 5, 5); g.fillRect(18, 12, 5, 5);
+    g.fillStyle = R.hi;
+    g.fillRect(1, 12, 5, 1); g.fillRect(18, 12, 5, 1);
+
+    // ── arms (thin bone, partly under cloth) ──
+    g.fillStyle = Bn.sh;   g.fillRect(3, 14, 2, 6); g.fillRect(19, 14, 2, 6);
+    g.fillStyle = Bn.base; g.fillRect(3, 14, 1, 6); g.fillRect(19, 14, 1, 6);
+
+    // ── skull ──
+    g.fillStyle = Bn.sh;   g.fillRect(4, 1, 16, 12);     // shadow shape
+    g.fillStyle = Bn.base; g.fillRect(5, 2, 14, 10);
+    g.fillStyle = Bn.hi;   g.fillRect(5, 2, 14,  2);     // top catchlight
+    g.fillStyle = Bn.hi;   g.fillRect(5, 2,  1, 10);     // left edge
+
+    // ── crack ──
+    g.fillStyle = Bn.sh;
+    g.fillRect(11, 3, 1, 3); g.fillRect(12, 5, 1, 1); g.fillRect(11, 6, 1, 1);
+
+    // ── hollow eye sockets (deep negative space — the menace) ──
+    g.fillStyle = '#000';
+    g.fillRect(7,  5, 4, 4);
+    g.fillRect(13, 5, 4, 4);
+    // brow shadow line above sockets
+    g.fillStyle = Bn.sh;
+    g.fillRect(6, 4, 6, 1); g.fillRect(12, 4, 6, 1);
+    // faint dying-ember inside (subtle, 1px each)
+    g.fillStyle = '#3a0a00';
+    g.fillRect(8, 7, 1, 1); g.fillRect(15, 7, 1, 1);
+
+    // ── nose hole ──
+    g.fillStyle = '#000'; g.fillRect(11, 9, 2, 2);
+
+    // ── teeth grimace (alternating gaps) ──
+    g.fillStyle = Bn.sh;   g.fillRect(7, 11, 10, 1);
+    g.fillStyle = Bn.base; g.fillRect(7, 12, 10, 1);
+    g.fillStyle = '#000';
+    g.fillRect(8,  12, 1, 1); g.fillRect(10, 12, 1, 1);
+    g.fillRect(12, 12, 1, 1); g.fillRect(14, 12, 1, 1); g.fillRect(16, 12, 1, 1);
+
+    // ── rusted sword (right hand) ──
+    g.fillStyle = PAL.metal.sh; g.fillRect(20, 8, 2, 14);
+    g.fillStyle = '#7c6850';    g.fillRect(20, 8, 1, 14);   // rust streak
+    g.fillStyle = PAL.gold.sh;  g.fillRect(18, 14, 5, 2);
+    g.fillStyle = PAL.gold.base;g.fillRect(18, 14, 5, 1);
+  });
+
+  // GOLD COIN
+  makeSprite('coin', 12, 12, (g) => {
+    g.fillStyle = '#e0b820'; g.beginPath(); g.ellipse(6,6,5,5,0,0,Math.PI*2); g.fill();
+    g.fillStyle = '#c09010'; g.beginPath(); g.ellipse(6,6,4,4,0,0,Math.PI*2); g.fill();
+    g.fillStyle = '#f0d040'; g.fillRect(5,2,2,8);
+    g.fillStyle = '#ffe060'; g.fillRect(4,2,1,2);
+  });
+
+  // HP ORB
+  makeSprite('hp_orb', 14, 14, (g) => {
+    g.fillStyle = '#c02020'; g.beginPath(); g.ellipse(7,7,6,6,0,0,Math.PI*2); g.fill();
+    g.fillStyle = '#e04040'; g.beginPath(); g.ellipse(7,6,5,5,0,0,Math.PI*2); g.fill();
+    g.fillStyle = '#ff8080'; g.beginPath(); g.ellipse(5,5,2,2,0,0,Math.PI*2); g.fill();
+  });
+
+  // ITEM STAR
+  makeSprite('item_star', 18, 18, (g) => {
+    g.fillStyle = '#d0c030';
+    g.beginPath();
+    for(let i=0;i<5;i++){
+      const a = (i*4-1)*Math.PI/5-Math.PI/2;
+      const b = (i*4+1)*Math.PI/5-Math.PI/2;
+      if(i===0) g.moveTo(9+9*Math.cos(a),9+9*Math.sin(a));
+      else g.lineTo(9+9*Math.cos(a),9+9*Math.sin(a));
+      g.lineTo(9+4*Math.cos(b),9+4*Math.sin(b));
+    }
+    g.closePath(); g.fill();
+    g.fillStyle = '#fff080'; g.beginPath(); g.ellipse(7,7,3,3,0,0,Math.PI*2); g.fill();
+  });
+
+  // HIT FLASH
+  makeSprite('hit', 16, 16, (g) => {
+    const grad = g.createRadialGradient(8,8,1,8,8,8);
+    grad.addColorStop(0,'rgba(255,255,200,0.95)');
+    grad.addColorStop(0.5,'rgba(255,180,0,0.6)');
+    grad.addColorStop(1,'rgba(255,80,0,0)');
+    g.fillStyle = grad; g.fillRect(0,0,16,16);
+  });
+
+  // PARTICLE
+  makeSprite('particle', 6, 6, (g) => {
+    g.fillStyle = '#ffdd60'; g.fillRect(1,1,4,4);
+  });
+}
+
+// ─────────────────────────────────────────────
+// MODULE: BSP (binary space partition node tree)
+// ─────────────────────────────────────────────
+const BSP_MIN_LEAF = 8;   // min partition size before stopping split
+const BSP_MIN_ROOM = 4;   // min room dimension
+const BSP_MAX_DEPTH = 5;
+
+function bspSplit(node, depth) {
+  // Decide whether to split further
+  const canSplit = depth < BSP_MAX_DEPTH &&
+    (node.w > BSP_MIN_LEAF * 2 || node.h > BSP_MIN_LEAF * 2);
+  if (!canSplit) return;
+
+  // Choose split orientation: bias toward splitting the longer axis
+  let horizontal;
+  if (node.w / node.h >= 1.25) horizontal = false;       // wide -> vertical cut
+  else if (node.h / node.w >= 1.25) horizontal = true;   // tall -> horizontal cut
+  else horizontal = RNG.chance(0.5);
+
+  const max = (horizontal ? node.h : node.w) - BSP_MIN_LEAF;
+  if (max <= BSP_MIN_LEAF) return;
+  const cut = RNG.int(BSP_MIN_LEAF, max);
+
+  if (horizontal) {
+    node.a = { x:node.x, y:node.y, w:node.w, h:cut };
+    node.b = { x:node.x, y:node.y+cut, w:node.w, h:node.h-cut };
+  } else {
+    node.a = { x:node.x, y:node.y, w:cut, h:node.h };
+    node.b = { x:node.x+cut, y:node.y, w:node.w-cut, h:node.h };
+  }
+  bspSplit(node.a, depth+1);
+  bspSplit(node.b, depth+1);
+}
+
+function bspLeaves(node, out) {
+  if (node.a || node.b) {
+    if (node.a) bspLeaves(node.a, out);
+    if (node.b) bspLeaves(node.b, out);
+  } else out.push(node);
+  return out;
+}
+
+// Carve a room inside a leaf, return {x,y,w,h}
+function bspCarveRoom(leaf) {
+  const maxW = leaf.w - 2, maxH = leaf.h - 2;
+  const w = RNG.int(BSP_MIN_ROOM, Math.max(BSP_MIN_ROOM, maxW));
+  const h = RNG.int(BSP_MIN_ROOM, Math.max(BSP_MIN_ROOM, maxH));
+  const x = leaf.x + RNG.int(1, Math.max(1, leaf.w - w - 1));
+  const y = leaf.y + RNG.int(1, Math.max(1, leaf.h - h - 1));
+  return { x, y, w, h };
+}
+
+// Recursively connect siblings: corridor between centers of subtrees' rooms
+function bspConnect(node, map) {
+  if (!node.a && !node.b) return node.room;
+  const ra = node.a ? bspConnect(node.a, map) : null;
+  const rb = node.b ? bspConnect(node.b, map) : null;
+  if (ra && rb) carveCorridor(map, roomCenter(ra), roomCenter(rb));
+  return ra || rb;
+}
+
+function roomCenter(r) {
+  return { x: Math.floor(r.x + r.w/2), y: Math.floor(r.y + r.h/2) };
+}
+
+function carveCorridor(map, a, b) {
+  // L-shaped corridor, random elbow orientation
+  const hFirst = RNG.chance(0.5);
+  if (hFirst) { carveH(map, a.x, b.x, a.y); carveV(map, a.y, b.y, b.x); }
+  else        { carveV(map, a.y, b.y, a.x); carveH(map, a.x, b.x, b.y); }
+}
+function carveH(map, x0, x1, y) {
+  const lo = Math.min(x0,x1), hi = Math.max(x0,x1);
+  for (let x=lo; x<=hi; x++) if (map[y] && map[y][x]===T.WALL) map[y][x]=T.FLOOR;
+}
+function carveV(map, y0, y1, x) {
+  const lo = Math.min(y0,y1), hi = Math.max(y0,y1);
+  for (let y=lo; y<=hi; y++) if (map[y] && map[y][x]===T.WALL) map[y][x]=T.FLOOR;
+}
+
+// ─────────────────────────────────────────────
+// MODULE: DUNGEON (BSP-driven floor generator)
+// ─────────────────────────────────────────────
+function buildDungeon(floorNum) {
+  // Seed from floor so each floor is reproducible within a run
+  RNG.seed((GameState.runSeed ^ (floorNum * 0x9E3779B1)) >>> 0);
+
+  const map = Array.from({length:ROWS}, () => Array(COLS).fill(T.WALL));
+
+  // Build BSP tree over interior (leave 1-tile border)
+  const root = { x:1, y:1, w:COLS-2, h:ROWS-2 };
+  bspSplit(root, 0);
+  const leaves = bspLeaves(root, []);
+
+  // Carve a room per leaf
+  const rooms = [];
+  leaves.forEach(leaf => {
+    const r = bspCarveRoom(leaf);
+    leaf.room = r;
+    rooms.push(r);
+    for (let y=r.y; y<r.y+r.h; y++)
+      for (let x=r.x; x<r.x+r.w; x++)
+        if (y>0 && y<ROWS-1 && x>0 && x<COLS-1) map[y][x]=T.FLOOR;
+  });
+
+  // Connect rooms by walking BSP tree
+  bspConnect(root, map);
+
+  // Spawn = center of first room; stairs = room farthest (manhattan) from spawn
+  const spawnRoom = rooms[0];
+  const spawn = roomCenter(spawnRoom);
+  let stairRoom = spawnRoom, best = -1;
+  rooms.forEach(r => {
+    const c = roomCenter(r);
+    const d = Math.abs(c.x-spawn.x) + Math.abs(c.y-spawn.y);
+    if (d > best) { best = d; stairRoom = r; }
+  });
+  const stairPos = roomCenter(stairRoom);
+  map[stairPos.y][stairPos.x] = T.STAIR;
+
+  // ── DECORATION ──
+  // Torch on a wall-adjacent floor tile inside most rooms
+  rooms.forEach(r => {
+    if (r === spawnRoom) return;
+    if (!RNG.chance(0.75)) return;
+    const tx = r.x + RNG.int(0, r.w-1);
+    const ty = r.y + RNG.int(0, r.h-1);
+    if (map[ty][tx]===T.FLOOR) map[ty][tx]=T.TORCH;
+  });
+
+  // Spikes: small hazard clusters in a few non-spawn/non-stair rooms
+  const hazardRooms = rooms.filter(r => r!==spawnRoom && r!==stairRoom);
+  hazardRooms.forEach(r => {
+    if (!RNG.chance(0.4)) return;
+    const cx = r.x + Math.floor(r.w/2), cy = r.y + Math.floor(r.h/2);
+    const n = RNG.int(2, 4);
+    for (let i=0;i<n;i++) {
+      const sx = cx + RNG.int(-1,1), sy = cy + RNG.int(-1,1);
+      if (map[sy] && map[sy][sx]===T.FLOOR) map[sy][sx]=T.SPIKE;
+    }
+  });
+
+  // Chests: 1–2 in the rooms farthest from spawn (excluding stair room)
+  const chestCandidates = hazardRooms
+    .map(r => ({ r, d: (()=>{ const c=roomCenter(r); return Math.abs(c.x-spawn.x)+Math.abs(c.y-spawn.y); })() }))
+    .sort((a,b)=>b.d-a.d)
+    .slice(0, RNG.int(1,2));
+  chestCandidates.forEach(({r}) => {
+    const c = roomCenter(r);
+    if (map[c.y][c.x]===T.FLOOR) map[c.y][c.x]=T.CHEST;
+  });
+
+  // ── PILLARS (Phase C — tall props w/ collision + Z-sort) ──
+  // Skip spawn + stair rooms (need clear gameplay focal points).
+  // Skip cramped rooms. 1–2 pillars per eligible room, interior only.
+  rooms.forEach(r => {
+    if (r === spawnRoom || r === stairRoom) return;
+    if (r.w < 5 || r.h < 5) return;
+    if (!RNG.chance(0.55)) return;
+    const n = RNG.int(1, 2);
+    for (let i=0; i<n; i++) {
+      const px = r.x + RNG.int(2, r.w-3);
+      const py = r.y + RNG.int(2, r.h-3);
+      if (map[py][px] === T.FLOOR) map[py][px] = T.PILLAR;
+    }
+  });
+
+  return { map, rooms, spawn, stairPos };
+}
+
+// ─────────────────────────────────────────────
+// GAME STATE
+// ─────────────────────────────────────────────
+let dungeon = null;
+let gameRunning = false;
+
+// Run-level state (floor progression, seed) — single namespace, module-prep
+const GameState = {
+  floorNum: 1,
+  runSeed: 0,
+  transitioning: false,
+};
+const player = {
+  x:0, y:0, // world px (center)
+  w:20, h:26,
+  hp:100, maxHp:100,
+  mp:50, maxMp:50,
+  xp:0, xpNext:100,
+  level:1,
+  atk:12, def:5,
+  speed:120,
+  gold:0, potions:3,
+  iframes:0,
+  attackCd:0,
+  attackPhase:0,    // Phase D: 1 → 0 over attackCd; drives lunge + slash arc
+  facing:1, // 1=right -1=left
+  walkPhase:0,
+  breathPhase:0,    // idle "breathing" bob (visual only)
+  dead:false,
+  // ── Phase 3: spells & MP ──
+  spellCd:[0,0,0],   // per-slot cooldown (ms remaining), indexed by SPELL_ORDER
+  hotTicksLeft:0,    // heal-over-time: remaining ticks
+  hotTimer:0,        // ms until next HoT tick
+  hotInterval:500,   // ms between HoT ticks
+  hotHeal:0,         // HP per HoT tick
+};
+
+let enemies = [];
+let pickups = [];
+let particles = [];
+let hitFlashes = [];
+let projectiles = [];
+let torchPhase = 0;
+let camera = {x:0, y:0};
+let lightCanvas = null, lctx = null;   // Phase A: offscreen lighting buffer
+let logLines = [];
+let keys = {};
+let attackPressed = false;
+let potionPressed = false;
+
+// Touch joystick
+const joy = { active:false, startX:0, startY:0, dx:0, dy:0, id:null };
+
+// ─────────────────────────────────────────────
+// LOOT TABLE
+// ─────────────────────────────────────────────
+const LOOT = [
+  {name:'Iron Sword', type:'Weapon', icon:'⚔', rarity:'common', stats:{ATK:'+8',DEF:'+2'}, desc:'A well-balanced blade.', gold:120, dAtk:8, dDef:2},
+  {name:'Vile Fang', type:'Greatsword', icon:'🗡', rarity:'rare', stats:{ATK:'+25','ATK%':'+15%'}, desc:'Cursed blade thirsting for blood.', gold:680, dAtk:25},
+  {name:'Leather Vest', type:'Armor', icon:'🛡', rarity:'common', stats:{DEF:'+12',HP:'+30'}, desc:'Tanned hide stitched with sinew.', gold:90, dDef:12, dHp:30},
+  {name:'Radiant Plate', type:'Heavy Armor', icon:'🪬', rarity:'epic', stats:{DEF:'+65',HP:'+200'}, desc:'Sun-forged plate radiating warmth.', gold:2450, dDef:65, dHp:200},
+  {name:'Ring of Vitality', type:'Ring', icon:'💍', rarity:'uncommon', stats:{HP:'+50'}, desc:'Pulses with life energy.', gold:300, dHp:50},
+  {name:'Swift Boots', type:'Boots', icon:'👟', rarity:'common', stats:{SPD:'+20%'}, desc:'Light as a feather.', gold:150, dSpd:20},
+  {name:'Mage Pendant', type:'Amulet', icon:'📿', rarity:'uncommon', stats:{MP:'+80'}, desc:'Crystallized arcane essence.', gold:350, dMp:80},
+];
+const RARITY_COL = {common:'#aaa', uncommon:'#4caf50', rare:'#2196f3', epic:'#9c27b0', legendary:'#ff9800'};
+
+// ─────────────────────────────────────────────
+// ENEMY DEFS
+// ─────────────────────────────────────────────
+const ENEMY_DEFS = {
+  spider: { sprite:'spider', name:'Giant Spider', hp:40, atk:8, xp:25, gold:[5,15], speed:55, aggroR:110, w:22, h:22 },
+  skeleton:{ sprite:'skeleton', name:'Skeleton Warrior', hp:65, atk:14, xp:45, gold:[10,28], speed:40, aggroR:130, w:20, h:28 },
+};
+
+const SPAWN_POINTS = []; // legacy — replaced by room-based spawning (see populateFloor)
+
+// ─────────────────────────────────────────────
+// MODULE: SPELLS (slots 2-4; reuses particle/hitFlash FX, projectile module)
+// ─────────────────────────────────────────────
+const SPELLS = {
+  firebolt: {
+    name:'Firebolt', icon:'🔥', mp:10, cd:600,
+    cast(p) {
+      const ang = p.facing > 0 ? 0 : Math.PI;
+      const sx = p.x + p.facing*16, sy = p.y - 2;
+      spawnProjectile({
+        x:sx, y:sy,
+        vx:Math.cos(ang)*380, vy:Math.sin(ang)*380,
+        w:12, h:12, life:1300, owner:'player',
+        damage: Math.round(p.atk*1.6 + p.level*1.5),
+        kind:'firebolt',
+      });
+      spawnParticles(sx, sy, 5, '#ff8030');
+      addLog(`Cast Firebolt`, 'sys');
+    },
+  },
+  mend: {
+    name:'Mend', icon:'✚', mp:15, cd:8000,
+    cast(p) {
+      p.hotTicksLeft = 6;
+      p.hotInterval  = 500;
+      p.hotTimer     = p.hotInterval;
+      p.hotHeal      = 5 + Math.floor(p.level*1.5);
+      spawnParticles(p.x, p.y, 10, '#40ee70');
+      addLog(`Mend — +${p.hotHeal} HP × 6 ticks`, 'heal');
+    },
+  },
+  nova: {
+    name:'Nova', icon:'💥', mp:25, cd:4000,
+    cast(p) {
+      const radius = 96;
+      hitFlashes.push({x:p.x, y:p.y, life:1, maxLife:1, scale:2.6});
+      spawnParticles(p.x, p.y, 30, '#80c0ff');
+      triggerShake(5, 220);
+      let hits = 0;
+      enemies.forEach(e => {
+        if(!e.alive) return;
+        const d = Math.hypot(e.x-p.x, e.y-p.y);
+        if(d < radius) {
+          const dmg = Math.max(1, Math.round(p.atk*1.3 + p.level*2));
+          e.hp -= dmg;
+          e.iframes = 280;
+          hits++;
+          spawnParticles(e.x, e.y, 6, '#a0d8ff');
+          const ang = Math.atan2(e.y-p.y, e.x-p.x) || 0;
+          e.x += Math.cos(ang)*26;
+          e.y += Math.sin(ang)*26;
+          if(e.hp<=0) killEnemy(e);
+        }
+      });
+      addLog(hits ? `Nova hits ${hits} for AoE` : `Nova — no targets`, hits?'dmg':'sys');
+    },
+  },
+};
+// Slot index (0,1,2) → spell id. Maps to keyboard keys 2,3,4 and player.spellCd[i].
+const SPELL_ORDER = ['firebolt','mend','nova'];
+
+// Floor scaling: HP/ATK geometric, rewards additive. Stacks with player-level mult.
+function floorStatMul(floorNum) { return Math.pow(1.22, floorNum - 1); }     // ~+22%/floor
+function floorRewardBonus(floorNum) { return 1 + (floorNum - 1) * 0.18; }    // +18%/floor
+
+function spawnEnemy(tx, ty, type) {
+  const def = ENEMY_DEFS[type];
+  const lvMul = 1 + (player.level-1)*0.4;
+  const fMul  = floorStatMul(GameState.floorNum);
+  const rMul  = floorRewardBonus(GameState.floorNum);
+  const hp    = Math.round(def.hp * lvMul * fMul);
+  enemies.push({
+    x: tx*TILE+TILE/2, y: ty*TILE+TILE/2,
+    w: def.w, h: def.h,
+    hp, maxHp: hp,
+    atk: Math.round(def.atk * lvMul * fMul),
+    xp: Math.round(def.xp * rMul),
+    gold: [Math.round(def.gold[0]*rMul), Math.round(def.gold[1]*rMul)],
+    speed: def.speed, aggroR: def.aggroR,
+    type, name: def.name, sprite: def.sprite,
+    attackCd: 0, wanderTimer:0, wanderDx:0, wanderDy:0,
+    iframes:0, alive:true, facing:1,
+    walkPhase:0,
+    aggro:false,       // Phase B: drives skeleton bone-rattle jitter
+  });
+}
+
+// Populate a freshly-built floor: spawn enemies in non-spawn rooms scaled by floor.
+function populateFloor() {
+  enemies = [];
+  const spawnRoom = dungeon.rooms[0];
+  // Enemy budget grows with floor depth
+  const budget = 6 + Math.floor(GameState.floorNum * 1.5);
+  const types = ['spider','skeleton'];
+  let placed = 0, guard = 0;
+  while (placed < budget && guard++ < 200) {
+    const r = RNG.pick(dungeon.rooms);
+    if (r === spawnRoom) continue;
+    const tx = r.x + RNG.int(0, r.w-1);
+    const ty = r.y + RNG.int(0, r.h-1);
+    const t = dungeon.map[ty][tx];
+    if (t !== T.FLOOR && t !== T.TORCH) continue;
+    // Deeper floors bias toward tougher skeletons
+    const skelBias = Math.min(0.7, 0.35 + GameState.floorNum*0.05);
+    spawnEnemy(tx, ty, RNG.chance(skelBias) ? 'skeleton' : 'spider');
+    placed++;
+  }
+}
+
+// ─────────────────────────────────────────────
+// PICKUPS
+// ─────────────────────────────────────────────
+// Phase D: drop positions can land in walls/pillars when an enemy dies
+// next to one. Snap such drops outward to the nearest non-solid tile so
+// loot is always reachable. Rides on the same isSolid() predicate that
+// gates entity movement, so walls + pillars + future solid types are
+// handled uniformly.
+function nudgeToFloor(x, y) {
+  if (!dungeon || !isSolid(tileAt(x, y))) return { x, y };
+  const tx0 = (x / TILE) | 0, ty0 = (y / TILE) | 0;
+  for (let r = 1; r <= 3; r++) {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      // Process only the outer ring of this radius (the inner ones were
+      // already searched on previous iterations).
+      if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+      const row = dungeon.map[ty0 + dy]; if (!row) continue;
+      const t = row[tx0 + dx];
+      if (t !== undefined && !isSolid(t)) {
+        return { x: (tx0+dx)*TILE + TILE/2, y: (ty0+dy)*TILE + TILE/2 };
+      }
+    }
+  }
+  return { x, y };  // give up rather than throw; visible loot beats lost loot
+}
+
+function spawnGold(x, y, amount) {
+  const count = Math.min(amount, 5);
+  for(let i=0;i<count;i++) {
+    const p = nudgeToFloor(x+(Math.random()-0.5)*24, y+(Math.random()-0.5)*12);
+    pickups.push({
+      type:'gold', sprite:'coin',
+      x: p.x, y: p.y,
+      amount: Math.floor(amount/count),
+      phase: Math.random()*Math.PI*2,
+    });
+  }
+}
+function spawnPotion(x, y) {
+  const p = nudgeToFloor(x, y);
+  pickups.push({type:'potion', sprite:'hp_orb', x:p.x, y:p.y, phase:Math.random()*Math.PI*2});
+}
+function spawnItem(x, y, itemDef) {
+  const p = nudgeToFloor(x, y);
+  pickups.push({type:'item', sprite:'item_star', x:p.x, y:p.y, itemDef, phase:Math.random()*Math.PI*2});
+}
+
+// ─────────────────────────────────────────────
+// PARTICLES
+// ─────────────────────────────────────────────
+function spawnParticles(x, y, count, col) {
+  for(let i=0;i<count;i++) {
+    const angle = Math.random()*Math.PI*2;
+    const spd = 40+Math.random()*80;
+    particles.push({
+      x, y, vx:Math.cos(angle)*spd, vy:Math.sin(angle)*spd,
+      life:1, maxLife:1, col: col||'#ffdd60', size:2+Math.random()*2,
+    });
+  }
+}
+
+// Phase B: multi-color, longer-lived burst for death dissolves.
+// opts: { speed, upBias, lifeMul, sizeMin, sizeMax }
+function spawnParticleBurst(x, y, count, cols, opts) {
+  opts = opts || {};
+  const speed   = opts.speed   != null ? opts.speed   : 100;
+  const upBias  = opts.upBias  != null ? opts.upBias  : 30;
+  const lifeMul = opts.lifeMul != null ? opts.lifeMul : 1.6;
+  const sMin    = opts.sizeMin != null ? opts.sizeMin : 2;
+  const sMax    = opts.sizeMax != null ? opts.sizeMax : 4;
+  for (let i=0; i<count; i++) {
+    const a   = Math.random()*Math.PI*2;
+    const spd = 20 + Math.random()*speed;
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * spd,
+      vy: Math.sin(a) * spd - upBias,
+      life: lifeMul, maxLife: lifeMul,
+      col: cols[Math.floor(Math.random()*cols.length)],
+      size: sMin + Math.random()*(sMax - sMin),
+    });
+  }
+}
+
+// ─────────────────────────────────────────────
+// MODULE: PROJECTILES (shared by player spells + future ranged enemies)
+// Wall collision uses isSolid() — same predicate moveEntity uses.
+// ─────────────────────────────────────────────
+function spawnProjectile(o) {
+  projectiles.push({
+    x:o.x, y:o.y,
+    vx:o.vx, vy:o.vy,
+    w:o.w||10, h:o.h||10,
+    life:o.life||1200, maxLife:o.life||1200,
+    owner:o.owner||'player',   // 'player' | 'enemy'
+    damage:o.damage||1,
+    kind:o.kind||'firebolt',
+    pierce:!!o.pierce,
+    hitSet:new Set(),
+    spinPhase:0,
+  });
+}
+
+function updateProjectiles(dt) {
+  for (let i=projectiles.length-1; i>=0; i--) {
+    const pr = projectiles[i];
+    pr.life -= dt;
+    pr.spinPhase += dt*0.02;
+
+    // Substep to avoid tunneling through 1-tile walls at high speed
+    const steps = 2;
+    let dead = false;
+    for (let s=0; s<steps && !dead; s++) {
+      pr.x += pr.vx*dt*0.001/steps;
+      pr.y += pr.vy*dt*0.001/steps;
+      if (isSolid(tileAt(pr.x, pr.y))) {
+        spawnParticles(pr.x, pr.y, 6, pr.kind==='firebolt'?'#ffa040':'#a0a0c0');
+        dead = true;
+      }
+    }
+    if (dead) { projectiles.splice(i,1); continue; }
+    if (pr.life<=0) { projectiles.splice(i,1); continue; }
+
+    // Trail
+    if (pr.kind==='firebolt' && Math.random()<0.7) {
+      particles.push({
+        x:pr.x + (Math.random()-0.5)*4, y:pr.y + (Math.random()-0.5)*4,
+        vx:-pr.vx*0.05 + (Math.random()-0.5)*30,
+        vy:-pr.vy*0.05 + (Math.random()-0.5)*30,
+        life:0.5, maxLife:0.5, col:'#ff8030', size:2+Math.random()*2,
+      });
+    }
+
+    // Entity collision
+    if (pr.owner==='player') {
+      let consumed = false;
+      for (const e of enemies) {
+        if (!e.alive || consumed) continue;
+        if (pr.hitSet.has(e)) continue;
+        if (rectsOverlap(pr.x,pr.y,pr.w,pr.h, e.x,e.y,e.w,e.h)) {
+          e.hp -= pr.damage;
+          e.iframes = 300;
+          pr.hitSet.add(e);
+          addLog(`Firebolt — ${e.name} -${pr.damage}`, 'dmg');
+          spawnParticles(e.x, e.y, 6, '#ff8030');
+          // small knockback along projectile heading
+          const sp = Math.hypot(pr.vx, pr.vy) || 1;
+          e.x += pr.vx/sp * 10;
+          e.y += pr.vy/sp * 10;
+          if (e.hp<=0) killEnemy(e);
+          if (!pr.pierce) consumed = true;
+        }
+      }
+      if (consumed) projectiles.splice(i,1);
+    } else if (pr.owner==='enemy') {
+      // Reserved for Phase 4 ranged enemies — already wired
+      if (player.iframes<=0 &&
+          rectsOverlap(pr.x,pr.y,pr.w,pr.h, player.x,player.y,player.w,player.h)) {
+        const dmg = Math.max(1, pr.damage - Math.floor(player.def*0.5));
+        player.hp = Math.max(0, player.hp - dmg);
+        player.iframes = 700;
+        addLog(`Hit for ${dmg}!`, 'dmg');
+        triggerDamageVignette();
+        triggerShake(4, 160);
+        spawnParticles(player.x, player.y, 6, '#e04040');
+        updateHUD();
+        if (player.hp<=0) playerDie();
+        projectiles.splice(i,1);
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// MODULE: LIGHTING — near-blackout fog-of-war.
+// World-space offscreen canvas, filled with rgba(0,0,0,0.92), with light cones
+// punched via destination-out, then blitted to main canvas offset by camera.
+// Lights ride existing torchPhase so they flicker in sync with torch sprites.
+// ─────────────────────────────────────────────
+const LIGHT_ALPHA = 0.92;
+
+function ensureLightCanvas() {
+  if (lightCanvas) return;
+  lightCanvas = document.createElement('canvas');
+  // Phase C: now sized to viewport, not world — 8× less fill per frame.
+  lightCanvas.width = VIEW_W; lightCanvas.height = VIEW_H;
+  lctx = lightCanvas.getContext('2d');
+}
+
+// Collect light sources currently relevant to the visible viewport.
+// Phase E: radii nudged (player 110→130, torch 75→90). Main brightness
+// gain comes from the flattened falloff curve in drawLightingPass —
+// these are modest supporting bumps so the cone reaches comfortably.
+function collectLights(startTX, endTX, startTY, endTY) {
+  const lights = [];
+  lights.push({
+    x: player.x,
+    y: player.y,
+    r: 130 + Math.sin(torchPhase*3) * 4,
+  });
+  if (dungeon) {
+    for (let ty = startTY; ty < endTY; ty++) {
+      const row = dungeon.map[ty]; if (!row) continue;
+      for (let tx = startTX; tx < endTX; tx++) {
+        if (row[tx] === T.TORCH) {
+          lights.push({
+            x: tx*TILE + 16,
+            y: ty*TILE + 16,
+            r: 90 + Math.sin(torchPhase*4 + tx*1.3 + ty*0.7) * 6,
+          });
+        }
+      }
+    }
+  }
+  return lights;
+}
+
+function drawLightingPass(lights) {
+  ensureLightCanvas();
+  // Reset comp + lay down the dark veil over the viewport.
+  lctx.globalCompositeOperation = 'source-over';
+  lctx.clearRect(0, 0, VIEW_W, VIEW_H);
+  lctx.fillStyle = `rgba(0,0,0,${LIGHT_ALPHA})`;
+  lctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  // Punch holes for each light source — translate world → viewport coords.
+  lctx.globalCompositeOperation = 'destination-out';
+  for (const L of lights) {
+    const vx = L.x - camera.x;
+    const vy = L.y - camera.y;
+    // Skip lights whose entire bounding box is outside the viewport.
+    if (vx + L.r < 0 || vy + L.r < 0 || vx - L.r > VIEW_W || vy - L.r > VIEW_H) continue;
+    // Phase E: keep most of the cone full-bright. Inner 55% is fully cut
+    // (rgba alpha=1 → world fully visible), then linear fade to no-cut
+    // at the edge. Far more navigable than the old 15%-then-fade shape.
+    const g = lctx.createRadialGradient(vx, vy, L.r * 0.15, vx, vy, L.r);
+    g.addColorStop(0.0,  'rgba(0,0,0,1)');
+    g.addColorStop(0.55, 'rgba(0,0,0,1)');
+    g.addColorStop(1.0,  'rgba(0,0,0,0)');
+    lctx.fillStyle = g;
+    lctx.fillRect(vx - L.r, vy - L.r, L.r*2, L.r*2);
+  }
+  lctx.globalCompositeOperation = 'source-over';
+
+  // Blit at (0,0) since lightCanvas is now in viewport space (Phase C).
+  ctx.drawImage(lightCanvas, 0, 0);
+}
+
+// ─────────────────────────────────────────────
+// MODULE: AUDIO — Web Audio synth SFX, no asset files (Phase G).
+// AudioContext is unlocked on first user gesture (startGame click).
+// Persistence: localStorage 'wardenfall.audio.v1' (master + muted).
+// ─────────────────────────────────────────────
+let audioCtx = null, masterGain = null;
+const audio = { master: 0.6, muted: false };
+const AUDIO_STORAGE_KEY = 'wardenfall.audio.v1';
+
+function loadAudio() {
+  try {
+    const raw = localStorage.getItem(AUDIO_STORAGE_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (typeof p.master === 'number') audio.master = Math.max(0, Math.min(1, p.master));
+    if (typeof p.muted  === 'boolean') audio.muted  = p.muted;
+  } catch {}
+}
+function saveAudio() {
+  try { localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify(audio)); } catch {}
+}
+
+function ensureAudio() {
+  if (audioCtx) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = audio.muted ? 0 : audio.master;
+    masterGain.connect(audioCtx.destination);
+  } catch {}
+}
+
+function applyMasterGain() {
+  if (masterGain) masterGain.gain.value = audio.muted ? 0 : audio.master;
+}
+
+// Brief tonal blip with envelope and optional pitch sweep.
+function playTone(opts) {
+  if (!audioCtx || audio.muted || audio.master <= 0) return;
+  const type   = opts.type   || 'square';
+  const freq   = opts.freq   || 440;
+  const dur    = opts.dur    || 0.1;
+  const gain   = opts.gain   || 0.18;
+  const now    = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const env = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  if (opts.freqEnd) {
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, opts.freqEnd), now + dur);
+  }
+  env.gain.setValueAtTime(0, now);
+  env.gain.linearRampToValueAtTime(gain, now + 0.005);
+  env.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  osc.connect(env).connect(masterGain);
+  osc.start(now); osc.stop(now + dur + 0.05);
+}
+
+// Filtered noise burst — impact, nova boom, skeleton-bone crack.
+function playNoise(opts) {
+  if (!audioCtx || audio.muted || audio.master <= 0) return;
+  const dur     = opts.dur     || 0.1;
+  const gain    = opts.gain    || 0.2;
+  const lowpass = opts.lowpass || 2000;
+  const now = audioCtx.currentTime;
+  const len = Math.max(64, Math.floor(audioCtx.sampleRate * dur));
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = Math.random()*2 - 1;
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const flt = audioCtx.createBiquadFilter(); flt.type='lowpass'; flt.frequency.value = lowpass;
+  const env = audioCtx.createGain();
+  env.gain.setValueAtTime(gain, now);
+  env.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  src.connect(flt).connect(env).connect(masterGain);
+  src.start(now);
+}
+
+// Named sound effects — one-liners or short combos.
+const SFX = {
+  swing:         () => playTone({ type:'sawtooth', freq:520, freqEnd:280, dur:0.08, gain:0.12 }),
+  impact:        () => playNoise({ dur:0.07, gain:0.22, lowpass:1800 }),
+  death_spider:  () => { playTone({ type:'square',   freq:180, freqEnd:60, dur:0.25, gain:0.16 });
+                         playNoise({ dur:0.1, gain:0.1, lowpass:900 }); },
+  death_skeleton:() => { playTone({ type:'sawtooth', freq:300, freqEnd:80, dur:0.30, gain:0.16 });
+                         playNoise({ dur:0.15, gain:0.14, lowpass:1500 }); },
+  firebolt:      () => playTone({ type:'sawtooth', freq:800, freqEnd:200, dur:0.18, gain:0.14 }),
+  mend:          () => playTone({ type:'sine',     freq:440, freqEnd:880, dur:0.40, gain:0.12 }),
+  nova:          () => { playTone({ type:'square', freq:100, freqEnd:40,  dur:0.35, gain:0.20 });
+                         playNoise({ dur:0.22, gain:0.18, lowpass:600 }); },
+  pickup_coin:   () => playTone({ type:'square',   freq:880, freqEnd:1320, dur:0.06, gain:0.10 }),
+  pickup_potion: () => playTone({ type:'triangle', freq:440, freqEnd:660,  dur:0.15, gain:0.12 }),
+  pickup_item:   () => { playTone({ type:'sine', freq:660, freqEnd:990,  dur:0.12, gain:0.13 });
+                         setTimeout(()=>playTone({ type:'sine', freq:990, freqEnd:1320, dur:0.12, gain:0.13 }), 80); },
+  potion_drink:  () => playTone({ type:'sine',     freq:200, freqEnd:500, dur:0.30, gain:0.14 }),
+  level_up:      () => { playTone({ type:'triangle', freq:523, dur:0.12, gain:0.14 });
+                         setTimeout(()=>playTone({ type:'triangle', freq:659, dur:0.12, gain:0.14 }), 90);
+                         setTimeout(()=>playTone({ type:'triangle', freq:784, dur:0.20, gain:0.14 }), 180); },
+  descend:       () => playTone({ type:'sawtooth', freq:200, freqEnd:60,  dur:0.50, gain:0.16 }),
+};
+
+// Load persisted audio settings as soon as the script runs.
+loadAudio();
+
+function drawProjectiles() {
+  projectiles.forEach(pr => {
+    if (pr.kind === 'firebolt') {
+      // glow halo
+      const g = ctx.createRadialGradient(pr.x, pr.y, 1, pr.x, pr.y, 18);
+      g.addColorStop(0,  'rgba(255,230,140,0.95)');
+      g.addColorStop(0.4,'rgba(255,140,30,0.55)');
+      g.addColorStop(1,  'rgba(255,80,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(pr.x-18, pr.y-18, 36, 36);
+      // core
+      ctx.fillStyle = '#ff8030';
+      ctx.beginPath(); ctx.ellipse(pr.x, pr.y, 5, 5, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff080';
+      ctx.beginPath(); ctx.ellipse(pr.x, pr.y, 2.5, 2.5, 0, 0, Math.PI*2); ctx.fill();
+    } else {
+      ctx.fillStyle = '#c0a0ff';
+      ctx.fillRect(pr.x-pr.w/2, pr.y-pr.h/2, pr.w, pr.h);
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// COLLISION HELPERS
+// ─────────────────────────────────────────────
+function tileAt(wx, wy) {
+  const tx = Math.floor(wx/TILE), ty = Math.floor(wy/TILE);
+  if(tx<0||ty<0||tx>=COLS||ty>=ROWS) return T.WALL;
+  return dungeon.map[ty][tx];
+}
+function isSolid(t) { return t===T.WALL || t===T.PILLAR; }
+function isHazard(t) { return t===T.SPIKE; }
+
+function moveEntity(ent, dx, dy, dt) {
+  const nx = ent.x + dx*dt;
+  const ny = ent.y + dy*dt;
+  const hw = ent.w/2 - 3, hh = ent.h/2 - 4;
+
+  // Phase F.1: sample only the edge we're moving toward. The old code
+  // required BOTH edges clear, so touching a wall on one side blocked
+  // movement away from it — the "stuck on walls" bug.
+  let canX = true;
+  if (dx > 0) {
+    canX = !isSolid(tileAt(nx+hw, ent.y))
+        && !isSolid(tileAt(nx+hw, ent.y - hh*0.5))
+        && !isSolid(tileAt(nx+hw, ent.y + hh*0.5));
+  } else if (dx < 0) {
+    canX = !isSolid(tileAt(nx-hw, ent.y))
+        && !isSolid(tileAt(nx-hw, ent.y - hh*0.5))
+        && !isSolid(tileAt(nx-hw, ent.y + hh*0.5));
+  }
+  if (canX) ent.x = nx;
+
+  let canY = true;
+  if (dy > 0) {
+    canY = !isSolid(tileAt(ent.x, ny+hh))
+        && !isSolid(tileAt(ent.x - hw*0.5, ny+hh))
+        && !isSolid(tileAt(ent.x + hw*0.5, ny+hh));
+  } else if (dy < 0) {
+    canY = !isSolid(tileAt(ent.x, ny-hh))
+        && !isSolid(tileAt(ent.x - hw*0.5, ny-hh))
+        && !isSolid(tileAt(ent.x + hw*0.5, ny-hh));
+  }
+  if (canY) ent.y = ny;
+}
+
+function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh) {
+  return ax-aw/2 < bx+bw/2 && ax+aw/2 > bx-bw/2 &&
+         ay-ah/2 < by+bh/2 && ay+ah/2 > by-bh/2;
+}
+
+// ─────────────────────────────────────────────
+// CAMERA
+// ─────────────────────────────────────────────
+function updateCamera() {
+  // Target: center the viewport on the player.
+  const tx = player.x - VIEW_W/2;
+  const ty = player.y - VIEW_H/2;
+  camera.x += (tx - camera.x) * 0.12;
+  camera.y += (ty - camera.y) * 0.12;
+  // Clamp to world bounds — Phase C now meaningful (was WW-WW=0 stub).
+  camera.x = Math.max(0, Math.min(WW - VIEW_W, camera.x));
+  camera.y = Math.max(0, Math.min(WH - VIEW_H, camera.y));
+}
+
+// ─────────────────────────────────────────────
+// COMBAT
+// ─────────────────────────────────────────────
+function doAttack() {
+  if(player.attackCd > 0) return;
+  player.attackCd = 480;
+  player.attackPhase = 1;     // Phase D: drives draw-time lunge + slash arc
+  SFX.swing();                // Phase G
+
+  const reach = 36;
+  const ax = player.x + player.facing * reach;
+  const ay = player.y;
+
+  // Hit flash
+  hitFlashes.push({x:ax, y:ay, life:1, maxLife:1, scale:1});
+
+  // Particles
+  spawnParticles(ax, ay, 5, '#ffdd60');
+
+  let hit = false;
+  enemies.forEach(e => {
+    if(!e.alive) return;
+    if(Math.hypot(ax-e.x, ay-e.y) < 44) {
+      const dmg = Math.max(1, player.atk + Math.floor(Math.random()*5-2));
+      e.hp -= dmg;
+      e.iframes = 300;
+      hit = true;
+      addLog(`Hit ${e.name} for ${dmg}`, 'dmg');
+      spawnParticles(e.x, e.y, 4, '#ff4040');
+      // Knockback
+      const angle = Math.atan2(e.y-player.y, e.x-player.x);
+      e.x += Math.cos(angle)*18;
+      e.y += Math.sin(angle)*18;
+      if(e.hp <= 0) killEnemy(e);
+    }
+  });
+
+  // Screen shake + impact SFX
+  if(hit) { triggerShake(3, 120); SFX.impact(); }
+}
+
+function killEnemy(e) {
+  e.alive = false;
+  addLog(`Defeated ${e.name}! +${e.xp} XP`, 'kill');
+  player.xp += e.xp;
+
+  // Phase B: per-type death dissolve
+  if (e.type === 'spider') {
+    spawnParticleBurst(e.x, e.y, 22,
+      ['#2e1414', '#5a1818', '#0a0408', '#1e0c0c'],
+      { speed:140, upBias:40, lifeMul:1.8, sizeMin:2, sizeMax:5 });
+  } else if (e.type === 'skeleton') {
+    spawnParticleBurst(e.x, e.y, 18,
+      ['#c8bea0', '#b8ad8c', '#d4cab0', '#6e6450', '#0a0a0a'],
+      { speed:110, upBias:30, lifeMul:1.6, sizeMin:2, sizeMax:4 });
+  } else {
+    spawnParticles(e.x, e.y, 8, '#cc4420');
+  }
+  // Phase G: per-type death sound
+  if (SFX['death_' + e.type]) SFX['death_' + e.type]();
+
+  const g = Math.floor(Math.random()*(e.gold[1]-e.gold[0])+e.gold[0]);
+  spawnGold(e.x, e.y, g);
+
+  if(Math.random()<0.28) {
+    if(Math.random()<0.4) spawnPotion(e.x, e.y-10);
+    else spawnItem(e.x, e.y-10, LOOT[Math.floor(Math.random()*LOOT.length)]);
+  }
+  checkLevelUp();
+}
+
+function enemyAttackPlayer(e) {
+  if(player.iframes>0) return;
+  const dmg = Math.max(1, e.atk - player.def + Math.floor(Math.random()*4-2));
+  player.hp = Math.max(0, player.hp-dmg);
+  player.iframes = 700;
+  addLog(`${e.name} hits you for ${dmg}!`, 'dmg');
+  triggerDamageVignette();
+  triggerShake(5, 200);
+  updateHUD();
+  if(player.hp<=0) playerDie();
+}
+
+function usePotion() {
+  if(player.potions<=0) { addLog('No potions!', 'dmg'); return; }
+  player.potions--;
+  const heal = 50 + player.level*6;
+  player.hp = Math.min(player.maxHp, player.hp+heal);
+  addLog(`Used potion. +${heal} HP`, 'heal');
+  spawnParticles(player.x, player.y, 10, '#40ee70');
+  SFX.potion_drink();              // Phase G
+  updateHUD(); updateHotbar();
+}
+
+// ── Phase 3: cast a spell by slot index (0..2) ──
+function castSpell(slot) {
+  if (player.dead) return;
+  const id = SPELL_ORDER[slot]; if(!id) return;
+  const s = SPELLS[id];
+  if (player.spellCd[slot] > 0) { addLog(`${s.name} on cooldown`, 'sys'); return; }
+  if (player.mp < s.mp)         { addLog(`Not enough MP for ${s.name}`, 'sys'); return; }
+  player.mp -= s.mp;
+  player.spellCd[slot] = s.cd;
+  s.cast(player);
+  if (SFX[id]) SFX[id]();          // Phase G: per-spell sound
+  updateHUD(); updateHotbar();
+}
+
+// Per-frame visual refresh for the right-side touch spell buttons.
+// Only writes style on changed slots; cheap enough to run every frame.
+function refreshSpellButtons() {
+  for (let i=0; i<SPELL_ORDER.length; i++) {
+    const el = document.getElementById('spell-btn-'+i);
+    if (!el) continue;
+    const s  = SPELLS[SPELL_ORDER[i]];
+    const cd = player.spellCd[i] || 0;
+    const cdPct = cd > 0 ? Math.min(1, cd / s.cd) : 0;
+    const ok = player.mp >= s.mp && cd <= 0 && !player.dead;
+    el.classList.toggle('disabled', !ok);
+    const mask = el.querySelector('.cd-mask');
+    if (mask) mask.style.height = (cdPct*100).toFixed(1) + '%';
+  }
+}
+
+function checkLevelUp() {
+  if(player.xp >= player.xpNext) {
+    player.level++;
+    player.xp -= player.xpNext;
+    player.xpNext = Math.floor(player.xpNext*1.6);
+    player.maxHp += 25; player.hp = player.maxHp;
+    player.maxMp += 10; player.mp = player.maxMp;
+    player.atk += 4; player.def += 2;
+    addLog(`LEVEL UP! Lv.${player.level} — ATK+4 DEF+2 HP full`, 'lvl');
+    document.getElementById('lvl-span').textContent = `Lv.${player.level}`;
+    spawnParticles(player.x, player.y, 16, '#c060ff');
+    triggerShake(4, 300);
+    SFX.level_up();                // Phase G
+    updateHUD();
+  }
+}
+
+function playerDie() {
+  player.dead = true;
+  addLog('You have fallen...', 'sys');
+}
+
+// ─────────────────────────────────────────────
+// MODULE: FLOOR PROGRESSION
+// ─────────────────────────────────────────────
+// Build/replace the current floor and place the player at its spawn.
+function loadFloor() {
+  dungeon = buildDungeon(GameState.floorNum);
+  player.x = dungeon.spawn.x*TILE + TILE/2;
+  player.y = dungeon.spawn.y*TILE + TILE/2;
+  // snap camera so we don't slide in from old position
+  camera.x = Math.max(0, Math.min(WW - VIEW_W, player.x - VIEW_W/2));
+  camera.y = Math.max(0, Math.min(WH - VIEW_H, player.y - VIEW_H/2));
+  pickups = [];
+  particles = [];
+  hitFlashes = [];
+  projectiles = [];
+  populateFloor();
+  drawMinimap();
+  document.getElementById('floor-label').textContent =
+    `☠ The Cursed Keep — Floor ${GameState.floorNum}`;
+}
+
+function descendFloor() {
+  GameState.transitioning = true;
+  SFX.descend();                   // Phase G
+  const fade = document.getElementById('floor-fade');
+  GameState.floorNum++;
+  addLog(`Descending to Floor ${GameState.floorNum}...`, 'lvl');
+  // Small reward for clearing a floor
+  player.hp = Math.min(player.maxHp, player.hp + Math.round(player.maxHp*0.25));
+  player.potions++;
+  fade.textContent = `FLOOR ${GameState.floorNum}`;
+  fade.style.opacity = '1';
+  setTimeout(() => {
+    loadFloor();
+    updateHUD(); updateHotbar();
+    fade.style.opacity = '0';
+    // brief invuln so we don't instantly get hit on arrival
+    player.iframes = 600;
+    GameState.transitioning = false;
+  }, 460);
+}
+
+// ─────────────────────────────────────────────
+// SCREEN FX
+// ─────────────────────────────────────────────
+let shakeTimer=0, shakeAmt=0;
+let vigTimer=0;
+
+function triggerShake(amt, dur) { shakeAmt=amt; shakeTimer=dur; }
+function triggerDamageVignette() {
+  vigTimer = 400;
+  document.getElementById('damage-vignette').style.boxShadow='inset 0 0 70px rgba(200,20,20,0.55)';
+}
+
+// ─────────────────────────────────────────────
+// HUD UPDATES
+// ─────────────────────────────────────────────
+function updateHUD() {
+  const p = player;
+  document.getElementById('hp-bar').style.width = (p.hp/p.maxHp*100)+'%';
+  document.getElementById('hp-val').textContent = `${p.hp}/${p.maxHp}`;
+  document.getElementById('mp-bar').style.width = (p.mp/p.maxMp*100)+'%';
+  document.getElementById('mp-val').textContent = `${p.mp}/${p.maxMp}`;
+  document.getElementById('xp-bar').style.width = (p.xp/p.xpNext*100)+'%';
+  document.getElementById('xp-val').textContent = `${p.xp}/${p.xpNext}`;
+  document.getElementById('atk-v').textContent = ' '+p.atk;
+  document.getElementById('def-v').textContent = ' '+p.def;
+  document.getElementById('gold-v').textContent = p.gold;
+}
+function updateHotbar() {
+  const hb = document.getElementById('hotbar');
+  const slots = [];
+  slots.push(`
+    <div class="hb-slot${player.potions>0?' active':''}">
+      <span class="hb-key">H</span>🧪<span class="hb-cnt">${player.potions}</span>
+    </div>
+  `);
+  for (let i=0; i<SPELL_ORDER.length; i++) {
+    const s  = SPELLS[SPELL_ORDER[i]];
+    const cd = player.spellCd[i] || 0;
+    const cdPct = cd > 0 ? Math.min(1, cd/s.cd) : 0;
+    const ok = player.mp >= s.mp && cd<=0 && !player.dead;
+    const cls = `hb-slot${ok?' active':''}${cd>0?' cooldown':''}`;
+    slots.push(`
+      <div class="${cls}">
+        <span class="hb-key">${i+2}</span>
+        <span style="font-size:15px;opacity:${ok?1:0.55}">${s.icon}</span>
+        <span class="hb-cnt hb-mp">${s.mp}</span>
+        ${cdPct>0?`<div class="hb-cd-fill" style="height:${(cdPct*100).toFixed(1)}%"></div>`:''}
+      </div>
+    `);
+  }
+  hb.innerHTML = slots.join('');
+}
+
+const logEl = document.getElementById('log-panel');
+function addLog(msg, type='sys') {
+  logLines.unshift({msg, type});
+  if(logLines.length>5) logLines.pop();
+  logEl.style.display='block';
+  logEl.innerHTML = logLines.map(l=>`<div class="log-line log-${l.type}">${l.msg}</div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// MINIMAP
+// ─────────────────────────────────────────────
+const mm = document.getElementById('minimap');
+const mctx = mm.getContext('2d');
+const MMS = 72/Math.max(COLS,ROWS);
+
+function drawMinimap() {
+  mctx.fillStyle='#08080f'; mctx.fillRect(0,0,72,72);
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) {
+    const t = dungeon.map[y][x];
+    if(t===T.WALL) continue;
+    mctx.fillStyle = t===T.CHEST?'#f0c060':t===T.STAIR?'#8060ff':t===T.SPIKE?'#ff6040':t===T.PILLAR?'#6e6450':'#3a3020';
+    mctx.fillRect(x*MMS, y*MMS, MMS, MMS);
+  }
+  // enemies
+  enemies.forEach(e => {
+    if(!e.alive) return;
+    mctx.fillStyle = e.type==='spider'?'#ff3030':'#ff8030';
+    mctx.fillRect(e.x/TILE*MMS-1, e.y/TILE*MMS-1, 2.5, 2.5);
+  });
+  // player
+  mctx.fillStyle='#60b0ff';
+  mctx.fillRect(player.x/TILE*MMS-1.5, player.y/TILE*MMS-1.5, 3, 3);
+}
+
+// ─────────────────────────────────────────────
+// TOOLTIP
+// ─────────────────────────────────────────────
+let tooltipTimer=0;
+function showItemTooltip(item) {
+  const tip = document.getElementById('tooltip');
+  const rc = RARITY_COL[item.rarity]||'#aaa';
+  tip.innerHTML = `
+    <div class="tip-name" style="color:${rc}">${item.icon} ${item.name}</div>
+    <div class="tip-type" style="color:${rc}">${item.type} · ${item.rarity}</div>
+    ${Object.entries(item.stats).map(([k,v])=>`<div class="tip-stat">▶ ${k}: ${v}</div>`).join('')}
+    <div class="tip-val">🪙 ${item.gold}g</div>
+    <div class="tip-desc">${item.desc}</div>
+  `;
+  tip.style.display='block';
+  tip.style.left='50%'; tip.style.top='40%';
+  tip.style.transform='translate(-50%,-50%)';
+  tooltipTimer=3000;
+}
+
+// ─────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────
+function drawSprite(id, x, y, flipX, alpha) {
+  const s = sprites[id]; if(!s) return;
+  ctx.save();
+  if(alpha!==undefined) ctx.globalAlpha=alpha;
+  if(flipX) {
+    ctx.scale(-1,1);
+    ctx.drawImage(s, -(x+s.width), y);
+  } else {
+    ctx.drawImage(s, x, y);
+  }
+  ctx.restore();
+}
+
+function worldToScreen(wx, wy) {
+  return { sx: wx - camera.x, sy: wy - camera.y };
+}
+
+function drawGame(dt) {
+  ctx.clearRect(0,0,VIEW_W,VIEW_H);
+
+  // Camera transform
+  let shakeX=0, shakeY=0;
+  if(shakeTimer>0) {
+    shakeX=(Math.random()-0.5)*shakeAmt*2;
+    shakeY=(Math.random()-0.5)*shakeAmt*2;
+  }
+  ctx.save();
+  ctx.translate(-camera.x+shakeX, -camera.y+shakeY);
+
+  // ── TILES (only the visible viewport region) ──
+  const startTX = Math.max(0, Math.floor(camera.x/TILE));
+  const endTX   = Math.min(COLS, Math.ceil((camera.x+VIEW_W)/TILE)+1);
+  const startTY = Math.max(0, Math.floor(camera.y/TILE));
+  const endTY   = Math.min(ROWS, Math.ceil((camera.y+VIEW_H)/TILE)+1);
+
+  for(let ty=startTY; ty<endTY; ty++) {
+    for(let tx=startTX; tx<endTX; tx++) {
+      const t = dungeon.map[ty][tx];
+      const px = tx*TILE, py = ty*TILE;
+      if(t===T.WALL) {
+        ctx.drawImage(sprites.wall, px, py);
+      } else if(t===T.FLOOR || t===T.PILLAR) {
+        // Pillar tile: draw the floor base here; the pillar prop itself is
+        // rendered later in the Y-sort pass so it can overlap the player.
+        ctx.drawImage(sprites.floor, px, py);
+      } else if(t===T.TORCH) {
+        ctx.drawImage(sprites.tfloor, px, py);
+        // torch light
+        const lum = 0.12+Math.sin(torchPhase*3+tx*1.3+ty*0.7)*0.05;
+        const grad = ctx.createRadialGradient(px+16,py+16,4,px+16,py+16,52);
+        grad.addColorStop(0,`rgba(255,150,40,${lum})`);
+        grad.addColorStop(1,'rgba(255,80,0,0)');
+        ctx.fillStyle=grad; ctx.fillRect(px-36,py-36,TILE+72,TILE+72);
+        // torch sprite (bob)
+        const bob = Math.sin(torchPhase*4+tx)*1.5;
+        ctx.drawImage(sprites.torch, px+11, py-8+bob);
+      } else if(t===T.SPIKE) {
+        ctx.drawImage(sprites.spike, px, py);
+      } else if(t===T.CHEST) {
+        ctx.drawImage(sprites.floor, px, py);
+        const bob = Math.sin(torchPhase*2)*1.5;
+        ctx.drawImage(sprites.chest, px, py-2+bob);
+      } else if(t===T.STAIR) {
+        ctx.drawImage(sprites.stair, px, py);
+      }
+    }
+  }
+
+  // Wall depth cap
+  for(let ty=startTY; ty<endTY; ty++) {
+    for(let tx=startTX; tx<endTX; tx++) {
+      if(dungeon.map[ty][tx]===T.WALL && ty>0 && dungeon.map[ty-1][tx]!==T.WALL) {
+        ctx.drawImage(sprites.wall_top, tx*TILE, ty*TILE);
+      }
+    }
+  }
+
+  // ── Y-SORT PASS (Phase C: pickups + enemies + player + pillars) ──
+  // Sort by foot Y so tall props (pillars) and the player overlap correctly.
+  // Hit flashes / particles / projectiles still draw on top, after this pass.
+  const drawables = [];
+  // Pickups (small, foot = p.y)
+  pickups.forEach(p => drawables.push({ y: p.y, kind: 'pickup', ref: p }));
+  // Enemies (foot at center y + half-height)
+  enemies.forEach(e => {
+    if (e.alive) drawables.push({ y: e.y + e.h/2, kind: 'enemy', ref: e });
+  });
+  // Player
+  drawables.push({ y: player.y + player.h/2, kind: 'player' });
+  // Pillars — enumerate visible only
+  for (let ty=startTY; ty<endTY; ty++) {
+    const row = dungeon.map[ty]; if (!row) continue;
+    for (let tx=startTX; tx<endTX; tx++) {
+      if (row[tx] === T.PILLAR) {
+        // Foot = bottom of the tile the pillar stands on.
+        drawables.push({ y: ty*TILE + TILE, kind: 'pillar', tx, ty });
+      }
+    }
+  }
+  drawables.sort((a,b) => a.y - b.y);
+
+  for (const d of drawables) {
+    if (d.kind === 'pickup') {
+      const p = d.ref;
+      const bob = Math.sin(torchPhase*3 + p.phase)*3;
+      ctx.drawImage(sprites[p.sprite],
+        p.x - sprites[p.sprite].width/2,
+        p.y - sprites[p.sprite].height/2 + bob);
+    } else if (d.kind === 'enemy') {
+      const e = d.ref;
+      // Phase B: bone-rattle jitter on aggro'd skeletons.
+      let jx = 0, jy = 0;
+      if (e.type === 'skeleton' && e.aggro) {
+        jx = Math.sin(torchPhase*38 + e.x*0.13) * 1.4;
+        jy = Math.cos(torchPhase*42 + e.y*0.11) * 0.9;
+      }
+      const drawX = e.x + jx, drawY = e.y + jy;
+      const sx = drawX - e.w/2, sy = drawY - e.h/2;
+      const isHit = e.iframes>0 && Math.floor(e.iframes/80)%2===0;
+      const alpha = isHit ? 0.4 : 1;
+      if (e.facing < 0) {
+        ctx.save(); ctx.scale(-1,1); ctx.globalAlpha = alpha;
+        ctx.drawImage(sprites[e.sprite], -drawX - sprites[e.sprite].width/2, sy);
+        ctx.restore();
+      } else {
+        drawSprite(e.sprite, sx, sy, false, alpha);
+      }
+      // HP bar — anchored to true position (no jitter).
+      const bw=26, bh=4;
+      const bx=e.x-bw/2, by=e.y-e.h/2-8;
+      ctx.fillStyle='#2a0000'; ctx.fillRect(bx,by,bw,bh);
+      const pct=Math.max(0, e.hp/e.maxHp);
+      ctx.fillStyle = pct>0.5 ? '#20cc40' : pct>0.25 ? '#e0a020' : '#e02020';
+      ctx.fillRect(bx, by, bw*pct, bh);
+      ctx.strokeStyle='#000'; ctx.lineWidth=0.5; ctx.strokeRect(bx,by,bw,bh);
+    } else if (d.kind === 'player') {
+      const bob = player.idle ? Math.sin(player.breathPhase) * 0.6 : 0;
+      // Phase D: attack lunge — forward bob peaks mid-swing.
+      const lunge = player.attackPhase > 0
+        ? Math.sin((1 - player.attackPhase) * Math.PI) * 6
+        : 0;
+      const drawCx = player.x + lunge * player.facing;
+      const sx = drawCx - sprites.player.width/2;
+      const sy = player.y - sprites.player.height/2 + bob;
+      const isHit = player.iframes>0 && Math.floor(player.iframes/100)%2===0;
+      const alpha = isHit ? 0.4 : 1;
+      if (player.facing < 0) {
+        ctx.save(); ctx.scale(-1,1); ctx.globalAlpha = alpha;
+        ctx.drawImage(sprites.player, -drawCx - sprites.player.width/2, sy);
+        ctx.restore();
+      } else {
+        drawSprite('player', sx, sy, false, alpha);
+      }
+      // Phase D: slash arc — quick silver sweep during early swing.
+      if (player.attackPhase > 0.5) {
+        const a = (1 - player.attackPhase) * 2;     // 0..1 across early phase
+        const cx = drawCx + player.facing * 14;
+        const cy = player.y - 2;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(player.facing, 1);
+        ctx.strokeStyle = `rgba(220, 230, 255, ${(1 - a) * 0.95})`;
+        ctx.lineWidth   = 2.5 - a*1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 16 + a*4,
+          -Math.PI/3 + a*Math.PI*0.6,
+           Math.PI/3 + a*Math.PI*0.6);
+        ctx.stroke();
+        ctx.restore();
+      }
+    } else if (d.kind === 'pillar') {
+      // Anchor sprite bottom to bottom of the pillar tile so the prop "stands".
+      const px = d.tx * TILE;
+      const py = d.ty * TILE + TILE - sprites.pillar.height;
+      // Center horizontally (sprite is 32 wide, tile is 32 — no offset needed).
+      ctx.drawImage(sprites.pillar, px, py);
+    }
+  }
+
+  // ── PROJECTILES ──
+  drawProjectiles();
+
+  // ── HIT FLASHES ──
+  hitFlashes.forEach(h => {
+    ctx.save();
+    ctx.globalAlpha=h.life*0.9;
+    const s=h.scale*2;
+    ctx.drawImage(sprites.hit, h.x-8*s, h.y-8*s, 16*s, 16*s);
+    ctx.restore();
+  });
+
+  // ── PARTICLES ──
+  particles.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.col;
+    ctx.fillRect(p.x-p.size/2, p.y-p.size/2, p.size, p.size);
+    ctx.restore();
+  });
+
+  ctx.restore(); // end camera transform
+
+  // ── LIGHTING PASS (Phase A: fog-of-war over world; under HUD/dead) ──
+  drawLightingPass(collectLights(startTX, endTX, startTY, endTY));
+
+  // ── DEAD OVERLAY ──
+  if(player.dead) {
+    ctx.fillStyle='rgba(80,0,0,0.6)'; ctx.fillRect(0,0,VIEW_W,VIEW_H);
+    ctx.fillStyle='#ff4040'; ctx.font='bold 18px Courier New'; ctx.textAlign='center';
+    ctx.fillText('YOU DIED', VIEW_W/2, VIEW_H/2-6);
+    ctx.fillStyle='#888'; ctx.font='9px Courier New';
+    ctx.fillText('Refresh to try again', VIEW_W/2, VIEW_H/2+14);
+  }
+}
+
+// ─────────────────────────────────────────────
+// UPDATE
+// ─────────────────────────────────────────────
+let lastTime=0, mmTimer=0, regenTimer=0, hotbarTimer=0;
+const spellPressed      = [false,false,false];
+const spellPressed_prev = [false,false,false];
+let potionKey_prev = false;     // Phase F: edge-detect for actionActive('potion')
+
+function update(dt) {
+  if(!gameRunning || player.dead) return;
+
+  // Phase F: ESC edge-detect — toggle settings overlay, then pause loop.
+  const escNow = actionActive('pause');
+  if (escNow && !escPrev) toggleSettings();
+  escPrev = escNow;
+  if (settingsOpen) return;   // freeze everything (AI, cooldowns, projectiles)
+
+  torchPhase += dt*0.001;
+
+  // ── PLAYER MOVEMENT ──
+  let dx=0, dy=0;
+  if(actionActive('moveLeft'))  dx=-1;
+  else if(actionActive('moveRight')) dx=1;
+  if(actionActive('moveUp'))    dy=-1;
+  else if(actionActive('moveDown'))  dy=1;
+
+  // Joystick
+  if(joy.active) {
+    dx += joy.dx; dy += joy.dy;
+    dx = Math.max(-1, Math.min(1, dx));
+    dy = Math.max(-1, Math.min(1, dy));
+  }
+
+  if(dx!==0&&dy!==0){ dx*=0.707; dy*=0.707; }
+  if(dx!==0) player.facing = dx>0?1:-1;
+
+  player.idle = (dx===0 && dy===0);
+  if(dx!==0||dy!==0) {
+    player.walkPhase += dt*0.008;
+    moveEntity(player, dx*player.speed, dy*player.speed, dt*0.001);
+  } else {
+    // Idle breathing — advance only when not moving (visual-only, draw-time bob).
+    player.breathPhase += dt*0.003;
+  }
+
+  // ── PLAYER COOLDOWNS ──
+  player.attackCd = Math.max(0, player.attackCd - dt);
+  player.iframes = Math.max(0, player.iframes - dt);
+  // Attack swing phase (Phase D) — track normalized 1→0 over 480ms window.
+  player.attackPhase = player.attackCd / 480;
+
+  // ── ATTACK INPUT ──
+  if ((actionActive('attack') || attackPressed) && player.attackCd<=0) doAttack();
+
+  // ── POTION INPUT (edge-triggered to fire once per press) ──
+  const potionKeyHeld = actionActive('potion');
+  if ((potionKeyHeld || potionPressed) && !potionPressed_prev && !potionKey_prev) usePotion();
+  potionKey_prev = potionKeyHeld;
+  potionPressed_prev = potionPressed;
+
+  // ── SPELL INPUT (keyboard via bindings + right-side touch buttons; edge-triggered) ──
+  for (let i=0; i<SPELL_ORDER.length; i++) {
+    const isDown = !!(actionActive('spell'+i) || spellPressed[i]);
+    if (isDown && !spellPressed_prev[i]) castSpell(i);
+    spellPressed_prev[i] = isDown;
+  }
+
+  // ── SPELL COOLDOWNS ──
+  for (let i=0; i<player.spellCd.length; i++) {
+    if (player.spellCd[i] > 0) player.spellCd[i] = Math.max(0, player.spellCd[i] - dt);
+  }
+
+  // ── HEAL-OVER-TIME (Mend) ──
+  if (player.hotTicksLeft > 0) {
+    player.hotTimer -= dt;
+    if (player.hotTimer <= 0) {
+      const before = player.hp;
+      player.hp = Math.min(player.maxHp, player.hp + player.hotHeal);
+      if (player.hp > before) spawnParticles(player.x, player.y-6, 3, '#40ee70');
+      player.hotTicksLeft--;
+      player.hotTimer = player.hotInterval;
+    }
+  }
+
+  // ── SPIKE DAMAGE ──
+  if(isHazard(tileAt(player.x, player.y)) && player.iframes<=0) {
+    player.hp = Math.max(0, player.hp-4);
+    player.iframes=800;
+    addLog('Spike! -4 HP', 'dmg');
+    triggerDamageVignette();
+    updateHUD();
+    if(player.hp<=0) playerDie();
+  }
+
+  // ── STAIR / DESCENT ──
+  if(!GameState.transitioning && tileAt(player.x, player.y)===T.STAIR) {
+    descendFloor();
+  }
+
+  // ── ENEMIES ──
+  enemies.forEach(e => {
+    if(!e.alive) return;
+    e.attackCd = Math.max(0, e.attackCd-dt);
+    e.iframes = Math.max(0, e.iframes-dt);
+    const dist = Math.hypot(player.x-e.x, player.y-e.y);
+
+    if(dist < e.aggroR) {
+      // Chase
+      e.aggro = true;
+      const angle = Math.atan2(player.y-e.y, player.x-e.x);
+      const spd = e.speed*(dist<50?0.4:1);
+      moveEntity(e, Math.cos(angle)*spd, Math.sin(angle)*spd, dt*0.001);
+      e.facing = player.x>e.x?1:-1;
+      e.walkPhase += dt*0.006;
+      // Attack
+      if(dist < 28 && e.attackCd<=0) {
+        e.attackCd = 1100;
+        enemyAttackPlayer(e);
+      }
+    } else {
+      e.aggro = false;
+      // Wander
+      e.wanderTimer -= dt;
+      if(e.wanderTimer<=0) {
+        const a = Math.random()*Math.PI*2;
+        e.wanderDx = Math.cos(a)*0.35;
+        e.wanderDy = Math.sin(a)*0.35;
+        e.wanderTimer = 800+Math.random()*1500;
+      }
+      moveEntity(e, e.wanderDx*e.speed, e.wanderDy*e.speed, dt*0.001);
+    }
+  });
+  enemies = enemies.filter(e=>e.alive);
+
+  // Auto-respawn if low: pick a room not containing the player, spawn off-screen-ish
+  if(enemies.length < 3 && dungeon) {
+    for (let tries=0; tries<12; tries++) {
+      const r = dungeon.rooms[Math.floor(Math.random()*dungeon.rooms.length)];
+      const tx = r.x + Math.floor(Math.random()*r.w);
+      const ty = r.y + Math.floor(Math.random()*r.h);
+      const t = dungeon.map[ty][tx];
+      if (t!==T.FLOOR && t!==T.TORCH) continue;
+      const wx = tx*TILE+TILE/2, wy = ty*TILE+TILE/2;
+      if (Math.hypot(wx-player.x, wy-player.y) < 200) continue; // not on top of player
+      spawnEnemy(tx, ty, Math.random()<0.5?'spider':'skeleton');
+      break;
+    }
+  }
+
+  // ── PICKUPS ──
+  pickups = pickups.filter(p => {
+    const dist = Math.hypot(player.x-p.x, player.y-p.y);
+    if(dist<20) {
+      if(p.type==='gold') {
+        player.gold+=p.amount;
+        document.getElementById('gold-v').textContent=player.gold;
+        addLog(`+${p.amount}g`, 'loot');
+        SFX.pickup_coin();          // Phase G
+      } else if(p.type==='potion') {
+        player.potions++;
+        addLog('Found potion!', 'heal');
+        SFX.pickup_potion();        // Phase G
+        updateHotbar();
+      } else if(p.type==='item') {
+        const it=p.itemDef;
+        addLog(`Found: ${it.icon} ${it.name}`, 'loot');
+        SFX.pickup_item();          // Phase G
+        if(it.dAtk) { player.atk+=it.dAtk; }
+        if(it.dDef) { player.def+=it.dDef; }
+        if(it.dHp)  { player.maxHp+=it.dHp; player.hp=Math.min(player.hp+it.dHp,player.maxHp); }
+        if(it.dMp)  { player.maxMp+=it.dMp; }
+        if(it.dSpd) { player.speed+=player.speed*(it.dSpd/100); }
+        showItemTooltip(it);
+        updateHUD();
+      }
+      return false;
+    }
+    return true;
+  });
+
+  // ── PARTICLES ──
+  particles.forEach(p => {
+    p.x+=p.vx*dt*0.001; p.y+=p.vy*dt*0.001;
+    p.vy+=80*dt*0.001;
+    p.life-=dt*0.0018;
+  });
+  particles = particles.filter(p=>p.life>0);
+
+  // ── PROJECTILES ──
+  updateProjectiles(dt);
+
+  // ── HIT FLASHES ──
+  hitFlashes.forEach(h => { h.life-=dt*0.006; h.scale+=dt*0.002; });
+  hitFlashes = hitFlashes.filter(h=>h.life>0);
+
+  // ── REGEN ──
+  regenTimer -= dt;
+  if(regenTimer<=0) {
+    regenTimer=2500;
+    if(player.mp<player.maxMp) player.mp=Math.min(player.maxMp,player.mp+4);
+    updateHUD();
+  }
+
+  // ── HOTBAR / SPELL BUTTON FX (throttled DOM refresh for CD overlays) ──
+  hotbarTimer -= dt;
+  if (hotbarTimer <= 0) { updateHotbar(); hotbarTimer = 150; }
+  refreshSpellButtons();
+
+  // ── SHAKE / VIG ──
+  shakeTimer -= dt;
+  if(shakeTimer<=0) shakeAmt=0;
+  vigTimer -= dt;
+  if(vigTimer<=0) document.getElementById('damage-vignette').style.boxShadow='inset 0 0 60px rgba(200,30,30,0)';
+
+  // ── TOOLTIP TIMER ──
+  tooltipTimer -= dt;
+  if(tooltipTimer<=0) document.getElementById('tooltip').style.display='none';
+
+  // ── MINIMAP ──
+  mmTimer -= dt;
+  if(mmTimer<=0) { drawMinimap(); mmTimer=500; }
+
+  updateCamera();
+  updateHUD();
+}
+
+// ─────────────────────────────────────────────
+// GAME LOOP
+// ─────────────────────────────────────────────
+let potionPressed_prev=false;
+
+function loop(ts) {
+  const dt = Math.min(ts-lastTime, 50);
+  lastTime = ts;
+  update(dt);
+  drawGame(dt);
+  requestAnimationFrame(loop);
+}
+
+// ─────────────────────────────────────────────
+// MODULE: BINDINGS & SETTINGS (Phase F)
+// Single source of truth for keyboard input. All `keys[...]` checks in
+// the game loop go through actionActive() so they obey live rebindings.
+// ─────────────────────────────────────────────
+// Normalize: single-character keys → lowercase ('A'→'a', ' '→' '),
+// named keys pass through ('ArrowUp', 'Escape', 'Tab', etc.)
+function normKey(k) { return (typeof k==='string' && k.length===1) ? k.toLowerCase() : k; }
+
+// Default bindings — every action lists keys in normalized form.
+const DEFAULT_BINDINGS = {
+  moveUp:    ['w', 'ArrowUp'],
+  moveDown:  ['s', 'ArrowDown'],
+  moveLeft:  ['a', 'ArrowLeft'],
+  moveRight: ['d', 'ArrowRight'],
+  attack:    [' '],
+  potion:    ['h'],
+  spell0:    ['2'],
+  spell1:    ['3'],
+  spell2:    ['4'],
+  pause:     ['Escape'],
+};
+
+// Named presets the user can apply with one click.
+const KEYBIND_PRESETS = {
+  default: DEFAULT_BINDINGS,
+  wow: {
+    moveUp:    ['w'],
+    moveDown:  ['s'],
+    moveLeft:  ['a'],
+    moveRight: ['d'],
+    attack:    [' '],
+    potion:    ['f'],
+    spell0:    ['q'],
+    spell1:    ['e'],
+    spell2:    ['r'],
+    pause:     ['Escape'],
+  },
+  arrows: {
+    moveUp:    ['ArrowUp'],
+    moveDown:  ['ArrowDown'],
+    moveLeft:  ['ArrowLeft'],
+    moveRight: ['ArrowRight'],
+    attack:    [' '],
+    potion:    ['h'],
+    spell0:    ['1'],
+    spell1:    ['2'],
+    spell2:    ['3'],
+    pause:     ['Escape'],
+  },
+};
+
+// Pretty labels for the settings UI.
+const ACTION_LABELS = {
+  moveUp:'Move Up', moveDown:'Move Down', moveLeft:'Move Left', moveRight:'Move Right',
+  attack:'Attack', potion:'Potion',
+  spell0:'Spell 1 · 🔥', spell1:'Spell 2 · ✚', spell2:'Spell 3 · 💥',
+  pause:'Pause / Settings',
+};
+
+const BIND_STORAGE_KEY = 'wardenfall.bindings.v1';
+
+function loadBindings() {
+  try {
+    const raw = localStorage.getItem(BIND_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Trust only keys we know; rebuild defensively.
+    const out = {};
+    for (const a in DEFAULT_BINDINGS) {
+      out[a] = Array.isArray(parsed[a]) ? parsed[a].map(normKey) : DEFAULT_BINDINGS[a].slice();
+    }
+    return out;
+  } catch { return null; }
+}
+function saveBindings() {
+  try { localStorage.setItem(BIND_STORAGE_KEY, JSON.stringify(bindings)); } catch {}
+}
+
+// Live binding state — loaded from storage or default.
+let bindings = loadBindings() || JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+
+function actionActive(name) {
+  const list = bindings[name]; if (!list) return false;
+  for (let i=0; i<list.length; i++) if (keys[list[i]]) return true;
+  return false;
+}
+
+function applyPreset(name) {
+  const preset = KEYBIND_PRESETS[name]; if (!preset) return;
+  bindings = JSON.parse(JSON.stringify(preset));
+  saveBindings();
+  renderSettings();
+}
+
+// Set of keys this game uses (for keydown preventDefault — kills page-scroll
+// on Space / Arrow / etc. only when those keys are actually bound).
+function isBoundKey(k) {
+  for (const a in bindings) if (bindings[a].includes(k)) return true;
+  return false;
+}
+
+// ─────────────────────────────────────────────
+// SETTINGS OVERLAY UI
+// ─────────────────────────────────────────────
+let settingsOpen = false;
+let rebindTarget = null;     // action name being rebound, or null
+let escPrev = false;         // edge-detect ESC across frames
+
+function openSettings()  { settingsOpen = true;  ensureAudio(); document.getElementById('settings-overlay').classList.add('open');    renderSettings(); }
+function closeSettings() { settingsOpen = false; document.getElementById('settings-overlay').classList.remove('open'); rebindTarget = null; }
+function toggleSettings(){ settingsOpen ? closeSettings() : openSettings(); }
+
+function renderSettings() {
+  // Presets row
+  const presetRow = document.getElementById('preset-row');
+  presetRow.innerHTML = `
+    <button class="preset-btn" onclick="applyPreset('default')">DEFAULT</button>
+    <button class="preset-btn" onclick="applyPreset('wow')">WoW (QER+F)</button>
+    <button class="preset-btn" onclick="applyPreset('arrows')">ARROWS</button>
+    <button class="preset-btn reset" onclick="applyPreset('default')">RESET</button>
+  `;
+  // Binding rows
+  const list = document.getElementById('kb-list');
+  list.innerHTML = Object.keys(DEFAULT_BINDINGS).map(act => {
+    const pretty = bindings[act].map(k => k === ' ' ? 'Space' : k).join(', ');
+    const listening = rebindTarget === act ? ' listening' : '';
+    const label = rebindTarget === act ? '...press key' : 'Rebind';
+    return `
+      <div class="kb-row">
+        <span class="lbl">${ACTION_LABELS[act]}</span>
+        <span class="keys">${pretty || '—'}</span>
+        <button class="kb-btn${listening}" onclick="beginRebind('${act}')">${label}</button>
+      </div>
+    `;
+  }).join('');
+  // Phase G: audio rows
+  const audioList = document.getElementById('audio-list');
+  if (audioList) {
+    const masterPct = Math.round(audio.master * 100);
+    audioList.innerHTML = `
+      <div class="kb-row">
+        <span class="lbl">Master Volume</span>
+        <input type="range" id="vol-master" min="0" max="100" value="${masterPct}" style="flex:1">
+        <span class="keys" id="vol-master-v" style="min-width:42px;text-align:right">${masterPct}%</span>
+      </div>
+      <div class="kb-row">
+        <span class="lbl">Mute</span>
+        <span class="keys"><input type="checkbox" id="vol-mute" ${audio.muted?'checked':''}></span>
+        <span style="min-width:42px"></span>
+      </div>
+    `;
+    const slider = document.getElementById('vol-master');
+    const sliderV = document.getElementById('vol-master-v');
+    slider.addEventListener('input', () => {
+      audio.master = (+slider.value) / 100;
+      sliderV.textContent = slider.value + '%';
+      applyMasterGain();
+      saveAudio();
+    });
+    const muteBox = document.getElementById('vol-mute');
+    muteBox.addEventListener('change', () => {
+      audio.muted = muteBox.checked;
+      applyMasterGain();
+      saveAudio();
+    });
+  }
+}
+
+function beginRebind(act) {
+  rebindTarget = act;
+  renderSettings();
+}
+
+// ─────────────────────────────────────────────
+// INPUT
+// ─────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  const k = normKey(e.key);
+  // Rebind capture intercepts everything except Escape (which cancels).
+  if (rebindTarget) {
+    e.preventDefault();
+    if (e.key === 'Escape') { rebindTarget = null; renderSettings(); return; }
+    bindings[rebindTarget] = [k];
+    saveBindings();
+    rebindTarget = null;
+    renderSettings();
+    return;
+  }
+  keys[k] = true;
+  // Prevent page-scroll on bound keys (Space, Arrows, digits, etc.).
+  if (isBoundKey(k)) e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[normKey(e.key)] = false; });
+
+// Attack + potion buttons
+document.getElementById('attack-btn').addEventListener('pointerdown', ()=>{ attackPressed=true; });
+document.getElementById('attack-btn').addEventListener('pointerup',   ()=>{ attackPressed=false; });
+document.getElementById('potion-btn').addEventListener('pointerdown', ()=>{ potionPressed=true; });
+document.getElementById('potion-btn').addEventListener('pointerup',   ()=>{ potionPressed=false; });
+
+// Spell buttons (mobile). Edge detection happens in update() so we just track held state.
+for (let i=0; i<3; i++) {
+  const el = document.getElementById('spell-btn-'+i);
+  if (!el) continue;
+  el.addEventListener('pointerdown', e => { e.preventDefault(); spellPressed[i]=true; });
+  el.addEventListener('pointerup',    () => { spellPressed[i]=false; });
+  el.addEventListener('pointercancel',() => { spellPressed[i]=false; });
+  el.addEventListener('pointerleave', () => { spellPressed[i]=false; });
+}
+
+// (Number-key preventDefault now handled by isBoundKey check in the main
+// keydown listener above — bindings drive what we suppress.)
+
+// Chest tap on canvas
+canvas.addEventListener('pointerdown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = VIEW_W/rect.width, scaleY = VIEW_H/rect.height;
+  const cx = (e.clientX-rect.left)*scaleX + camera.x;
+  const cy = (e.clientY-rect.top)*scaleY + camera.y;
+  const tx = Math.floor(cx/TILE), ty = Math.floor(cy/TILE);
+  if(dungeon.map[ty]&&dungeon.map[ty][tx]===T.CHEST) {
+    openChest(tx,ty);
+  }
+});
+
+function openChest(tx,ty) {
+  dungeon.map[ty][tx]=T.FLOOR;
+  const cx=tx*TILE+TILE/2, cy=ty*TILE+TILE/2;
+  const g=Math.floor(Math.random()*200+100);
+  player.gold+=g;
+  document.getElementById('gold-v').textContent=player.gold;
+  const it=LOOT[Math.floor(Math.random()*LOOT.length)];
+  spawnItem(cx,cy-10,it);
+  spawnGold(cx,cy+6,g);
+  addLog(`Chest opened! +${g}g + ${it.name}`, 'loot');
+  showItemTooltip(it);
+  spawnParticles(cx,cy,12,'#f0c060');
+  triggerShake(3,150);
+}
+
+// ── JOYSTICK ──
+const jzone = document.getElementById('joystick-zone');
+const jbase = document.getElementById('joystick-base');
+const jknob = document.getElementById('joystick-knob');
+const JR=50, KR=22;
+
+jzone.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  joy.active=true; joy.id=e.pointerId;
+  joy.startX=e.clientX; joy.startY=e.clientY; joy.dx=0; joy.dy=0;
+  jbase.style.display='block'; jknob.style.display='block';
+  jbase.style.left=(e.clientX-JR)+'px'; jbase.style.top=(e.clientY-JR)+'px';
+  jbase.style.width=jbase.style.height=JR*2+'px';
+  jknob.style.width=jknob.style.height=KR*2+'px';
+  jknob.style.left=(e.clientX-KR)+'px'; jknob.style.top=(e.clientY-KR)+'px';
+});
+window.addEventListener('pointermove', e=>{
+  if(!joy.active||e.pointerId!==joy.id) return;
+  const dx=e.clientX-joy.startX, dy=e.clientY-joy.startY;
+  const dist=Math.hypot(dx,dy);
+  const nx=dist>JR?dx/dist*JR:dx;
+  const ny=dist>JR?dy/dist*JR:dy;
+  joy.dx=nx/JR; joy.dy=ny/JR;
+  jknob.style.left=(joy.startX+nx-KR)+'px';
+  jknob.style.top=(joy.startY+ny-KR)+'px';
+});
+window.addEventListener('pointerup', e=>{
+  if(e.pointerId!==joy.id) return;
+  joy.active=false; joy.dx=0; joy.dy=0;
+  jbase.style.display='none'; jknob.style.display='none';
+});
+
+// ─────────────────────────────────────────────
+// START
+// ─────────────────────────────────────────────
+function startGame() {
+  document.getElementById('overlay').style.display='none';
+  ensureAudio();                   // Phase G: unlock AudioContext on user gesture
+  buildSprites();
+
+  // Seed the whole run; each floor derives deterministically from this.
+  GameState.runSeed = (Date.now() ^ (Math.random()*0xFFFFFFFF)) >>> 0;
+  GameState.floorNum = 1;
+  GameState.transitioning = false;
+
+  loadFloor();
+
+  updateHUD(); updateHotbar();
+  addLog('You enter the Cursed Keep...', 'sys');
+  addLog('WASD to move, SPACE to attack.', 'sys');
+  addLog('Find the glowing stairs to descend.', 'sys');
+  gameRunning=true;
+  requestAnimationFrame(ts=>{ lastTime=ts; requestAnimationFrame(loop); });
+}
+</script>
+</body>
+</html>
