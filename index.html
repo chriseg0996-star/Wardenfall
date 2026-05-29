@@ -189,9 +189,13 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 #floor-fade {
   position:absolute; inset:0; pointer-events:none; z-index:90;
   background:#000; opacity:0; transition:opacity 0.45s;
-  display:flex; align-items:center; justify-content:center;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
   font-family:'Courier New',monospace; color:#b090d0; font-size:18px; letter-spacing:3px;
+  gap:6px;
 }
+/* Phase M — Biome Variety: transition card has a biome banner line + floor */
+#floor-fade .ff-biome { font-size:20px; letter-spacing:6px; }
+#floor-fade .ff-floor { font-size:12px; letter-spacing:4px; color:#888; }
 
 /* Phase F: settings / pause overlay */
 #settings-overlay {
@@ -585,7 +589,7 @@ window.addEventListener('resize', resize);
 // ─────────────────────────────────────────────
 // TILE TYPES
 // ─────────────────────────────────────────────
-const T = { WALL:0, FLOOR:1, TORCH:2, CHEST:3, SPIKE:4, STAIR:5, PILLAR:6 };
+const T = { WALL:0, FLOOR:1, TORCH:2, CHEST:3, SPIKE:4, STAIR:5, PILLAR:6, LAVA:7 };
 
 // ─────────────────────────────────────────────
 // MODULE: PALETTE — shared {base, hi, sh} per material.
@@ -607,6 +611,114 @@ const PAL = {
   bloodE: '#ff2020',   // spider eye core
   bloodH: '#ff8080',   // spider eye hot center
 };
+
+// ─────────────────────────────────────────────
+// Phase M — Biome Variety
+// Three rotating biomes shape the dungeon's visuals + mob mix as the
+// player descends. Biome assignment in loadFloor() uses a 10-floor
+// cycle so the same theme reappears every 10 floors. Boss floors keep
+// the visuals but override the label (the boss is the focal point).
+// ─────────────────────────────────────────────
+const BIOMES = {
+  cursed_keep: {
+    ambientName: 'The Cursed Keep',
+    accent:      '#b090d0',                // matches existing purple floor label
+    wallTint:    '#12121e', wallTintAlpha: 0.0,   // 0 = no tint (default look)
+    floorTint:   '#221c10', floorTintAlpha: 0.0,
+    lightColor:  'rgba(0,0,0,0.92)',       // current behavior
+    torchColor:  '#ff9020',
+    enemyBias:   null,                     // null → use the floor-tier table from Phase I
+    hazardType:  'spike',
+    ambient:     null,                     // no ambient particles
+    floorInlay:  null,
+  },
+  bone_crypt: {
+    ambientName: 'Bone Crypt',
+    accent:      '#e0d8c0',
+    wallTint:    '#1a1410', wallTintAlpha: 0.45,
+    floorTint:   '#1c1814', floorTintAlpha: 0.40,
+    lightColor:  'rgba(10,5,0,0.93)',
+    torchColor:  '#d0c080',                // sickly yellow-white
+    enemyBias:   { skeleton:0.50, archer:0.25, shielder:0.20, necromancer:0.05 },
+    hazardType:  'spike',
+    ambient:     'dust',                   // slow falling white dots
+    floorInlay:  'bone',                   // ivory horizontal lines every 8px on floor sprite
+  },
+  infernal_depths: {
+    ambientName: 'Infernal Depths',
+    accent:      '#ff7040',
+    wallTint:    '#1a0800', wallTintAlpha: 0.55,
+    floorTint:   '#180c04', floorTintAlpha: 0.50,
+    lightColor:  'rgba(20,0,0,0.94)',
+    torchColor:  '#ff4400',                // deep red-orange
+    enemyBias:   { spider:0.20, archer:0.20, shielder:0.30, necromancer:0.30 },
+    hazardType:  'lava',
+    ambient:     'ember',                  // slow rising red dots
+    floorInlay:  null,
+  },
+};
+
+// Tinted-tile cache (per biome). Built lazily on first access so we don't
+// regenerate sprites every floor.
+const biomeSpriteCache = {};
+function getBiomeSprites(biomeId) {
+  if (biomeSpriteCache[biomeId]) return biomeSpriteCache[biomeId];
+  const b = BIOMES[biomeId] || BIOMES.cursed_keep;
+  const cache = {};
+  // Wall
+  const wc = document.createElement('canvas'); wc.width = TILE; wc.height = TILE;
+  const wctx = wc.getContext('2d');
+  wctx.drawImage(sprites.wall, 0, 0);
+  if (b.wallTintAlpha > 0) {
+    wctx.globalCompositeOperation = 'source-atop';
+    wctx.globalAlpha = b.wallTintAlpha;
+    wctx.fillStyle   = b.wallTint;
+    wctx.fillRect(0, 0, TILE, TILE);
+  }
+  cache.wall = wc;
+  // Floor
+  const fc = document.createElement('canvas'); fc.width = TILE; fc.height = TILE;
+  const fctx = fc.getContext('2d');
+  fctx.drawImage(sprites.floor, 0, 0);
+  if (b.floorTintAlpha > 0) {
+    fctx.globalCompositeOperation = 'source-atop';
+    fctx.globalAlpha = b.floorTintAlpha;
+    fctx.fillStyle   = b.floorTint;
+    fctx.fillRect(0, 0, TILE, TILE);
+  }
+  // Bone-inlay floor variant for bone_crypt — thin ivory horizontal stripes
+  if (b.floorInlay === 'bone') {
+    fctx.globalCompositeOperation = 'source-over';
+    fctx.globalAlpha = 0.35;
+    fctx.fillStyle   = '#d4cab0';
+    for (let y = 4; y < TILE; y += 8) fctx.fillRect(2, y, TILE-4, 1);
+  }
+  fctx.globalAlpha = 1;
+  cache.floor = fc;
+  // Torch-floor (same as floor for tinted biomes — torch sprite draws on top)
+  const tc = document.createElement('canvas'); tc.width = TILE; tc.height = TILE;
+  const tctx = tc.getContext('2d');
+  tctx.drawImage(sprites.tfloor, 0, 0);
+  if (b.floorTintAlpha > 0) {
+    tctx.globalCompositeOperation = 'source-atop';
+    tctx.globalAlpha = b.floorTintAlpha;
+    tctx.fillStyle   = b.floorTint;
+    tctx.fillRect(0, 0, TILE, TILE);
+  }
+  cache.tfloor = tc;
+  biomeSpriteCache[biomeId] = cache;
+  return cache;
+}
+
+// Parse a #rrggbb hex string → {r, g, b}. Used to recolour the torch
+// radial gradient per biome without rebuilding the sprite.
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h, 16);
+  return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
+}
+
+function _currentBiome() { return BIOMES[GameState.biome] || BIOMES.cursed_keep; }
 
 // ─────────────────────────────────────────────
 // PROCEDURAL SPRITE CACHE
@@ -697,6 +809,26 @@ function buildSprites() {
       g.beginPath(); g.moveTo(x+1,28); g.lineTo(x+3,12); g.lineTo(x+2,28); g.closePath(); g.fill();
       g.fillStyle='#708090';
     }
+  });
+
+  // Phase M — Biome Variety: LAVA pit tile (infernal_depths only).
+  // Animated brightness pulse is applied at draw time on top of this base.
+  makeSprite('lava', TILE, TILE, (g) => {
+    g.fillStyle = '#180c04'; g.fillRect(0, 0, TILE, TILE);
+    g.fillStyle = '#3a1004'; g.fillRect(1, 1, TILE-2, TILE-2);
+    // Molten pools (the bright frames will overlay these)
+    g.fillStyle = '#ff4400';
+    g.beginPath(); g.ellipse( 8,  8, 4, 3, 0, 0, Math.PI*2); g.fill();
+    g.beginPath(); g.ellipse(22, 11, 4, 2, 0, 0, Math.PI*2); g.fill();
+    g.beginPath(); g.ellipse(14, 23, 5, 3, 0, 0, Math.PI*2); g.fill();
+    // Hot centres
+    g.fillStyle = '#ffaa20';
+    g.beginPath(); g.ellipse( 8,  8, 2, 1, 0, 0, Math.PI*2); g.fill();
+    g.beginPath(); g.ellipse(14, 23, 2, 1, 0, 0, Math.PI*2); g.fill();
+    // Cracked rim
+    g.fillStyle = '#0a0408';
+    g.fillRect(0, 0, TILE, 1); g.fillRect(0, TILE-1, TILE, 1);
+    g.fillRect(0, 0, 1, TILE); g.fillRect(TILE-1, 0, 1, TILE);
   });
 
   // PILLAR — Phase C tall prop (32 wide × 64 tall). Anchored so its base
@@ -1474,6 +1606,7 @@ const GameState = {
   floorNum: 1,
   runSeed: 0,
   transitioning: false,
+  biome: 'cursed_keep',     // Phase M — set per floor in loadFloor()
 };
 const player = {
   x:0, y:0, // world px (center)
@@ -1566,6 +1699,22 @@ function isBossEnemy(e) {
 // chosen type id. Uses RNG so the per-floor enemy mix is reproducible from
 // the run seed.
 function pickEnemyType(floorNum) {
+  // Phase M — biome override. If the current biome defines an enemyBias
+  // map, sample from it; otherwise fall through to the original floor-tier
+  // weights (cursed_keep takes this path on purpose — no override).
+  const biome = BIOMES[GameState.biome];
+  if (biome && biome.enemyBias) {
+    const entries = Object.entries(biome.enemyBias);
+    let total = 0;
+    for (let i = 0; i < entries.length; i++) total += entries[i][1];
+    const roll = RNG.next() * total;
+    let acc = 0;
+    for (let i = 0; i < entries.length; i++) {
+      acc += entries[i][1];
+      if (roll < acc) return entries[i][0];
+    }
+    return entries[entries.length - 1][0];
+  }
   let table;
   if      (floorNum <= 2) table = [['spider',0.60], ['skeleton',0.40]];
   else if (floorNum <= 4) table = [['spider',0.40], ['skeleton',0.35], ['archer',0.25]];
@@ -1809,6 +1958,63 @@ function spawnParticleBurst(x, y, count, cols, opts) {
 }
 
 // ─────────────────────────────────────────────
+// Phase M — Biome Variety: ambient particle layer (separate from combat
+// particles so it isn't cleared by spawnParticles cleanup or floor loads).
+// "dust" biomes spawn slow-falling motes from the viewport top; "ember"
+// biomes spawn slow-rising sparks from the bottom. Max 20 active at once.
+// ─────────────────────────────────────────────
+let ambientParticles  = [];
+let ambientSpawnTimer = 0;
+const AMBIENT_MAX = 20;
+
+function spawnAmbientParticle() {
+  const b = _currentBiome();
+  if (!b.ambient) return;
+  const isEmber = b.ambient === 'ember';
+  const x = camera.x + Math.random() * VIEW_W;
+  const y = isEmber ? camera.y + VIEW_H + 4 : camera.y - 4;
+  ambientParticles.push({
+    x, y,
+    vx: (Math.random() - 0.5) * 6,
+    vy: isEmber ? -(10 + Math.random()*14) : 5 + Math.random()*9,
+    life: 1, maxLife: 1,
+    col:  isEmber ? '#ff5018' : '#e0d8c0',
+    size: isEmber ? 1.5 + Math.random()*1.2 : 1 + Math.random()*0.8,
+  });
+  if (ambientParticles.length > AMBIENT_MAX) ambientParticles.shift();
+}
+
+function updateAmbientParticles(dt) {
+  const b = _currentBiome();
+  if (b.ambient) {
+    ambientSpawnTimer -= dt;
+    const interval = (b.ambient === 'ember') ? 150 : 200;
+    if (ambientSpawnTimer <= 0) {
+      spawnAmbientParticle();
+      ambientSpawnTimer = interval;
+    }
+  }
+  for (let i = ambientParticles.length - 1; i >= 0; i--) {
+    const p = ambientParticles[i];
+    p.x += p.vx * dt * 0.001;
+    p.y += p.vy * dt * 0.001;
+    p.life -= dt * 0.0008;
+    if (p.life <= 0) ambientParticles.splice(i, 1);
+  }
+}
+
+function drawAmbientParticles() {
+  for (let i = 0; i < ambientParticles.length; i++) {
+    const p = ambientParticles[i];
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.life) * 0.7;
+    ctx.fillStyle = p.col;
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+    ctx.restore();
+  }
+}
+
+// ─────────────────────────────────────────────
 // MODULE: PROJECTILES (shared by player spells + future ranged enemies)
 // Wall collision uses isSolid() — same predicate moveEntity uses.
 // ─────────────────────────────────────────────
@@ -1963,7 +2169,8 @@ function drawLightingPass(lights) {
   // Reset comp + lay down the dark veil over the viewport.
   lctx.globalCompositeOperation = 'source-over';
   lctx.clearRect(0, 0, VIEW_W, VIEW_H);
-  lctx.fillStyle = `rgba(0,0,0,${LIGHT_ALPHA})`;
+  // Phase M — veil colour + alpha from current biome.
+  lctx.fillStyle = (_currentBiome() && _currentBiome().lightColor) || `rgba(0,0,0,${LIGHT_ALPHA})`;
   lctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
   // Punch holes for each light source — translate world → viewport coords.
@@ -2183,7 +2390,13 @@ function tileAt(wx, wy) {
   return dungeon.map[ty][tx];
 }
 function isSolid(t) { return t===T.WALL || t===T.PILLAR; }
-function isHazard(t) { return t===T.SPIKE; }
+function isHazard(t) { return t === T.SPIKE || t === T.LAVA; }
+// Phase M — per-hazard damage + iframe profile. Returns null if not hazardous.
+function hazardProfile(t) {
+  if (t === T.SPIKE) return { dmg: 4, iframes: 800, label: 'Spike!' };
+  if (t === T.LAVA ) return { dmg: 8, iframes: 600, label: 'Lava!' };
+  return null;
+}
 
 function moveEntity(ent, dx, dy, dt) {
   const nx = ent.x + dx*dt;
@@ -2840,6 +3053,27 @@ function clearScoresConfirm() {
 // Build/replace the current floor and place the player at its spawn.
 function loadFloor() {
   dungeon = buildDungeon(GameState.floorNum);
+  // Phase M — Biome Variety: 10-floor cycle determines current biome.
+  // cycle = 0..2 → Cursed Keep, 3..5 → Bone Crypt, 6..9 → Infernal Depths.
+  // Boss floors (every 5th) keep biome visuals but override the floor label.
+  {
+    const cycle = ((GameState.floorNum - 1) % 10);
+    GameState.biome = (cycle < 3) ? 'cursed_keep'
+                   : (cycle < 6) ? 'bone_crypt'
+                   : 'infernal_depths';
+  }
+  // Infernal Depths swaps spike hazards for lava pits (deadlier hazard).
+  if (GameState.biome === 'infernal_depths') {
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        if (dungeon.map[y][x] === T.SPIKE) dungeon.map[y][x] = T.LAVA;
+      }
+    }
+  }
+  // Reset ambient particle pool on floor change so the previous biome's
+  // motes don't bleed into the new one.
+  ambientParticles = [];
+  ambientSpawnTimer = 0;
   // Phase H — A* Pathfinding: bake walkability once per floor. Flat typed
   // array for fast index lookups; 1 = walkable, 0 = solid. Rebuilt every
   // loadFloor() and read-only afterwards (chest opens flip CHEST→FLOOR
@@ -2875,8 +3109,10 @@ function loadFloor() {
     document.getElementById('floor-label').textContent =
       `☠ BOSS FLOOR — ${bossName}`;
   } else {
+    // Phase M — biome-themed label.
+    const biomeName = _currentBiome().ambientName;
     document.getElementById('floor-label').textContent =
-      `☠ The Cursed Keep — Floor ${GameState.floorNum}`;
+      `☠ ${biomeName} — Floor ${GameState.floorNum}`;
   }
   updateBossHP();   // immediately sync the boss HP bar (hide on non-boss floors)
 }
@@ -2891,7 +3127,17 @@ function descendFloor() {
   // Small reward for clearing a floor
   player.hp = Math.min(player.maxHp, player.hp + Math.round(player.maxHp*0.25));
   player.potions++;
-  fade.textContent = `FLOOR ${GameState.floorNum}`;
+  // Phase M — transition card shows the NEW floor's biome banner.
+  {
+    const cycle = ((GameState.floorNum - 1) % 10);
+    const nextBiomeId = (cycle < 3) ? 'cursed_keep'
+                     : (cycle < 6) ? 'bone_crypt'
+                     : 'infernal_depths';
+    const nb = BIOMES[nextBiomeId];
+    fade.innerHTML =
+      `<div class="ff-biome" style="color:${nb.accent}">${nb.ambientName.toUpperCase()}</div>` +
+      `<div class="ff-floor">FLOOR ${GameState.floorNum}</div>`;
+  }
   fade.style.opacity = '1';
   setTimeout(() => {
     loadFloor();
@@ -2994,7 +3240,7 @@ function drawMinimap() {
   for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) {
     const t = dungeon.map[y][x];
     if(t===T.WALL) continue;
-    mctx.fillStyle = t===T.CHEST?'#f0c060':t===T.STAIR?'#8060ff':t===T.SPIKE?'#ff6040':t===T.PILLAR?'#6e6450':'#3a3020';
+    mctx.fillStyle = t===T.CHEST?'#f0c060':t===T.STAIR?'#8060ff':t===T.SPIKE?'#ff6040':t===T.LAVA?'#ff3300':t===T.PILLAR?'#6e6450':'#3a3020';
     mctx.fillRect(x*MMS, y*MMS, MMS, MMS);
   }
   // enemies
@@ -3066,31 +3312,46 @@ function drawGame(dt) {
   const startTY = Math.max(0, Math.floor(camera.y/TILE));
   const endTY   = Math.min(ROWS, Math.ceil((camera.y+VIEW_H)/TILE)+1);
 
+  // Phase M — pull biome-tinted tile sprites + cached torch rgb for the
+  // torch-glow gradient. Cached per biome, so this is a single object
+  // lookup per frame.
+  const bs = getBiomeSprites(GameState.biome || 'cursed_keep');
+  const _bi  = _currentBiome();
+  const _torchRgb = hexToRgb(_bi.torchColor);
+
   for(let ty=startTY; ty<endTY; ty++) {
     for(let tx=startTX; tx<endTX; tx++) {
       const t = dungeon.map[ty][tx];
       const px = tx*TILE, py = ty*TILE;
       if(t===T.WALL) {
-        ctx.drawImage(sprites.wall, px, py);
+        ctx.drawImage(bs.wall, px, py);
       } else if(t===T.FLOOR || t===T.PILLAR) {
         // Pillar tile: draw the floor base here; the pillar prop itself is
         // rendered later in the Y-sort pass so it can overlap the player.
-        ctx.drawImage(sprites.floor, px, py);
+        ctx.drawImage(bs.floor, px, py);
       } else if(t===T.TORCH) {
-        ctx.drawImage(sprites.tfloor, px, py);
-        // torch light
-        const lum = 0.12+Math.sin(torchPhase*3+tx*1.3+ty*0.7)*0.05;
-        const grad = ctx.createRadialGradient(px+16,py+16,4,px+16,py+16,52);
-        grad.addColorStop(0,`rgba(255,150,40,${lum})`);
-        grad.addColorStop(1,'rgba(255,80,0,0)');
-        ctx.fillStyle=grad; ctx.fillRect(px-36,py-36,TILE+72,TILE+72);
-        // torch sprite (bob)
-        const bob = Math.sin(torchPhase*4+tx)*1.5;
+        ctx.drawImage(bs.tfloor, px, py);
+        // Torch light — biome-coloured radial gradient.
+        const lum = 0.12 + Math.sin(torchPhase*3 + tx*1.3 + ty*0.7) * 0.05;
+        const grad = ctx.createRadialGradient(px+16, py+16, 4, px+16, py+16, 52);
+        grad.addColorStop(0, `rgba(${_torchRgb.r},${_torchRgb.g},${_torchRgb.b},${lum})`);
+        grad.addColorStop(1, `rgba(${_torchRgb.r},${Math.floor(_torchRgb.g*0.4)},0,0)`);
+        ctx.fillStyle = grad; ctx.fillRect(px-36, py-36, TILE+72, TILE+72);
+        const bob = Math.sin(torchPhase*4 + tx)*1.5;
         ctx.drawImage(sprites.torch, px+11, py-8+bob);
       } else if(t===T.SPIKE) {
         ctx.drawImage(sprites.spike, px, py);
+      } else if(t===T.LAVA) {
+        // Phase M — molten pulse via animated overlay brightness.
+        ctx.drawImage(sprites.lava, px, py);
+        const pulse = 0.18 + Math.sin(torchPhase*4 + tx*0.7 + ty*0.5) * 0.14;
+        ctx.save();
+        ctx.globalAlpha = pulse;
+        ctx.fillStyle = '#ff5500';
+        ctx.fillRect(px, py, TILE, TILE);
+        ctx.restore();
       } else if(t===T.CHEST) {
-        ctx.drawImage(sprites.floor, px, py);
+        ctx.drawImage(bs.floor, px, py);
         const bob = Math.sin(torchPhase*2)*1.5;
         ctx.drawImage(sprites.chest, px, py-2+bob);
       } else if(t===T.STAIR) {
@@ -3249,6 +3510,11 @@ function drawGame(dt) {
     ctx.fillRect(p.x-p.size/2, p.y-p.size/2, p.size, p.size);
     ctx.restore();
   });
+
+  // Phase M — ambient particles (bone dust / embers) drawn inside the
+  // camera transform so they live in world space and get masked by the
+  // fog of war like everything else.
+  drawAmbientParticles();
 
   ctx.restore(); // end camera transform
 
@@ -3490,7 +3756,7 @@ function setupBossFloor() {
   for (let y = ny; y < ny + nh; y++) {
     for (let x = nx; x < nx + nw; x++) {
       const t = dungeon.map[y][x];
-      if (t === T.WALL || t === T.PILLAR || t === T.SPIKE) {
+      if (t === T.WALL || t === T.PILLAR || t === T.SPIKE || t === T.LAVA) {
         dungeon.map[y][x] = T.FLOOR;
       }
     }
@@ -3664,15 +3930,19 @@ function update(dt) {
     }
   }
 
-  // ── SPIKE DAMAGE ──
-  if(isHazard(tileAt(player.x, player.y)) && player.iframes<=0) {
-    player.hp = Math.max(0, player.hp-4);
-    player.iframes=800;
-    RunStats.damageTaken += 4;          // Phase L
-    addLog('Spike! -4 HP', 'dmg');
-    triggerDamageVignette();
-    updateHUD();
-    if(player.hp<=0) playerDie();
+  // ── HAZARD DAMAGE (Phase M — spike + lava, per-type damage + iframes) ──
+  {
+    const pTile = tileAt(player.x, player.y);
+    const hz = hazardProfile(pTile);
+    if (hz && player.iframes <= 0) {
+      player.hp = Math.max(0, player.hp - hz.dmg);
+      player.iframes = hz.iframes;
+      RunStats.damageTaken += hz.dmg;
+      addLog(`${hz.label} -${hz.dmg} HP`, 'dmg');
+      triggerDamageVignette();
+      updateHUD();
+      if (player.hp <= 0) playerDie();
+    }
   }
 
   // ── STAIR / DESCENT ──
@@ -3919,6 +4189,9 @@ function update(dt) {
     p.life-=dt*0.0018;
   });
   particles = particles.filter(p=>p.life>0);
+
+  // ── Phase M — AMBIENT PARTICLES (bone dust / embers) ──
+  updateAmbientParticles(dt);
 
   // ── PROJECTILES ──
   updateProjectiles(dt);
