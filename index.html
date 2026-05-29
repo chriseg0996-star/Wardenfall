@@ -341,11 +341,11 @@ const VIEW_W  = VIEW_TX * TILE;   // 384
 const VIEW_H  = VIEW_TY * TILE;   // 256
 
 // ── Phase H: A* pathfinding tuning ──
-const PATH_RECOMPUTE_MS       = 400;       // base interval before A* re-runs
-const PATH_RECOMPUTE_JITTER_MS = 200;      // randomised per enemy so they don't all recompute on the same frame
-const PATH_WAYPOINT_REACHED_PX = 6;        // distance to current waypoint that counts as "arrived"
-const PATH_MAX_ITERATIONS     = 800;       // A* node-expansion safety cap (40×30 grid worst case ≈ 1200)
-const LOS_STEP_PX             = TILE / 3;  // line-of-sight sample density
+const PATH_RECALC_MS            = 350;     // base interval before A* re-runs (per enemy)
+const PATH_STAGGER_PER_INDEX_MS = 80;      // initial pathTimer offset per spawn index — prevents thundering-herd recalc
+const PATH_WAYPOINT_REACHED_PX  = 12;      // pop waypoint when within this many px of its world center
+const PATH_MAX_NODES            = 300;     // A* node-expansion hard cap (freeze guard)
+const PATH_DIRECT_CHASE_TILES   = 2;       // when player is within this many tiles, skip pathfinding entirely
 
 // ─────────────────────────────────────────────
 // MODULE: RNG (seeded, mulberry32 — reproducible floors)
@@ -1133,10 +1133,11 @@ function spawnEnemy(tx, ty, type) {
     iframes:0, alive:true, facing:1,
     walkPhase:0,
     aggro:false,       // Phase B: drives skeleton bone-rattle jitter
-    // Phase H: pathfinding state — null path means "no waypoint queue".
-    path:null,
-    pathTimer:0,       // ms until next A* re-run
-    losClear:false,    // last LOS sample result (also drives close-range slowdown)
+    // Phase H — A* Pathfinding state. Stagger initial pathTimer by spawn
+    // index so a fresh floor's enemies don't all recompute on frame 1.
+    pathCache:  null,                                              // [{tx,ty},...] or null
+    pathTarget: null,                                              // {tx,ty} player tile last queried
+    pathTimer:  enemies.length * PATH_STAGGER_PER_INDEX_MS,        // ms until next A* re-run
   });
 }
 
@@ -1589,79 +1590,103 @@ function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh) {
 }
 
 // ─────────────────────────────────────────────
-// MODULE: PATHFINDING (Phase H)
-// A* on the 40×30 tile grid, 8-connected with diagonal-cut prevention,
-// octile heuristic. Walkability uses the same isSolid() predicate as
-// movement so walls + pillars + future solid tile types are handled
-// uniformly.
+// Phase H — A* Pathfinding
 //
-// Callers use the chain: hasLOS() → if clear, chase directly (cheap);
-// if blocked, aStar() → waypoint list, refreshed every PATH_RECOMPUTE_MS.
-// Path waypoints are tile-centre world coordinates (computed by callers
-// from the {tx,ty} entries).
+// Walkability source: dungeon.walkGrid (Uint8Array, 1=walkable), built
+// once per loadFloor() so query-time is a single typed-array read with
+// no isSolid()/map-of-arrays indirection.
+//
+// A*: 4-connected only (BSP corridors are 1 tile wide; diagonals would
+// let enemies "kiss" wall corners that don't exist as walkable paths).
+// Manhattan distance heuristic — admissible + tight for a 4-connected
+// uniform-cost grid. Binary min-heap open set (O(log n) push/pop) so
+// the inner loop doesn't degrade to O(n log n) sort. Hard cap of
+// PATH_MAX_NODES expansions guarantees we can't freeze on degenerate
+// maps (~13% of the worst-case 1200-tile grid).
+//
+// Returns: array of {tx, ty} waypoints from start (exclusive) to goal
+// (inclusive). null if unreachable or node-cap hit.
+//
+// LOS: Bresenham over the same walkGrid. End-inclusive on both ends.
 // ─────────────────────────────────────────────
 
-// Line-of-sight between two world points. Conservative: any solid sample
-// kills the line. Sample density is LOS_STEP_PX (~1/3 tile) — enough to
-// catch 1-tile walls without exploding cost for long ranges.
-function hasLOS(x1, y1, x2, y2) {
-  const dist  = Math.hypot(x2 - x1, y2 - y1);
-  const steps = Math.max(1, Math.ceil(dist / LOS_STEP_PX));
-  for (let i = 1; i <= steps; i++) {
-    const t  = i / steps;
-    const sx = x1 + (x2 - x1) * t;
-    const sy = y1 + (y2 - y1) * t;
-    if (isSolid(tileAt(sx, sy))) return false;
+function walkAt(tx, ty) {
+  if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) return false;
+  return !!(dungeon && dungeon.walkGrid && dungeon.walkGrid[ty * COLS + tx]);
+}
+
+// Bresenham line over tile coords. True iff every tile crossed is walkable.
+function losTiles(sx, sy, gx, gy) {
+  let x = sx | 0, y = sy | 0;
+  const x1 = gx | 0, y1 = gy | 0;
+  const adx = Math.abs(x1 - x), ady = Math.abs(y1 - y);
+  const stepX = x < x1 ? 1 : -1;
+  const stepY = y < y1 ? 1 : -1;
+  let err = adx - ady;
+  while (true) {
+    if (!walkAt(x, y)) return false;
+    if (x === x1 && y === y1) return true;
+    const e2 = err * 2;
+    if (e2 > -ady) { err -= ady; x += stepX; }
+    if (e2 <  adx) { err += adx; y += stepY; }
   }
-  return true;
 }
 
-// 8-connected neighbour offsets — last column is the per-step cost.
-const _A_NEIGHBORS = [
-  [-1,  0, 1     ], [ 1,  0, 1     ], [ 0, -1, 1     ], [ 0,  1, 1     ],
-  [-1, -1, 1.4142], [ 1, -1, 1.4142], [-1,  1, 1.4142], [ 1,  1, 1.4142],
-];
-
-function _aHeuristic(x1, y1, x2, y2) {
-  // Octile distance — admissible + tight for 8-connected grids.
-  const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
-  return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+// Binary min-heap keyed by node.f. Plain functions over a backing array
+// — no per-call object cost beyond the array itself.
+function _heapPush(h, node) {
+  h.push(node);
+  let i = h.length - 1;
+  while (i > 0) {
+    const p = (i - 1) >> 1;
+    if (h[i].f < h[p].f) { const t = h[i]; h[i] = h[p]; h[p] = t; i = p; }
+    else break;
+  }
+}
+function _heapPop(h) {
+  if (h.length === 0) return null;
+  const min  = h[0];
+  const last = h.pop();
+  if (h.length > 0) {
+    h[0] = last;
+    let i = 0; const n = h.length;
+    while (true) {
+      const l = 2*i + 1, r = 2*i + 2;
+      let s = i;
+      if (l < n && h[l].f < h[s].f) s = l;
+      if (r < n && h[r].f < h[s].f) s = r;
+      if (s === i) break;
+      const t = h[i]; h[i] = h[s]; h[s] = t;
+      i = s;
+    }
+  }
+  return min;
 }
 
-// Returns an array of {tx, ty} waypoints from start (exclusive) to goal
-// (inclusive), or null if no path exists / iteration cap hit.
+// 4-directional neighbours — corridors are 1 tile wide, no diagonals.
+const _A_NB4 = [ [1,0], [-1,0], [0,1], [0,-1] ];
+
 function aStar(sx, sy, gx, gy) {
-  if (!dungeon) return null;
+  if (!dungeon || !dungeon.walkGrid) return null;
   if (sx === gx && sy === gy) return [];
-  if (sx < 0 || sy < 0 || sx >= COLS || sy >= ROWS) return null;
-  if (gx < 0 || gy < 0 || gx >= COLS || gy >= ROWS) return null;
-  if (isSolid(dungeon.map[gy][gx])) return null;     // goal unreachable
+  if (!walkAt(gx, gy)) return null;            // unreachable goal
 
-  const key = (x, y) => y * COLS + x;
-  const startKey = key(sx, sy);
-  const goalKey  = key(gx, gy);
-
-  // openSet kept as a Set + linear scan for lowest f. With ≤ ~200 open
-  // nodes in practice on a 40×30 grid, this beats a heap's overhead.
-  const openSet  = new Set([startKey]);
+  const startKey = sy * COLS + sx;
+  const goalKey  = gy * COLS + gx;
+  const open     = [];
   const cameFrom = new Map();
   const gScore   = new Map([[startKey, 0]]);
-  const fScore   = new Map([[startKey, _aHeuristic(sx, sy, gx, gy)]]);
+  const closed   = new Set();
 
-  let iter = 0;
-  while (openSet.size > 0 && iter++ < PATH_MAX_ITERATIONS) {
-    // Pop lowest-f node.
-    let currentKey = -1, currentF = Infinity;
-    for (const k of openSet) {
-      const f = fScore.get(k);
-      if (f !== undefined && f < currentF) { currentF = f; currentKey = k; }
-    }
-    if (currentKey < 0) break;
+  _heapPush(open, { key: startKey, x: sx, y: sy, f: Math.abs(gx - sx) + Math.abs(gy - sy) });
 
-    if (currentKey === goalKey) {
-      // Reconstruct waypoint list.
+  let explored = 0;
+  while (open.length > 0 && explored < PATH_MAX_NODES) {
+    const cur = _heapPop(open);
+    if (closed.has(cur.key)) continue;        // stale heap entry — skip
+    if (cur.key === goalKey) {
       const path = [];
-      let k = currentKey;
+      let k = cur.key;
       while (cameFrom.has(k)) {
         const x = k % COLS, y = (k - x) / COLS;
         path.unshift({ tx: x, ty: y });
@@ -1669,33 +1694,27 @@ function aStar(sx, sy, gx, gy) {
       }
       return path;
     }
+    closed.add(cur.key);
+    explored++;
 
-    openSet.delete(currentKey);
-    const cx = currentKey % COLS;
-    const cy = (currentKey - cx) / COLS;
-    const cG = gScore.get(currentKey);
-
-    for (let i = 0; i < _A_NEIGHBORS.length; i++) {
-      const dx = _A_NEIGHBORS[i][0], dy = _A_NEIGHBORS[i][1], cost = _A_NEIGHBORS[i][2];
-      const nx = cx + dx, ny = cy + dy;
-      if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
-      if (isSolid(dungeon.map[ny][nx])) continue;
-      // Prevent slipping through diagonal corner gaps.
-      if (dx !== 0 && dy !== 0) {
-        if (isSolid(dungeon.map[cy][nx]) || isSolid(dungeon.map[ny][cx])) continue;
-      }
-      const nk    = key(nx, ny);
-      const tentG = cG + cost;
+    const cG = gScore.get(cur.key);
+    for (let i = 0; i < 4; i++) {
+      const nx = cur.x + _A_NB4[i][0];
+      const ny = cur.y + _A_NB4[i][1];
+      if (!walkAt(nx, ny)) continue;
+      const nk = ny * COLS + nx;
+      if (closed.has(nk)) continue;
+      const tentG = cG + 1;
       const prevG = gScore.get(nk);
       if (prevG === undefined || tentG < prevG) {
-        cameFrom.set(nk, currentKey);
+        cameFrom.set(nk, cur.key);
         gScore.set(nk, tentG);
-        fScore.set(nk, tentG + _aHeuristic(nx, ny, gx, gy));
-        openSet.add(nk);
+        const f = tentG + Math.abs(gx - nx) + Math.abs(gy - ny);
+        _heapPush(open, { key: nk, x: nx, y: ny, f });
       }
     }
   }
-  return null;   // no path within iter cap
+  return null;
 }
 
 // ─────────────────────────────────────────────
@@ -1868,6 +1887,18 @@ function playerDie() {
 // Build/replace the current floor and place the player at its spawn.
 function loadFloor() {
   dungeon = buildDungeon(GameState.floorNum);
+  // Phase H — A* Pathfinding: bake walkability once per floor. Flat typed
+  // array for fast index lookups; 1 = walkable, 0 = solid. Rebuilt every
+  // loadFloor() and read-only afterwards (chest opens flip CHEST→FLOOR
+  // which is already walkable, pillars are gen-time only — so no per-frame
+  // invalidation needed).
+  const wg = new Uint8Array(COLS * ROWS);
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      wg[y * COLS + x] = isSolid(dungeon.map[y][x]) ? 0 : 1;
+    }
+  }
+  dungeon.walkGrid = wg;
   player.x = dungeon.spawn.x*TILE + TILE/2;
   player.y = dungeon.spawn.y*TILE + TILE/2;
   // snap camera so we don't slide in from old position
@@ -2338,73 +2369,81 @@ function update(dt) {
     const dist = Math.hypot(player.x-e.x, player.y-e.y);
 
     if(dist < e.aggroR) {
-      // ── Phase H: LOS-gated A* chase ──
+      // ── Phase H — A* Pathfinding chase ──
       e.aggro = true;
-      // Step pathing cooldown regardless of which branch we take below.
-      e.pathTimer = Math.max(0, e.pathTimer - dt);
+      e.pathTimer -= dt;
 
-      // Cheap line-of-sight check. If clear, go straight at the player
-      // (preserves the snappy pre-Phase-H feel in open rooms).
-      const losClear = hasLOS(e.x, e.y, player.x, player.y);
-      e.losClear = losClear;
+      // Tile coords for both ends of the pursuit (cheap; reused below).
+      const eTX = Math.floor(e.x / TILE);
+      const eTY = Math.floor(e.y / TILE);
+      const pTX = Math.floor(player.x / TILE);
+      const pTY = Math.floor(player.y / TILE);
+      const tileDist = Math.abs(pTX - eTX) + Math.abs(pTY - eTY);
 
-      let targetX = player.x, targetY = player.y;
-      if (losClear) {
-        e.path = null;          // drop any stale path; direct chase is fine
-      } else {
-        // Need a path. Recompute when stale OR when the cooldown ticks down.
-        if (!e.path || e.path.length === 0 || e.pathTimer <= 0) {
-          const sx = Math.floor(e.x / TILE);
-          const sy = Math.floor(e.y / TILE);
-          const gx = Math.floor(player.x / TILE);
-          const gy = Math.floor(player.y / TILE);
-          e.path = aStar(sx, sy, gx, gy);
-          // Jitter so 5+ enemies don't all recompute on the same frame.
-          e.pathTimer = PATH_RECOMPUTE_MS + Math.random() * PATH_RECOMPUTE_JITTER_MS;
-        }
-        if (e.path && e.path.length > 0) {
-          // Aim at the first waypoint; pop it when reached.
-          const wp = e.path[0];
-          targetX = wp.tx * TILE + TILE / 2;
-          targetY = wp.ty * TILE + TILE / 2;
-          if (Math.hypot(targetX - e.x, targetY - e.y) < PATH_WAYPOINT_REACHED_PX) {
-            e.path.shift();
-            if (e.path.length > 0) {
-              const nwp = e.path[0];
-              targetX = nwp.tx * TILE + TILE / 2;
-              targetY = nwp.ty * TILE + TILE / 2;
-            } else {
-              targetX = player.x; targetY = player.y;
-            }
-          }
-        } else {
-          // A* failed (player unreachable, isolated region, etc.).
-          // Fall back to direct heading — moveEntity will at least slide
-          // along the obstacle rather than producing visible stalls.
-          targetX = player.x; targetY = player.y;
-        }
+      // Decide: direct chase vs. follow a path.
+      // - Within PATH_DIRECT_CHASE_TILES → no pathfinding overhead.
+      // - LOS clear via Bresenham over walkGrid → no pathfinding either.
+      let usePath = false;
+      if (tileDist >= PATH_DIRECT_CHASE_TILES && !losTiles(eTX, eTY, pTX, pTY)) {
+        usePath = true;
       }
 
-      const angle  = Math.atan2(targetY - e.y, targetX - e.x);
-      // Close-range slowdown only kicks in when we have LOS to the player
-      // (the "circling for a swing" feel). Pathfinding away from a wall
-      // shouldn't tax the enemy's pace.
-      const closeIn = losClear && dist < 50;
-      const spd    = e.speed * (closeIn ? 0.4 : 1);
+      let targetX = player.x, targetY = player.y;
+      if (usePath) {
+        // Recalc when: cache empty, timer expired, OR player tile changed
+        // since the last query (so player darting across a doorway forces
+        // an immediate re-plan).
+        const targetMoved = !e.pathTarget || e.pathTarget.tx !== pTX || e.pathTarget.ty !== pTY;
+        if (!e.pathCache || e.pathCache.length === 0 || e.pathTimer <= 0 || targetMoved) {
+          e.pathCache  = aStar(eTX, eTY, pTX, pTY);
+          e.pathTarget = { tx: pTX, ty: pTY };
+          e.pathTimer  = PATH_RECALC_MS;
+        }
+        if (e.pathCache && e.pathCache.length > 0) {
+          const wp  = e.pathCache[0];
+          const wpX = wp.tx * TILE + TILE / 2;
+          const wpY = wp.ty * TILE + TILE / 2;
+          if (Math.hypot(wpX - e.x, wpY - e.y) < PATH_WAYPOINT_REACHED_PX) {
+            e.pathCache.shift();
+            if (e.pathCache.length > 0) {
+              const nwp = e.pathCache[0];
+              targetX = nwp.tx * TILE + TILE / 2;
+              targetY = nwp.ty * TILE + TILE / 2;
+            }
+            // else: cache emptied this frame — targetX/Y stay on player as fallback
+          } else {
+            targetX = wpX;
+            targetY = wpY;
+          }
+        }
+        // pathCache null → A* found no path (isolated region etc.).
+        // targetX/Y stay on player; moveEntity will at least slide along
+        // the obstacle rather than visibly stalling.
+      } else {
+        // Direct chase — drop any stale path so it doesn't reappear later.
+        e.pathCache = null;
+      }
+
+      const angle   = Math.atan2(targetY - e.y, targetX - e.x);
+      // Close-range slowdown only when chasing directly (the "circling for
+      // a swing" feel). Mid-pathing through a corridor stays at full speed.
+      const closeIn = !usePath && dist < 50;
+      const spd     = e.speed * (closeIn ? 0.4 : 1);
       moveEntity(e, Math.cos(angle)*spd, Math.sin(angle)*spd, dt*0.001);
       e.facing = player.x > e.x ? 1 : -1;
       e.walkPhase += dt * 0.006;
 
-      // Attack (unchanged — still based on true distance to player).
+      // Attack — based on true (world-space) distance to player.
       if (dist < 28 && e.attackCd <= 0) {
         e.attackCd = 1100;
         enemyAttackPlayer(e);
       }
     } else {
-      // Out of aggro range — wander (unchanged). Drop any cached path so
-      // it doesn't carry stale waypoints into the next chase cycle.
+      // Out of aggro range — wander unchanged. Drop any cached path so
+      // it doesn't bleed into the next chase cycle.
       e.aggro = false;
-      e.path = null;
+      e.pathCache  = null;
+      e.pathTarget = null;
       e.wanderTimer -= dt;
       if(e.wanderTimer<=0) {
         const a = Math.random()*Math.PI*2;
