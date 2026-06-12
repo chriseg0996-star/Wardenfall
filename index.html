@@ -1632,6 +1632,46 @@ function buildDungeon(floorNum) {
 }
 
 // ─────────────────────────────────────────────
+// MODULE: CLASSES (Phase P — RPG pivot)
+// Player stats are DERIVED: classBase(classId, level) + player.gearStats.
+// Mage base/growth == the pre-pivot hero numbers, so this refactor is a
+// zero-diff change for current gameplay. Knight/Ranger kits wire up in
+// Phase R; until then they are selectable only via window.__setClass.
+// ─────────────────────────────────────────────
+const CLASS_DEFS = {
+  knight: {
+    name: 'Knight', icon: '🛡',
+    base:   { hp:140, mp:20, atk:14, def:8, speed:110 },
+    growth: { hp:35,  mp:4,  atk:4,  def:3 },
+    kit: ['bash','stance','whirlwind'],          // Phase R
+  },
+  ranger: {
+    name: 'Ranger', icon: '🏹',
+    base:   { hp:90,  mp:30, atk:13, def:4, speed:135 },
+    growth: { hp:20,  mp:6,  atk:5,  def:1 },
+    kit: ['powershot','multishot','tumble'],     // Phase R
+  },
+  mage: {
+    name: 'Mage', icon: '🔮',
+    base:   { hp:100, mp:50, atk:12, def:5, speed:120 },
+    growth: { hp:25,  mp:10, atk:4,  def:2 },
+    kit: ['firebolt','mend','nova'],             // existing SPELLS
+  },
+};
+
+function classBaseStats(classId, level) {
+  const c = CLASS_DEFS[classId] || CLASS_DEFS.mage;
+  const n = level - 1;
+  return {
+    hp:    c.base.hp  + c.growth.hp  * n,
+    mp:    c.base.mp  + c.growth.mp  * n,
+    atk:   c.base.atk + c.growth.atk * n,
+    def:   c.base.def + c.growth.def * n,
+    speed: c.base.speed,
+  };
+}
+
+// ─────────────────────────────────────────────
 // GAME STATE
 // ─────────────────────────────────────────────
 let dungeon = null;
