@@ -1661,7 +1661,7 @@ const CLASS_DEFS = {
 
 function classBaseStats(classId, level) {
   const c = CLASS_DEFS[classId] || CLASS_DEFS.mage;
-  const n = level - 1;
+  const n = Math.max(0, level - 1);   // guard: level<1 must not yield sub-base stats
   return {
     hp:    c.base.hp  + c.growth.hp  * n,
     mp:    c.base.mp  + c.growth.mp  * n,
