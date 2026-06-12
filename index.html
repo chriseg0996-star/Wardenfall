@@ -1692,6 +1692,7 @@ function initPlayerStats(classId) {
   player.classId = classId;
   player.level = 1; player.xp = 0; player.xpNext = 100;
   player.gearStats = { atk:0, def:0, hp:0, mp:0, spdPct:0 };
+  player.dead = false;                 // review fix: __setClass after death must revive
   recomputeStats({ fullHeal: true });
 }
 
@@ -1702,6 +1703,7 @@ window.__setClass = (id) => {
   if (!CLASS_DEFS[id]) return 'unknown class: ' + id;
   initPlayerStats(id);
   updateHUD();
+  updateHotbar();
   return `now ${id} Lv.1 — atk ${player.atk} def ${player.def} hp ${player.maxHp}`;
 };
 
