@@ -1876,13 +1876,16 @@ function initPlayerStats(classId) {
   refreshKitButtons();                 // Phase R: sync touch buttons to new class kit
 }
 
-// Dev helper — Phase R: now kit-aware (initPlayerStats → refreshKitButtons).
+// Dev helper — Phase R: saves outgoing character, switches to target class slot.
+// Calling mid-run effectively restarts the character at the current floor —
+// acceptable dev-tool behaviour (applyCharacter = run-start semantics).
 window.__setClass = (id) => {
   if (!CLASS_DEFS[id]) return 'unknown class: ' + id;
-  initPlayerStats(id);   // resets stats + calls refreshKitButtons
+  syncAccount();         // save outgoing character before switching
+  applyCharacter(id);    // initPlayerStats + restore level/gear from account slot
   updateHUD();
   updateHotbar();
-  return `now ${id} Lv.1 — atk ${player.atk} def ${player.def} hp ${player.maxHp}`;
+  return `now ${id} Lv.${player.level} — atk ${player.atk} def ${player.def} hp ${player.maxHp}`;
 };
 
 // ─────────────────────────────────────────────
@@ -2021,6 +2024,7 @@ function equipItem(it) {
   if (idx >= 0) gearStash.splice(idx, 1);
   if (prev) stashItem(prev);
   recomputeGearTotals();
+  syncAccount();     // Phase R — persist equipped state after recomputeGearTotals
 }
 
 function unequipSlot(slot) {
@@ -2029,6 +2033,7 @@ function unequipSlot(slot) {
   player.equipped[slot] = null;
   stashItem(it);
   recomputeGearTotals();
+  syncAccount();     // Phase R — persist unequip
 }
 
 function sellStashItem(idx) {
@@ -2040,6 +2045,7 @@ function sellStashItem(idx) {
   document.getElementById('gold-v').textContent = player.gold;
   addLog(`Sold ${it.icon} ${it.name} (+${it.gold}g)`, 'loot');
   SFX.pickup_coin();
+  syncAccount();   // Phase R — persist gear/gold changes
 }
 
 // Single acquisition path for every loot source.
@@ -2059,7 +2065,87 @@ function acquireItem(it) {
   }
   showItemTooltip(it);
   updateHUD();
+  syncAccount();   // Phase R — persist gear changes
 }
+
+// ─────────────────────────────────────────────
+// MODULE: ACCOUNT (Phase R — RPG pivot)
+// Persistent account: per-class character slots + shared gold/stash.
+// 'wardenfall.account.v1'. Same defensive try/catch idiom as audio/scores.
+// ─────────────────────────────────────────────
+const ACCOUNT_STORAGE_KEY = 'wardenfall.account.v1';
+
+function _freshCharacter() {
+  return { level:1, xp:0, xpNext:100,
+           equipped:{ weapon:null, helm:null, armor:null, boots:null, ring:null } };
+}
+function _freshAccount() {
+  return { v:1, gold:0, stash:[],
+           characters:{ knight:_freshCharacter(), ranger:_freshCharacter(), mage:_freshCharacter() },
+           lastPlayed:'mage' };
+}
+let account = _freshAccount();
+
+function loadAccount() {
+  try {
+    const raw = localStorage.getItem(ACCOUNT_STORAGE_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (!p || p.v !== 1 || !p.characters) return;       // unknown schema → fresh
+    const fresh = _freshAccount();
+    account = {
+      v:1,
+      gold: typeof p.gold === 'number' ? Math.max(0, p.gold) : 0,
+      stash: Array.isArray(p.stash) ? p.stash.filter(it => it && it.slot && it.stats) : [],
+      characters: fresh.characters,
+      lastPlayed: CLASS_DEFS[p.lastPlayed] ? p.lastPlayed : 'mage',
+    };
+    for (const cid of ['knight','ranger','mage']) {
+      const c = p.characters[cid];
+      if (!c) continue;
+      const f = account.characters[cid];
+      if (typeof c.level === 'number' && c.level >= 1) f.level = Math.floor(c.level);
+      if (typeof c.xp === 'number' && c.xp >= 0) f.xp = c.xp;
+      if (typeof c.xpNext === 'number' && c.xpNext > 0) f.xpNext = c.xpNext;
+      if (c.equipped) for (const s of GEAR_SLOTS) {
+        const it = c.equipped[s];
+        if (it && it.slot === s && it.stats) f.equipped[s] = it;
+      }
+    }
+  } catch {}
+}
+
+function saveAccount() {
+  try { localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(account)); } catch {}
+}
+
+// Pull the live run state into the account object, then persist.
+function syncAccount() {
+  const c = account.characters[player.classId];
+  if (c) {
+    c.level = player.level; c.xp = player.xp; c.xpNext = player.xpNext;
+    c.equipped = player.equipped;
+  }
+  account.gold = player.gold;
+  account.stash = gearStash;
+  account.lastPlayed = player.classId;
+  saveAccount();
+}
+
+// Load a character slot into the live player (start of a run).
+// NOTE: calling mid-run (e.g. via __setClass) effectively restarts the
+// character at the current floor — acceptable dev-tool behaviour.
+function applyCharacter(classId) {
+  initPlayerStats(classId);                       // resets, revives, fullHeal
+  const c = account.characters[classId] || _freshCharacter();
+  player.level = c.level; player.xp = c.xp; player.xpNext = c.xpNext;
+  player.equipped = c.equipped;
+  player.gold = account.gold;
+  gearStash = account.stash;
+  recomputeGearTotals();                          // Σ equipped → gearStats → stats
+  recomputeStats({ fullHeal:true });              // start runs at full hp/mp
+}
+loadAccount();
 
 // ─────────────────────────────────────────────
 // GAME STATE
@@ -3653,12 +3739,14 @@ function checkLevelUp() {
     triggerShake(3, 200);          // Phase N — tuned down from 4/300
     SFX.level_up();                // Phase G
     updateHUD();
+    syncAccount();                 // Phase R — persist level-up immediately
   }
 }
 
 function playerDie() {
   player.dead = true;
   addLog('You have fallen...', 'sys');
+  syncAccount();               // Phase R — save progress before death screen
   showDeathScreen();           // Phase L
 }
 
@@ -3973,6 +4061,7 @@ function loadFloor() {
       `☠ ${biomeName} — Floor ${GameState.floorNum}`;
   }
   updateBossHP();   // immediately sync the boss HP bar (hide on non-boss floors)
+  syncAccount();    // Phase R — persist progress on every floor transition
 }
 
 function descendFloor() {
