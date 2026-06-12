@@ -1685,7 +1685,7 @@ function recomputeStats(opts) {
   }
   player.atk   = b.atk + g.atk;
   player.def   = b.def + g.def;
-  player.speed = Math.round(b.speed * (1 + g.spdPct / 100));
+  player.speed = Math.round(b.speed * (1 + Math.min(g.spdPct, 100) / 100));
 }
 
 function initPlayerStats(classId) {
@@ -1772,6 +1772,10 @@ function generateItem(ilvl, opts) {
   }
   const base = GEAR_NAME[slot][Math.floor(Math.random()*GEAR_NAME[slot].length)];
   const pre  = RARITY_PREFIX[rarity][Math.floor(Math.random()*RARITY_PREFIX[rarity].length)];
+  // Cap speed rolls: movement % is far more powerful per point than flat
+  // stats; uncapped legendary boots rolled ~190%. Per-item cap + the total
+  // clamp in recomputeStats keep speed sane until the balance pass tunes it.
+  if (stats.spdPct) stats.spdPct = Math.min(stats.spdPct, 40);
   return {
     slot, rarity, ilvl, stats,
     name: pre + ' ' + base,
