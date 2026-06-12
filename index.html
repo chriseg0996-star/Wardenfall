@@ -1691,6 +1691,8 @@ function recomputeStats(opts) {
 function initPlayerStats(classId) {
   player.classId = classId;
   player.level = 1; player.xp = 0; player.xpNext = 100;
+  player.equipped = { weapon:null, helm:null, armor:null, boots:null, ring:null };
+  gearStash = [];
   player.gearStats = { atk:0, def:0, hp:0, mp:0, spdPct:0 };
   player.dead = false;                 // review fix: __setClass after death must revive
   recomputeStats({ fullHeal: true });
@@ -1804,6 +1806,79 @@ function _dispStats(it) {
   return d;
 }
 
+// ── Equip model. player.gearStats is DERIVED: Σ equipped item stats.
+// gearStash is run-scoped until the Phase R account save.
+let gearStash = [];
+const STASH_CAP = 40;
+
+function recomputeGearTotals() {
+  const g = { atk:0, def:0, hp:0, mp:0, spdPct:0 };
+  for (const slot of GEAR_SLOTS) {
+    const it = player.equipped[slot];
+    if (!it) continue;
+    g.atk += it.stats.atk; g.def += it.stats.def; g.hp += it.stats.hp;
+    g.mp  += it.stats.mp;  g.spdPct += it.stats.spdPct;
+  }
+  player.gearStats = g;
+  recomputeStats();
+}
+
+function stashItem(it) {
+  if (gearStash.length >= STASH_CAP) {
+    let wi = 0;
+    for (let i = 1; i < gearStash.length; i++)
+      if (itemScore(gearStash[i]) < itemScore(gearStash[wi])) wi = i;
+    const sold = gearStash.splice(wi, 1)[0];
+    player.gold += sold.gold;
+    document.getElementById('gold-v').textContent = player.gold;
+    addLog(`Stash full — sold ${sold.icon} ${sold.name} (+${sold.gold}g)`, 'loot');
+  }
+  gearStash.push(it);
+}
+
+function equipItem(it) {
+  const prev = player.equipped[it.slot];
+  player.equipped[it.slot] = it;
+  const idx = gearStash.indexOf(it);
+  if (idx >= 0) gearStash.splice(idx, 1);
+  if (prev) stashItem(prev);
+  recomputeGearTotals();
+}
+
+function unequipSlot(slot) {
+  const it = player.equipped[slot];
+  if (!it) return;
+  player.equipped[slot] = null;
+  stashItem(it);
+  recomputeGearTotals();
+}
+
+function sellStashItem(idx) {
+  const it = gearStash[idx];
+  if (!it) return;
+  gearStash.splice(idx, 1);
+  player.gold += it.gold;
+  RunStats.goldCollected += it.gold;
+  document.getElementById('gold-v').textContent = player.gold;
+  addLog(`Sold ${it.icon} ${it.name} (+${it.gold}g)`, 'loot');
+  SFX.pickup_coin();
+}
+
+// Single acquisition path for every loot source.
+function acquireItem(it) {
+  updateBestItem(it);
+  const cur = player.equipped[it.slot];
+  if (!cur || itemScore(it) > itemScore(cur)) {
+    equipItem(it);
+    addLog(`Equipped: ${it.icon} ${it.name}`, 'loot');
+  } else {
+    stashItem(it);
+    addLog(`Stashed: ${it.icon} ${it.name}`, 'loot');
+  }
+  showItemTooltip(it);
+  updateHUD();
+}
+
 // ─────────────────────────────────────────────
 // GAME STATE
 // ─────────────────────────────────────────────
@@ -1826,6 +1901,7 @@ const player = {
   level:1,
   classId:'mage',                       // Phase P — drives classBaseStats
   gearStats:{atk:0, def:0, hp:0, mp:0, spdPct:0},  // Phase P — Σ run bonuses (Phase Q: Σ equipped)
+  equipped:{weapon:null, helm:null, armor:null, boots:null, ring:null},  // Phase Q
   atk:12, def:5,
   speed:120,
   gold:0, potions:3,
@@ -1865,28 +1941,6 @@ let potionPressed = false;
 // Touch joystick
 const joy = { active:false, startX:0, startY:0, dx:0, dy:0, id:null };
 
-// ─────────────────────────────────────────────
-// LOOT TABLE
-// ─────────────────────────────────────────────
-const LOOT = [
-  // Original 7 (Phases 1-3)
-  {name:'Iron Sword',       type:'Weapon',     icon:'⚔', rarity:'common',    stats:{ATK:'+8',DEF:'+2'},          desc:'A well-balanced blade.',                gold:120,  dAtk:8,  dDef:2},
-  {name:'Vile Fang',        type:'Greatsword', icon:'🗡', rarity:'rare',      stats:{ATK:'+25','ATK%':'+15%'},    desc:'Cursed blade thirsting for blood.',     gold:680,  dAtk:25},
-  {name:'Leather Vest',     type:'Armor',      icon:'🛡', rarity:'common',    stats:{DEF:'+12',HP:'+30'},          desc:'Tanned hide stitched with sinew.',      gold:90,   dDef:12, dHp:30},
-  {name:'Radiant Plate',    type:'Heavy Armor',icon:'🪬', rarity:'epic',      stats:{DEF:'+65',HP:'+200'},         desc:'Sun-forged plate radiating warmth.',    gold:2450, dDef:65, dHp:200},
-  {name:'Ring of Vitality', type:'Ring',       icon:'💍', rarity:'uncommon',  stats:{HP:'+50'},                    desc:'Pulses with life energy.',              gold:300,  dHp:50},
-  {name:'Swift Boots',      type:'Boots',      icon:'👟', rarity:'common',    stats:{SPD:'+20%'},                  desc:'Light as a feather.',                   gold:150,  dSpd:20},
-  {name:'Mage Pendant',     type:'Amulet',     icon:'📿', rarity:'uncommon',  stats:{MP:'+80'},                    desc:'Crystallized arcane essence.',          gold:350,  dMp:80},
-  // Phase J — 8 new items
-  {name:'Cursed Dagger',    type:'Weapon',     icon:'🗡', rarity:'uncommon',  stats:{ATK:'+15'},                   desc:'Draws blood with each strike.',         gold:220,  dAtk:15},
-  {name:'Bone Shield',      type:'Shield',     icon:'🛡', rarity:'uncommon',  stats:{DEF:'+20',HP:'+20'},          desc:'Carved from a fallen colossus.',        gold:280,  dDef:20, dHp:20},
-  {name:'Shadow Cloak',     type:'Armor',      icon:'🧥', rarity:'rare',      stats:{DEF:'+30',SPD:'+15%'},        desc:'Woven from darkness itself.',           gold:520,  dDef:30, dSpd:15},
-  {name:'Ember Staff',      type:'Catalyst',   icon:'🪄', rarity:'rare',      stats:{MP:'+60',ATK:'+10'},          desc:'Channels raw fire energy.',             gold:480,  dMp:60,  dAtk:10},
-  {name:'Vampiric Ring',    type:'Ring',       icon:'💍', rarity:'epic',      stats:{ATK:'+20','HP%':'+10%'},      desc:'Steals life with every blow.',          gold:1200, dAtk:20, dHp:30},
-  {name:'Titan Gauntlets',  type:'Gloves',     icon:'🧤', rarity:'rare',      stats:{ATK:'+18',DEF:'+18'},         desc:'Forged by a dead god.',                 gold:740,  dAtk:18, dDef:18},
-  {name:'Soulstone',        type:'Relic',      icon:'🔮', rarity:'epic',      stats:{MP:'+100',HP:'+50'},          desc:'A trapped soul powers this gem.',       gold:1800, dMp:100, dHp:50},
-  {name:'Crown of Thorns',  type:'Helmet',     icon:'👑', rarity:'legendary', stats:{ATK:'+40',DEF:'+20',HP:'+100'},desc:'The cursed king wore this to his grave.',gold:4200, dAtk:40, dDef:20, dHp:100},
-];
 const RARITY_COL = {common:'#aaa', uncommon:'#4caf50', rare:'#2196f3', epic:'#9c27b0', legendary:'#ff9800'};
 
 // ─────────────────────────────────────────────
@@ -2946,14 +3000,8 @@ function killEnemy(e) {
     SFX.boss_roar();
     triggerShake(8, 500);
     // Drop pool: epic+ for colossus, rare+ for broodmother.
-    const minTiers = (e.type === 'colossus')
-      ? ['epic','legendary']
-      : ['rare','epic','legendary'];
-    let pool = LOOT.filter(it => minTiers.includes(it.rarity));
-    if (pool.length === 0) pool = LOOT.filter(it => it.rarity === 'rare');
-    if (pool.length === 0) pool = LOOT;
-    const drop = pool[Math.floor(Math.random() * pool.length)];
-    spawnItem(e.x, e.y - 18, drop);
+    const bossMinRarity = (e.type === 'colossus') ? 'epic' : 'rare';
+    spawnItem(e.x, e.y - 18, generateItem(GameState.floorNum, { minRarity: bossMinRarity }));
     // Gold bonus on top of the rolled drop.
     const bonusGold = (e.type === 'colossus') ? 300 : 250;
     spawnGold(e.x, e.y + 6, bonusGold);
@@ -3004,7 +3052,7 @@ function killEnemy(e) {
 
   if(Math.random()<0.28) {
     if(Math.random()<0.4) spawnPotion(e.x, e.y-10);
-    else spawnItem(e.x, e.y-10, LOOT[Math.floor(Math.random()*LOOT.length)]);
+    else spawnItem(e.x, e.y-10, generateItem(GameState.floorNum));
   }
   checkLevelUp();
 }
@@ -3549,7 +3597,7 @@ function showItemTooltip(item) {
   tip.innerHTML = `
     <div class="tip-name" style="color:${rc}">${item.icon} ${item.name}</div>
     <div class="tip-type" style="color:${rc}">${item.type} · ${item.rarity}</div>
-    ${Object.entries(item.stats).map(([k,v])=>`<div class="tip-stat">▶ ${k}: ${v}</div>`).join('')}
+    ${Object.entries(_dispStats(item)).map(([k,v])=>`<div class="tip-stat">▶ ${k}: ${v}</div>`).join('')}
     <div class="tip-val">🪙 ${item.gold}g</div>
     <div class="tip-desc">${item.desc}</div>
   `;
@@ -4546,13 +4594,8 @@ function update(dt) {
         SFX.pickup_potion();        // Phase G
         updateHotbar();
       } else if(p.type==='item') {
-        const it=p.itemDef;
-        addLog(`Found: ${it.icon} ${it.name}`, 'loot');
-        SFX.pickup_item();          // Phase G
-        updateBestItem(it);         // Phase L
-        _applyItemToPlayer(it);        // Phase P — single application path
-        showItemTooltip(it);
-        updateHUD();
+        SFX.pickup_item();
+        acquireItem(p.itemDef);
       }
       pickups.splice(pi, 1);
     }
@@ -4812,77 +4855,32 @@ function _pickRarity(floorNum) {
   return table[table.length - 1][0];
 }
 
-// Pick a random LOOT entry of the rolled rarity. Falls back gracefully
-// to any item if the LOOT table has no entries of that rarity.
-function pickItemByRarity(floorNum) {
-  const rarity = _pickRarity(floorNum);
-  const pool = LOOT.filter(it => it.rarity === rarity);
-  if (pool.length === 0) {
-    // Try the next lower rarity available
-    const tiers = ['common','uncommon','rare','epic','legendary'];
-    for (let i = tiers.indexOf(rarity) - 1; i >= 0; i--) {
-      const fb = LOOT.filter(it => it.rarity === tiers[i]);
-      if (fb.length > 0) return fb[Math.floor(Math.random()*fb.length)];
-    }
-    return LOOT[Math.floor(Math.random()*LOOT.length)];
+function weakestGearSlot() {
+  let worst = GEAR_SLOTS[0], worstScore = Infinity;
+  for (const s of GEAR_SLOTS) {
+    const it = player.equipped[s];
+    const sc = it ? itemScore(it) : -1;     // empty slot always wins
+    if (sc < worstScore) { worstScore = sc; worst = s; }
   }
-  return pool[Math.floor(Math.random()*pool.length)];
+  return worst;
 }
-
-// Guaranteed upgrade slot: identify the player's strongest grown stat
-// (vs. base) and pick a high-delta item in that field, biased toward
-// rare+ tiers on deeper floors. Always returns a positive net-stat pick.
-function pickUpgradeItem(floorNum) {
-  // Phase P — gear growth comes directly from gearStats; no hardcoded class baselines.
-  const g = player.gearStats;
-  const grown = {
-    Atk: g.atk,
-    Def: g.def,
-    Hp:  g.hp,
-    Mp:  g.mp,
-  };
-  let bestKey = 'Atk', bestVal = -Infinity;
-  for (const k in grown) if (grown[k] > bestVal) { bestVal = grown[k]; bestKey = k; }
-  const deltaField = 'd' + bestKey;
-  const candidates = LOOT.filter(it => it[deltaField] && it[deltaField] > 0);
-  if (candidates.length === 0) return LOOT[Math.floor(Math.random()*LOOT.length)];
-  candidates.sort((a, b) => b[deltaField] - a[deltaField]);
-  // Bias toward higher-tier candidates on later floors; on floor 1 any
-  // top-3 in that stat will do.
-  const slice = candidates.slice(0, Math.min(floorNum >= 5 ? 2 : 3, candidates.length));
-  return slice[Math.floor(Math.random()*slice.length)];
-}
-
 function generateChestOffer(floorNum) {
   return [
-    pickItemByRarity(floorNum),
-    pickItemByRarity(floorNum),
-    pickUpgradeItem(floorNum),
+    generateItem(floorNum),
+    generateItem(floorNum),
+    generateItem(floorNum, { slot: weakestGearSlot() }),  // upgrade-biased card
   ];
 }
 
-// Compute deltas vs. current player stats. Returns [{label, amount, isPct}].
+// Phase Q — delta vs the currently equipped item in the candidate's slot.
 function computeStatDeltas(it) {
-  const d = [];
-  if (it.dAtk) d.push({ label:'ATK', amount: it.dAtk });
-  if (it.dDef) d.push({ label:'DEF', amount: it.dDef });
-  if (it.dHp ) d.push({ label:'HP',  amount: it.dHp  });
-  if (it.dMp ) d.push({ label:'MP',  amount: it.dMp  });
-  if (it.dSpd) d.push({ label:'SPD', amount: it.dSpd, isPct:true });
-  return d;
-}
-
-function _applyItemToPlayer(it) {
-  // Phase P — items accumulate into gearStats; totals are derived.
-  const g = player.gearStats;
-  if (it.dAtk) g.atk    += it.dAtk;
-  if (it.dDef) g.def    += it.dDef;
-  if (it.dHp)  g.hp     += it.dHp;
-  if (it.dMp)  g.mp     += it.dMp;
-  if (it.dSpd) g.spdPct += it.dSpd;
-  recomputeStats();
-  // Preserve the old heal-on-pickup feel for +HP items.
-  if (it.dHp) player.hp = Math.min(player.hp + it.dHp, player.maxHp);
+  const cur = player.equipped[it.slot];
+  const deltas = [];
+  for (const k of ['atk','def','hp','mp','spdPct']) {
+    const d = it.stats[k] - (cur ? cur.stats[k] : 0);
+    if (d !== 0) deltas.push({ stat: k === 'spdPct' ? 'SPD%' : k.toUpperCase(), amount: d });
+  }
+  return deltas;
 }
 
 function renderInventoryModal() {
@@ -4897,8 +4895,7 @@ function renderInventoryModal() {
       : deltas.map(d => {
           const sign = d.amount > 0 ? '+' : '';
           const cls  = d.amount > 0 ? 'ic-delta-pos' : d.amount < 0 ? 'ic-delta-neg' : '';
-          const suf  = d.isPct ? '%' : '';
-          return `<div class="ic-delta ${cls}">${sign}${d.amount}${suf} ${d.label}</div>`;
+          return `<div class="ic-delta ${cls}">${sign}${d.amount} ${d.stat}</div>`;
         }).join('');
     return `
       <div class="item-card" style="border-color:${rc}"
@@ -4927,13 +4924,9 @@ function selectChestItem(idx) {
   const offer = currentChestOffer;
   if (!offer || !offer.items[idx]) return;
   const it = offer.items[idx];
-  _applyItemToPlayer(it);
-  updateBestItem(it);                  // Phase L — chest items count too
-  addLog(`Equipped: ${it.icon} ${it.name}`, 'loot');
   SFX.ui_select();                     // Phase N — UI click feedback
   SFX.pickup_item();
-  updateHUD();
-  showItemTooltip(it);
+  acquireItem(it);
   _closeChestModal(true);
 }
 
