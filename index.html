@@ -710,6 +710,20 @@ function getBiomeSprites(biomeId) {
     tctx.fillRect(0, 0, TILE, TILE);
   }
   cache.tfloor = tc;
+  // Phase O — pre-rendered torch glow (was a per-tile per-frame radial
+  // gradient + rgba string concat). Baked at full alpha; the render loop
+  // applies the per-tile flicker via ctx.globalAlpha = lum.
+  const gc = document.createElement('canvas');
+  gc.width = gc.height = TILE + 72;
+  const gctx = gc.getContext('2d');
+  const rgb  = hexToRgb(b.torchColor);
+  const half = (TILE + 72) / 2;
+  const gg = gctx.createRadialGradient(half, half, 4, half, half, half);
+  gg.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},1)`);
+  gg.addColorStop(1, `rgba(${rgb.r},${Math.floor(rgb.g*0.4)},0,0)`);
+  gctx.fillStyle = gg;
+  gctx.fillRect(0, 0, TILE + 72, TILE + 72);
+  cache.torchGlow = gc;
   biomeSpriteCache[biomeId] = cache;
   return cache;
 }
@@ -1426,6 +1440,24 @@ function buildSprites() {
   // PARTICLE
   makeSprite('particle', 6, 6, (g) => {
     g.fillStyle = '#ffdd60'; g.fillRect(1,1,4,4);
+  });
+
+  // Phase O — pre-rendered glow sprites (were per-frame radial gradients).
+  // FIREBOLT GLOW HALO
+  makeSprite('fireGlow', 36, 36, (g) => {
+    const grad = g.createRadialGradient(18, 18, 1, 18, 18, 18);
+    grad.addColorStop(0,  'rgba(255,230,140,0.95)');
+    grad.addColorStop(0.4,'rgba(255,140,30,0.55)');
+    grad.addColorStop(1,  'rgba(255,80,0,0)');
+    g.fillStyle = grad; g.fillRect(0, 0, 36, 36);
+  });
+
+  // STAIR PULSE HALO (drawn scaled 20→40px radius by the render loop)
+  makeSprite('stairPulse', 80, 80, (g) => {
+    const grad = g.createRadialGradient(40, 40, 4, 40, 40, 40);
+    grad.addColorStop(0, 'rgba(160,80,255,0.40)');
+    grad.addColorStop(1, 'rgba(160,80,255,0)');
+    g.fillStyle = grad; g.fillRect(0, 0, 80, 80);
   });
 }
 
@@ -2185,12 +2217,32 @@ function updateProjectiles(dt) {
 // ─────────────────────────────────────────────
 const LIGHT_ALPHA = 0.92;
 
+// Phase O — pre-rendered light-falloff disc. The cut profile is relative to
+// the radius (inner 15% solid → solid to 55% → fade to edge), so one disc
+// scaled via drawImage replaces a per-light per-frame createRadialGradient.
+const LIGHT_DISC_R = 128;
+let lightDisc = null;
+function buildLightDisc() {
+  lightDisc = document.createElement('canvas');
+  lightDisc.width = lightDisc.height = LIGHT_DISC_R * 2;
+  const g = lightDisc.getContext('2d');
+  const grad = g.createRadialGradient(
+    LIGHT_DISC_R, LIGHT_DISC_R, LIGHT_DISC_R * 0.15,
+    LIGHT_DISC_R, LIGHT_DISC_R, LIGHT_DISC_R);
+  grad.addColorStop(0.0,  'rgba(0,0,0,1)');
+  grad.addColorStop(0.55, 'rgba(0,0,0,1)');
+  grad.addColorStop(1.0,  'rgba(0,0,0,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, LIGHT_DISC_R * 2, LIGHT_DISC_R * 2);
+}
+
 function ensureLightCanvas() {
   if (lightCanvas) return;
   lightCanvas = document.createElement('canvas');
   // Phase C: now sized to viewport, not world — 8× less fill per frame.
   lightCanvas.width = VIEW_W; lightCanvas.height = VIEW_H;
   lctx = lightCanvas.getContext('2d');
+  buildLightDisc();
 }
 
 // Collect light sources currently relevant to the visible viewport.
@@ -2202,7 +2254,8 @@ function collectLights(startTX, endTX, startTY, endTY) {
   lights.push({
     x: player.x,
     y: player.y,
-    r: 130 + Math.sin(torchPhase*3) * 4,
+    // Phase O follow-up: radius 130→230 — much wider visibility per playtest.
+    r: 230 + Math.sin(torchPhase*3) * 5,
   });
   if (dungeon) {
     for (let ty = startTY; ty < endTY; ty++) {
@@ -2212,7 +2265,8 @@ function collectLights(startTX, endTX, startTY, endTY) {
           lights.push({
             x: tx*TILE + 16,
             y: ty*TILE + 16,
-            r: 90 + Math.sin(torchPhase*4 + tx*1.3 + ty*0.7) * 6,
+            // Phase O follow-up: 90→130 to match the wider player lantern.
+            r: 130 + Math.sin(torchPhase*4 + tx*1.3 + ty*0.7) * 7,
           });
         }
       }
@@ -2237,15 +2291,10 @@ function drawLightingPass(lights) {
     const vy = L.y - camera.y;
     // Skip lights whose entire bounding box is outside the viewport.
     if (vx + L.r < 0 || vy + L.r < 0 || vx - L.r > VIEW_W || vy - L.r > VIEW_H) continue;
-    // Phase E: keep most of the cone full-bright. Inner 55% is fully cut
-    // (rgba alpha=1 → world fully visible), then linear fade to no-cut
-    // at the edge. Far more navigable than the old 15%-then-fade shape.
-    const g = lctx.createRadialGradient(vx, vy, L.r * 0.15, vx, vy, L.r);
-    g.addColorStop(0.0,  'rgba(0,0,0,1)');
-    g.addColorStop(0.55, 'rgba(0,0,0,1)');
-    g.addColorStop(1.0,  'rgba(0,0,0,0)');
-    lctx.fillStyle = g;
-    lctx.fillRect(vx - L.r, vy - L.r, L.r*2, L.r*2);
+    // Phase E falloff shape, Phase O delivery: the pre-rendered disc holds
+    // the inner-55%-solid-then-fade profile; scaling it to the light radius
+    // is equivalent to the old per-light gradient at a fraction of the cost.
+    lctx.drawImage(lightDisc, vx - L.r, vy - L.r, L.r*2, L.r*2);
   }
   lctx.globalCompositeOperation = 'source-over';
 
@@ -2381,12 +2430,8 @@ loadAudio();
 function drawProjectiles() {
   projectiles.forEach(pr => {
     if (pr.kind === 'firebolt') {
-      // glow halo
-      const g = ctx.createRadialGradient(pr.x, pr.y, 1, pr.x, pr.y, 18);
-      g.addColorStop(0,  'rgba(255,230,140,0.95)');
-      g.addColorStop(0.4,'rgba(255,140,30,0.55)');
-      g.addColorStop(1,  'rgba(255,80,0,0)');
-      ctx.fillStyle = g; ctx.fillRect(pr.x-18, pr.y-18, 36, 36);
+      // glow halo — Phase O: pre-rendered sprite (was a per-frame gradient)
+      ctx.drawImage(sprites.fireGlow, pr.x-18, pr.y-18);
       // core
       ctx.fillStyle = '#ff8030';
       ctx.beginPath(); ctx.ellipse(pr.x, pr.y, 5, 5, 0, 0, Math.PI*2); ctx.fill();
@@ -3345,6 +3390,12 @@ function showItemTooltip(item) {
 // ─────────────────────────────────────────────
 function drawSprite(id, x, y, flipX, alpha) {
   const s = sprites[id]; if(!s) return;
+  // Phase O — fast path: the overwhelmingly common case (no flip, no alpha)
+  // needs no save/restore.
+  if (!flipX && (alpha === undefined || alpha === 1)) {
+    ctx.drawImage(s, x, y);
+    return;
+  }
   ctx.save();
   if(alpha!==undefined) ctx.globalAlpha=alpha;
   if(flipX) {
@@ -3378,12 +3429,9 @@ function drawGame(dt) {
   const startTY = Math.max(0, Math.floor(camera.y/TILE));
   const endTY   = Math.min(ROWS, Math.ceil((camera.y+VIEW_H)/TILE)+1);
 
-  // Phase M — pull biome-tinted tile sprites + cached torch rgb for the
-  // torch-glow gradient. Cached per biome, so this is a single object
-  // lookup per frame.
+  // Phase M — pull biome-tinted tile sprites (incl. the Phase O pre-rendered
+  // torch glow). Cached per biome, so this is a single object lookup per frame.
   const bs = getBiomeSprites(GameState.biome || 'cursed_keep');
-  const _bi  = _currentBiome();
-  const _torchRgb = hexToRgb(_bi.torchColor);
 
   for(let ty=startTY; ty<endTY; ty++) {
     for(let tx=startTX; tx<endTX; tx++) {
@@ -3397,12 +3445,12 @@ function drawGame(dt) {
         ctx.drawImage(bs.floor, px, py);
       } else if(t===T.TORCH) {
         ctx.drawImage(bs.tfloor, px, py);
-        // Torch light — biome-coloured radial gradient.
+        // Torch light — Phase O: pre-rendered biome glow sprite, flicker
+        // via globalAlpha (was a per-tile per-frame gradient).
         const lum = 0.12 + Math.sin(torchPhase*3 + tx*1.3 + ty*0.7) * 0.05;
-        const grad = ctx.createRadialGradient(px+16, py+16, 4, px+16, py+16, 52);
-        grad.addColorStop(0, `rgba(${_torchRgb.r},${_torchRgb.g},${_torchRgb.b},${lum})`);
-        grad.addColorStop(1, `rgba(${_torchRgb.r},${Math.floor(_torchRgb.g*0.4)},0,0)`);
-        ctx.fillStyle = grad; ctx.fillRect(px-36, py-36, TILE+72, TILE+72);
+        ctx.globalAlpha = lum;
+        ctx.drawImage(bs.torchGlow, px-36, py-36);
+        ctx.globalAlpha = 1;
         const bob = Math.sin(torchPhase*4 + tx)*1.5;
         ctx.drawImage(sprites.torch, px+11, py-8+bob);
       } else if(t===T.SPIKE) {
@@ -3411,11 +3459,10 @@ function drawGame(dt) {
         // Phase M — molten pulse via animated overlay brightness.
         ctx.drawImage(sprites.lava, px, py);
         const pulse = 0.18 + Math.sin(torchPhase*4 + tx*0.7 + ty*0.5) * 0.14;
-        ctx.save();
         ctx.globalAlpha = pulse;
         ctx.fillStyle = '#ff5500';
         ctx.fillRect(px, py, TILE, TILE);
-        ctx.restore();
+        ctx.globalAlpha = 1;
       } else if(t===T.CHEST) {
         ctx.drawImage(bs.floor, px, py);
         const bob = Math.sin(torchPhase*2)*1.5;
@@ -3425,22 +3472,18 @@ function drawGame(dt) {
         // shimmer in unison.
         const shPhase = torchPhase * 2.1 + tx*0.3 + ty*0.3;
         const shimX   = (Math.sin(shPhase) * 0.5 + 0.5) * (TILE - 10);
-        ctx.save();
         ctx.globalAlpha = 0.55;
         ctx.fillStyle   = '#ffe080';
         ctx.fillRect(px + 5 + shimX, py + 13 + bob, 1, 5);
-        ctx.restore();
+        ctx.globalAlpha = 1;
       } else if(t===T.STAIR) {
         ctx.drawImage(sprites.stair, px, py);
         // Phase N — stair pulse: purple radial halo, period 2s,
         // radius 20→40 px. Guides the eye toward the exit.
         const sp = (Math.sin(torchPhase * Math.PI) + 1) * 0.5;     // 0..1, 2s period
         const sr = 20 + sp * 20;
-        const sg = ctx.createRadialGradient(px+16, py+16, 4, px+16, py+16, sr);
-        sg.addColorStop(0, 'rgba(160,80,255,0.40)');
-        sg.addColorStop(1, 'rgba(160,80,255,0)');
-        ctx.fillStyle = sg;
-        ctx.fillRect(px+16-sr, py+16-sr, sr*2, sr*2);
+        // Phase O: pre-rendered halo scaled to the pulse radius.
+        ctx.drawImage(sprites.stairPulse, px+16-sr, py+16-sr, sr*2, sr*2);
       }
     }
   }
@@ -3511,22 +3554,21 @@ function drawGame(dt) {
       // Phase N — attack telegraph: yellow flash strobing at 25Hz during
       // the 180ms wind-up so the player has a clear "incoming attack" tell.
       if (e.windupTimer > 0 && Math.floor(e.windupTimer/40) % 2 === 0) {
-        ctx.save();
+        // Phase O: manual alpha reset (was save/restore per enemy per frame).
         ctx.globalAlpha = 0.55;
         ctx.fillStyle   = '#ffe040';
         ctx.fillRect(sx, sy, sprites[e.sprite].width, sprites[e.sprite].height);
-        ctx.restore();
+        ctx.globalAlpha = 1;
       }
       // Phase I — shielder: highlight when actively blocking.
       if (e.type === 'shielder' && e.shieldedNow) {
-        ctx.save();
         ctx.globalAlpha = 0.55;
         ctx.fillStyle = '#80c0ff';
         // Overlay a thin slab in front of the shielder, on its facing side,
         // to read as the raised tower shield.
         const ox = e.facing < 0 ? (e.x - e.w/2 - 6) : (e.x + e.w/2 - 2);
         ctx.fillRect(ox, e.y - e.h/2 + 2, 8, e.h - 6);
-        ctx.restore();
+        ctx.globalAlpha = 1;
       }
       // HP bar — anchored to true position (no jitter). Skipped for
       // bosses because the dedicated top-of-screen #boss-hp bar is the
@@ -4292,7 +4334,10 @@ function update(dt) {
       moveEntity(e, e.wanderDx*e.speed, e.wanderDy*e.speed, dt*0.001);
     }
   });
-  enemies = enemies.filter(e=>e.alive);
+  // Phase O — in-place removal (was .filter(), a new array every frame).
+  for (let i=enemies.length-1; i>=0; i--) {
+    if (!enemies[i].alive) enemies.splice(i, 1);
+  }
 
   // Auto-respawn if low: pick a room not containing the player, spawn off-screen-ish
   if(enemies.length < 3 && dungeon) {
@@ -4310,7 +4355,9 @@ function update(dt) {
   }
 
   // ── PICKUPS ──
-  pickups = pickups.filter(p => {
+  // Phase O — backward in-place splice (was .filter(), a new array every frame).
+  for (let pi=pickups.length-1; pi>=0; pi--) {
+    const p = pickups[pi];
     const dist = Math.hypot(player.x-p.x, player.y-p.y);
     if(dist<20) {
       if(p.type==='gold') {
@@ -4337,18 +4384,20 @@ function update(dt) {
         showItemTooltip(it);
         updateHUD();
       }
-      return false;
+      pickups.splice(pi, 1);
     }
-    return true;
-  });
+  }
 
   // ── PARTICLES ──
-  particles.forEach(p => {
+  // Phase O — update + in-place removal in one backward pass (was forEach
+  // followed by .filter(), a new array every frame).
+  for (let i=particles.length-1; i>=0; i--) {
+    const p = particles[i];
     p.x+=p.vx*dt*0.001; p.y+=p.vy*dt*0.001;
     p.vy+=80*dt*0.001;
     p.life-=dt*0.0018;
-  });
-  particles = particles.filter(p=>p.life>0);
+    if (p.life<=0) particles.splice(i, 1);
+  }
 
   // ── Phase M — AMBIENT PARTICLES (bone dust / embers) ──
   updateAmbientParticles(dt);
@@ -4360,8 +4409,12 @@ function update(dt) {
   updateProjectiles(dt);
 
   // ── HIT FLASHES ──
-  hitFlashes.forEach(h => { h.life-=dt*0.006; h.scale+=dt*0.002; });
-  hitFlashes = hitFlashes.filter(h=>h.life>0);
+  // Phase O — same in-place pattern as particles.
+  for (let i=hitFlashes.length-1; i>=0; i--) {
+    const h = hitFlashes[i];
+    h.life-=dt*0.006; h.scale+=dt*0.002;
+    if (h.life<=0) hitFlashes.splice(i, 1);
+  }
 
   // ── REGEN ──
   regenTimer -= dt;
