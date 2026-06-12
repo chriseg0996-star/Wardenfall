@@ -38,7 +38,8 @@ single file: `index.html`.
 - ACTIVE — RPG pivot: spec at docs/superpowers/specs/2026-06-12-wardenfall-rpg-pivot-design.md,
   phase index at docs/superpowers/plans/2026-06-12-rpg-pivot-master.md.
 - DONE — RPG Phase P: derived stat model (classBase + gearStats) + CLASS_DEFS (knight/ranger/mage).
-- NEXT — RPG Phase Q: gear system core (generated items, 5 slots × 5 rarities, equip/inventory).
+- DONE — RPG Phase Q: gear system core (generateItem, equip/stash, gear screen, loot cards).
+- NEXT — RPG Phase R: screens + account save + playable Knight/Ranger kits.
 
 ## First instruction to expect
 "Read index.html and this file, then implement Phase 3."
