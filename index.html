@@ -2193,6 +2193,62 @@ const SKILLS = {
       triggerShake(4, 200);
     },
   },
+  // ── Phase R: Ranger kit ──
+  powershot: {
+    name:'Power Shot', icon:'🏹', mp:10, cd:4000, sfx:'arrow_fire',
+    cast(p) {
+      spawnProjectile({
+        x: p.x + p.facing*12, y: p.y, vx: p.facing*460, vy: 0, w: 12, h: 4,
+        life: 900, owner:'player', damage: Math.max(1, Math.round(p.atk*1.8)),
+        kind:'arrow', pierce:true,
+      });
+      spawnParticles(p.x + p.facing*16, p.y, 6, '#caa078');
+    },
+  },
+  multishot: {
+    name:'Multishot', icon:'🎯', mp:16, cd:7000, sfx:'arrow_fire',
+    cast(p) {
+      for (const spread of [-0.25, 0, 0.25]) {
+        const ang = (p.facing > 0 ? 0 : Math.PI) + spread;
+        spawnProjectile({
+          x: p.x + p.facing*12, y: p.y,
+          vx: Math.cos(ang)*360, vy: Math.sin(ang)*360, w: 10, h: 4,
+          life: 700, owner:'player', damage: Math.max(1, Math.round(p.atk*0.9)),
+          kind:'arrow',
+        });
+      }
+    },
+  },
+  tumble: {
+    name:'Tumble', icon:'💨', mp:8, cd:5000, sfx:'dash',
+    cast(p) {
+      // Dash ~90px in movement direction (facing if standing still),
+      // stepping 6px at a time so walls stop the dash cleanly.
+      let dx = p.facing, dy = 0;
+      if (joy.active && (joy.dx || joy.dy)) {
+        const m = Math.hypot(joy.dx, joy.dy);
+        dx = joy.dx / m; dy = joy.dy / m;
+      } else {
+        // Prefer keyboard direction if pressed
+        let kdx = 0, kdy = 0;
+        if (actionActive('moveLeft'))  kdx = -1;
+        else if (actionActive('moveRight')) kdx = 1;
+        if (actionActive('moveUp'))    kdy = -1;
+        else if (actionActive('moveDown'))  kdy = 1;
+        if (kdx !== 0 || kdy !== 0) {
+          const m = Math.hypot(kdx, kdy) || 1;
+          dx = kdx / m; dy = kdy / m;
+        }
+      }
+      for (let i = 0; i < 15; i++) {
+        const nx = p.x + dx*6, ny = p.y + dy*6;
+        if (isSolid(tileAt(nx, ny))) break;
+        p.x = nx; p.y = ny;
+      }
+      p.iframes = 500;
+      spawnParticles(p.x, p.y, 10, '#b0a890');
+    },
+  },
 };
 // Phase R: SPELL_ORDER removed — slot → id now resolved via kitSkills()[slot].
 
@@ -2775,6 +2831,9 @@ const SFX = {
   shielder_bash: () => { playNoise({ dur:0.12, gain:0.26, lowpass:600 });
                          playTone({ type:'square', freq:130, freqEnd:55, dur:0.18, gain:0.18 }); },
   summon:        () => playTone({ type:'sine',     freq:220, freqEnd:660, dur:0.45, gain:0.12 }),
+  // Phase R — Ranger dash
+  dash:          () => { playTone({ type:'sawtooth', freq:600, freqEnd:200, dur:0.12, gain:0.10 });
+                         playNoise({ dur:0.08, gain:0.08, lowpass:1200 }); },
   // Phase K — Boss Floors
   boss_slam:     () => { playNoise({ dur:0.45, gain:0.30, lowpass:380 });
                          playTone({ type:'square',   freq:70,  freqEnd:30, dur:0.50, gain:0.22 }); },
@@ -3068,7 +3127,21 @@ function doAttack() {
   if(player.attackCd > 0) return;
   player.attackCd = player.attackCdMax;   // BUG-4 FIXED — was hardcoded 480
   player.attackPhase = 1;     // Phase D: drives draw-time lunge + slash arc
-  SFX.swing();                // Phase G
+
+  // Phase R — Ranger: bow basic attack (no melee SFX/hit-scan)
+  if (player.classId === 'ranger') {
+    SFX.arrow_fire();
+    spawnProjectile({
+      x: player.x + player.facing*12, y: player.y,
+      vx: player.facing*340, vy: 0, w: 10, h: 4,
+      life: 700, owner: 'player',
+      damage: Math.max(1, player.atk + Math.floor(Math.random()*5-2)),
+      kind: 'arrow',
+    });
+    return;
+  }
+
+  SFX.swing();                // Phase G (melee only)
 
   const reach = 36;
   const ax = player.x + player.facing * reach;
