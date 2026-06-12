@@ -2974,10 +2974,9 @@ function checkLevelUp() {
     player.level++;
     player.xp -= player.xpNext;
     player.xpNext = Math.floor(player.xpNext*1.6);
-    player.maxHp += 25; player.hp = player.maxHp;
-    player.maxMp += 10; player.mp = player.maxMp;
-    player.atk += 4; player.def += 2;
-    addLog(`LEVEL UP! Lv.${player.level} — ATK+4 DEF+2 HP full`, 'lvl');
+    recomputeStats({ fullHeal: true });        // Phase P — growth comes from CLASS_DEFS
+    const gr = (CLASS_DEFS[player.classId] || CLASS_DEFS.mage).growth;
+    addLog(`LEVEL UP! Lv.${player.level} — ATK+${gr.atk} DEF+${gr.def} HP full`, 'lvl');
     document.getElementById('lvl-span').textContent = `Lv.${player.level}`;
     spawnParticles(player.x, player.y, 16, '#c060ff');
     triggerShake(3, 200);          // Phase N — tuned down from 4/300
