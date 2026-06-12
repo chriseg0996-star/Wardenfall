@@ -2237,7 +2237,7 @@ const player = {
   breathPhase:0,    // idle "breathing" bob (visual only)
   dead:false,
   // ── Phase 3: spells & MP ──
-  spellCd:[0,0,0],   // per-slot cooldown (ms remaining), indexed by SPELL_ORDER
+  spellCd:[0,0,0],   // per-slot cooldown (ms remaining), indexed by the class kit (kitSkills())
   hotTicksLeft:0,    // heal-over-time: remaining ticks
   hotTimer:0,        // ms until next HoT tick
   hotInterval:500,   // ms between HoT ticks
@@ -5479,7 +5479,7 @@ const KEYBIND_PRESETS = {
 const ACTION_LABELS = {
   moveUp:'Move Up', moveDown:'Move Down', moveLeft:'Move Left', moveRight:'Move Right',
   attack:'Attack', potion:'Potion',
-  spell0:'Spell 1 · 🔥', spell1:'Spell 2 · ✚', spell2:'Spell 3 · 💥',
+  spell0:'Skill 1', spell1:'Skill 2', spell2:'Skill 3',
   pause:'Pause / Settings',
 };
 
@@ -5989,7 +5989,7 @@ function startGame(classId) {
 // ─────────────────────────────────────────────
 // Phase N — Polish (COMPLETE)
 // ─────────────────────────────────────────────
-// Wardenfall — phases A–O complete; RPG pivot P–Q shipped (stats, classes, gear).
+// Wardenfall — phases A–O complete; RPG pivot P–R shipped (stats, classes, gear, account).
 </script>
 </body>
 </html>

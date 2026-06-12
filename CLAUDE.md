@@ -39,7 +39,8 @@ single file: `index.html`.
   phase index at docs/superpowers/plans/2026-06-12-rpg-pivot-master.md.
 - DONE — RPG Phase P: derived stat model (classBase + gearStats) + CLASS_DEFS (knight/ranger/mage).
 - DONE — RPG Phase Q: gear system core (generateItem, equip/stash, gear screen, loot cards).
-- NEXT — RPG Phase R: screens + account save + playable Knight/Ranger kits.
+- DONE — RPG Phase R: SKILLS kits (knight/ranger/mage), class sprites+portraits, account save, title/char-select.
+- NEXT — RPG Phase S: chapter/stage select, stage seeds, stars, results screen, touch pause.
 
 ## First instruction to expect
 "Read index.html and this file, then implement Phase 3."
