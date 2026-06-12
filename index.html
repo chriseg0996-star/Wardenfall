@@ -562,7 +562,7 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   <!-- Phase J — Inventory & Item Decisions: chest-opened modal -->
   <div id="inventory-overlay">
     <div class="inventory-panel">
-      <div class="inventory-title">⚱ CHEST OPENED</div>
+      <div class="inventory-title">⚱ LOOT — CHOOSE ONE</div>
       <div class="inventory-sub">Choose one</div>
       <div class="inventory-cards" id="inventory-cards"></div>
       <div class="inventory-actions">
@@ -4997,25 +4997,35 @@ function renderInventoryModal() {
   if (!offer) return;
   const cards = document.getElementById('inventory-cards');
   cards.innerHTML = offer.items.map((it, idx) => {
-    const rc = RARITY_COL[it.rarity] || '#aaa';
+    const rc   = RARITY_COL[it.rarity] || '#aaa';
+    const epic = it.rarity === 'epic' || it.rarity === 'legendary';
+    const glow = epic ? `box-shadow:0 0 8px ${rc};` : '';
+    // stat lines from _dispStats
+    const statLines = Object.entries(_dispStats(it))
+      .map(([k,v]) => `<div class="ic-stat">${k} <span style="color:#ddd">${v}</span></div>`)
+      .join('');
+    // delta block — fix SPD% to render as "+N% SPD"
     const deltas = computeStatDeltas(it);
     const deltaHtml = deltas.length === 0
-      ? `<div class="ic-delta-none">No stat change</div>`
+      ? `<div class="ic-delta-none">vs equipped: —</div>`
       : deltas.map(d => {
           const sign = d.amount > 0 ? '+' : '';
           const cls  = d.amount > 0 ? 'ic-delta-pos' : d.amount < 0 ? 'ic-delta-neg' : '';
-          return `<div class="ic-delta ${cls}">${sign}${d.amount} ${d.stat}</div>`;
+          const label = d.stat === 'SPD%'
+            ? `${sign}${d.amount}% SPD`
+            : `${sign}${d.amount} ${d.stat}`;
+          return `<div class="ic-delta ${cls}">${label}</div>`;
         }).join('');
     return `
-      <div class="item-card" style="border-color:${rc}"
+      <div class="item-card" style="border:2px solid ${rc};${glow}"
            onclick="selectChestItem(${idx})"
-           onmouseover="this.style.boxShadow='0 0 12px ${rc}66'"
-           onmouseout="this.style.boxShadow='none'">
-        <div class="ic-icon">${it.icon}</div>
+           onmouseover="this.style.boxShadow='0 0 14px ${rc}'"
+           onmouseout="this.style.boxShadow='${epic ? `0 0 8px ${rc}` : `none`}'">
+        <div class="ic-icon" style="font-size:32px;margin-bottom:4px">${it.icon}</div>
         <div class="ic-name" style="color:${rc}">${it.name}</div>
-        <div class="ic-type">${it.type}</div>
-        <div class="ic-deltas">${deltaHtml}</div>
-        <div class="ic-desc">${it.desc}</div>
+        <div class="ic-rarity" style="color:${rc};font-size:8px;letter-spacing:1px;text-transform:uppercase;opacity:0.85">${it.rarity} · ilvl ${it.ilvl}</div>
+        <div class="ic-stats" style="margin-top:4px;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:9px;color:#8fa7c4">${statLines}</div>
+        <div class="ic-deltas" style="margin-top:4px;border-top:1px solid #333;padding-top:3px">${deltaHtml}</div>
       </div>
     `;
   }).join('');
