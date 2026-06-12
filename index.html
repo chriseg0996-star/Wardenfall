@@ -1671,6 +1671,40 @@ function classBaseStats(classId, level) {
   };
 }
 
+// Recompute all derived stats from class base + gear. Current hp/mp are
+// preserved (clamped to new max) unless opts.fullHeal (level-up, new game).
+function recomputeStats(opts) {
+  const b = classBaseStats(player.classId, player.level);
+  const g = player.gearStats;
+  player.maxHp = b.hp + g.hp;
+  player.maxMp = b.mp + g.mp;
+  if (opts && opts.fullHeal) { player.hp = player.maxHp; player.mp = player.maxMp; }
+  else {
+    player.hp = Math.min(player.hp, player.maxHp);
+    player.mp = Math.min(player.mp, player.maxMp);
+  }
+  player.atk   = b.atk + g.atk;
+  player.def   = b.def + g.def;
+  player.speed = Math.round(b.speed * (1 + g.spdPct / 100));
+}
+
+function initPlayerStats(classId) {
+  player.classId = classId;
+  player.level = 1; player.xp = 0; player.xpNext = 100;
+  player.gearStats = { atk:0, def:0, hp:0, mp:0, spdPct:0 };
+  recomputeStats({ fullHeal: true });
+}
+
+// Dev helper until the Phase R character-select screen exists. Resets to
+// Lv.1 of the given class. NOTE: hotbar kit stays the mage spells until
+// Phase R wires per-class kits.
+window.__setClass = (id) => {
+  if (!CLASS_DEFS[id]) return 'unknown class: ' + id;
+  initPlayerStats(id);
+  updateHUD();
+  return `now ${id} Lv.1 — atk ${player.atk} def ${player.def} hp ${player.maxHp}`;
+};
+
 // ─────────────────────────────────────────────
 // GAME STATE
 // ─────────────────────────────────────────────
@@ -1691,6 +1725,8 @@ const player = {
   mp:50, maxMp:50,
   xp:0, xpNext:100,
   level:1,
+  classId:'mage',                       // Phase P — drives classBaseStats
+  gearStats:{atk:0, def:0, hp:0, mp:0, spdPct:0},  // Phase P — Σ run bonuses (Phase Q: Σ equipped)
   atk:12, def:5,
   speed:120,
   gold:0, potions:3,
@@ -5030,6 +5066,7 @@ function startGame() {
   GameState.floorNum = 1;
   GameState.transitioning = false;
 
+  initPlayerStats(player.classId || 'mage');   // Phase P — derived stat model
   resetRunStats();                 // Phase L — fresh run telemetry
   loadFloor();
 
