@@ -1830,6 +1830,7 @@ function stashItem(it) {
       if (itemScore(gearStash[i]) < itemScore(gearStash[wi])) wi = i;
     const sold = gearStash.splice(wi, 1)[0];
     player.gold += sold.gold;
+    RunStats.goldCollected += sold.gold;
     document.getElementById('gold-v').textContent = player.gold;
     addLog(`Stash full — sold ${sold.icon} ${sold.name} (+${sold.gold}g)`, 'loot');
   }
@@ -1870,6 +1871,10 @@ function acquireItem(it) {
   const cur = player.equipped[it.slot];
   if (!cur || itemScore(it) > itemScore(cur)) {
     equipItem(it);
+    // Heal by the HP gained vs the replaced item — finding armor mid-fight
+    // should feel good (parity with the pre-gear item system).
+    const dHp = it.stats.hp - (cur ? cur.stats.hp : 0);
+    if (dHp > 0) player.hp = Math.min(player.hp + dHp, player.maxHp);
     addLog(`Equipped: ${it.icon} ${it.name}`, 'loot');
   } else {
     stashItem(it);
