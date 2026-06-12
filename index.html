@@ -1900,6 +1900,7 @@ function stashItem(it) {
 }
 
 function equipItem(it) {
+  if (!it) return;   // guard against stale onclick index
   const prev = player.equipped[it.slot];
   player.equipped[it.slot] = it;
   const idx = gearStash.indexOf(it);
@@ -4925,7 +4926,7 @@ function renderGearScreen() {
                     `<div class="gs-name">${GEAR_LABEL[slot]}<br>— empty —</div></div>`;
     const rc = RARITY_COL[it.rarity];
     const lines = Object.entries(_dispStats(it)).map(([k,v])=>`${k} ${v}`).join(' · ');
-    return `<div class="gear-slot" style="border-color:${rc}" onclick="unequipSlot('${slot}');renderGearScreen();">` +
+    return `<div class="gear-slot" style="border-color:${rc}" onclick="unequipSlot('${slot}');renderGearScreen();updateHUD();">` +
            `<div class="gs-icon">${it.icon}</div><div class="gs-name" style="color:${rc}">${it.name}</div>` +
            `<div class="gs-name">${lines}</div></div>`;
   }).join('');
