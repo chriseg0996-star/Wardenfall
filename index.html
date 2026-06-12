@@ -1927,6 +1927,8 @@ function initPlayerStats(classId) {
   gearStash = [];
   player.gearStats = { atk:0, def:0, hp:0, mp:0, spdPct:0 };
   player.dead = false;                 // review fix: __setClass after death must revive
+  player.spellCd = [0,0,0];            // no cooldown bleed across class loads
+  player.stanceTimer = 0; player.hotTicksLeft = 0;
   recomputeStats({ fullHeal: true });
   refreshKitButtons();                 // Phase R: sync touch buttons to new class kit
 }
