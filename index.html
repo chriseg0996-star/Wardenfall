@@ -306,6 +306,54 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 }
 .inv-action-btn.skip { background:#1a1a22; border-color:#555; color:#aaa; }
 .inv-action-btn.skip:hover { background:#2a2a34; }
+
+/* Phase Q — Gear screen */
+#gear-overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,0.78); z-index:60;
+  display:none; align-items:center; justify-content:center;
+}
+#gear-overlay.open { display:flex; }
+.gear-panel {
+  background:#15151d; border:2px solid #6a5a20; border-radius:8px;
+  padding:14px 16px; width:min(520px, 92vw); max-height:86vh;
+  display:flex; flex-direction:column; gap:8px;
+  font-family:'Courier New',monospace;
+}
+.gear-title { color:#ffd040; font-size:13px; letter-spacing:3px; text-align:center; }
+.gear-equipped { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
+.gear-slot {
+  width:84px; min-height:64px; border:1px solid #444; border-radius:6px;
+  background:#1b1b26; padding:4px; font-size:9px; color:#ccc; text-align:center;
+  cursor:pointer;
+}
+.gear-slot .gs-icon { font-size:18px; }
+.gear-slot .gs-name { font-size:8px; line-height:1.2; }
+.gear-slot.empty { opacity:0.45; }
+.gear-stash-label { color:#999; font-size:9px; letter-spacing:2px; }
+.gear-stash {
+  overflow-y:auto; max-height:38vh; display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:6px;
+}
+.stash-card {
+  border:1px solid #444; border-radius:6px; background:#1b1b26;
+  padding:5px; font-size:9px; color:#ccc; cursor:pointer; min-height:44px;
+}
+.stash-card .sc-name { font-size:9px; }
+.stash-card .sc-stats { color:#9a9; font-size:8px; }
+.stash-card .sc-row { display:flex; gap:4px; margin-top:3px; }
+.stash-card button {
+  flex:1; font-size:8px; padding:3px 0; min-height:22px; cursor:pointer;
+  background:#262635; color:#ddd; border:1px solid #555; border-radius:4px;
+}
+.gear-actions { display:flex; justify-content:center; }
+#gear-btn {
+  position:absolute; bottom:160px; right:12px;
+  width:32px; height:32px; border-radius:50%;
+  background:rgba(100,100,30,0.35); border:1px solid rgba(180,170,60,0.6);
+  color:#ffd040; font-size:14px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; user-select:none; -webkit-user-select:none; z-index:10;
+}
+
 @media (max-width: 540px) {
   .inventory-cards { flex-direction: column; align-items:stretch; max-width:300px; }
   .item-card { max-width:none; flex:0 0 auto; }
@@ -463,6 +511,7 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
     <div class="spell-btn" id="spell-btn-1" title="Mend (3)">✚<span class="mp-cost">15</span><div class="cd-mask"></div></div>
     <div class="spell-btn" id="spell-btn-2" title="Nova (4)">💥<span class="mp-cost">25</span><div class="cd-mask"></div></div>
   </div>
+  <div id="gear-btn" title="Gear">🎒</div>
   <div id="damage-vignette"></div>
   <div id="floor-fade"></div>
 
@@ -519,6 +568,19 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
       <div class="inventory-actions">
         <button class="inv-action-btn" id="inv-reroll-btn" onclick="rerollChest()">REROLL (30g)</button>
         <button class="inv-action-btn skip" onclick="skipChestItem()">SKIP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase Q — Gear screen: equipped slots + stash -->
+  <div id="gear-overlay">
+    <div class="gear-panel">
+      <div class="gear-title">🎒 GEAR</div>
+      <div class="gear-equipped" id="gear-equipped"></div>
+      <div class="gear-stash-label">STASH (<span id="gear-stash-count">0</span>/40)</div>
+      <div class="gear-stash" id="gear-stash"></div>
+      <div class="gear-actions">
+        <button class="inv-action-btn skip" onclick="closeGearScreen()">CLOSE</button>
       </div>
     </div>
   </div>
@@ -4268,13 +4330,14 @@ function update(dt) {
   // item taken — gold still drops). Otherwise toggle the settings panel.
   const escNow = actionActive('pause');
   if (escNow && !escPrev) {
-    if (inventoryOpen) skipChestItem();
+    if (gearOpen)      { closeGearScreen(); }
+    else if (inventoryOpen) skipChestItem();
     else               toggleSettings();
   }
   escPrev = escNow;
   // Freeze everything (AI, cooldowns, projectiles, regen) while either
   // overlay is up.
-  if (settingsOpen || inventoryOpen) return;
+  if (settingsOpen || inventoryOpen || gearOpen) return;
 
   torchPhase += dt*0.001;
 
@@ -4840,6 +4903,46 @@ function isBoundKey(k) {
 // ─────────────────────────────────────────────
 let inventoryOpen      = false;
 let currentChestOffer  = null;   // { items:[3], rerollUsed:bool, gold, cx, cy }
+
+// Phase Q — Gear screen
+let gearOpen = false;
+
+function openGearScreen() {
+  if (!gameRunning || player.dead || GameState.transitioning || inventoryOpen) return;
+  gearOpen = true;
+  renderGearScreen();
+  document.getElementById('gear-overlay').classList.add('open');
+}
+function closeGearScreen() {
+  gearOpen = false;
+  document.getElementById('gear-overlay').classList.remove('open');
+}
+function renderGearScreen() {
+  const eq = document.getElementById('gear-equipped');
+  eq.innerHTML = GEAR_SLOTS.map(slot => {
+    const it = player.equipped[slot];
+    if (!it) return `<div class="gear-slot empty"><div class="gs-icon">${GEAR_ICON[slot]}</div>` +
+                    `<div class="gs-name">${GEAR_LABEL[slot]}<br>— empty —</div></div>`;
+    const rc = RARITY_COL[it.rarity];
+    const lines = Object.entries(_dispStats(it)).map(([k,v])=>`${k} ${v}`).join(' · ');
+    return `<div class="gear-slot" style="border-color:${rc}" onclick="unequipSlot('${slot}');renderGearScreen();">` +
+           `<div class="gs-icon">${it.icon}</div><div class="gs-name" style="color:${rc}">${it.name}</div>` +
+           `<div class="gs-name">${lines}</div></div>`;
+  }).join('');
+  const st = document.getElementById('gear-stash');
+  document.getElementById('gear-stash-count').textContent = gearStash.length;
+  st.innerHTML = gearStash.map((it, i) => {
+    const rc = RARITY_COL[it.rarity];
+    const lines = Object.entries(_dispStats(it)).map(([k,v])=>`${k} ${v}`).join(' · ');
+    return `<div class="stash-card" style="border-color:${rc}">` +
+           `<div class="sc-name" style="color:${rc}">${it.icon} ${it.name}</div>` +
+           `<div class="sc-stats">${lines} · ilvl ${it.ilvl}</div>` +
+           `<div class="sc-row">` +
+           `<button onclick="equipItem(gearStash[${i}]);renderGearScreen();updateHUD();">EQUIP</button>` +
+           `<button onclick="sellStashItem(${i});renderGearScreen();">SELL ${it.gold}g</button>` +
+           `</div></div>`;
+  }).join('') || `<div style="color:#666;font-size:9px;">Stash is empty — defeat enemies and open chests.</div>`;
+}
 const CHEST_REROLL_COST = 30;
 
 // Rarity weight table per floor tier (matches Phase I spawn-bias spirit).
@@ -5052,6 +5155,11 @@ window.addEventListener('keydown', e => {
     renderSettings();
     return;
   }
+  // 'I' key — toggle gear screen (Phase Q). Guard: not while rebinding, not while settings open.
+  if ((e.key === 'i' || e.key === 'I') && gameRunning && !settingsOpen && !inventoryOpen) {
+    gearOpen ? closeGearScreen() : openGearScreen();
+    return;
+  }
   keys[k] = true;
   // Prevent page-scroll on bound keys (Space, Arrows, digits, etc.).
   if (isBoundKey(k)) e.preventDefault();
@@ -5074,6 +5182,9 @@ for (let i=0; i<3; i++) {
   el.addEventListener('pointerleave', () => { spellPressed[i]=false; });
 }
 
+// Gear button (mobile touch — Phase Q)
+document.getElementById('gear-btn').addEventListener('click', () => { gearOpen ? closeGearScreen() : openGearScreen(); });
+
 // (Number-key preventDefault now handled by isBoundKey check in the main
 // keydown listener above — bindings drive what we suppress.)
 
@@ -5081,7 +5192,7 @@ for (let i=0; i<3; i++) {
 canvas.addEventListener('pointerdown', e => {
   // BUG-1 (Phase N) FIXED — block chest taps while the game is paused,
   // dead, mid-transition, or already showing an inventory/death modal.
-  if (!gameRunning || player.dead || GameState.transitioning || inventoryOpen) return;
+  if (!gameRunning || player.dead || GameState.transitioning || inventoryOpen || gearOpen) return;
   const rect = canvas.getBoundingClientRect();
   const scaleX = VIEW_W/rect.width, scaleY = VIEW_H/rect.height;
   const cx = (e.clientX-rect.left)*scaleX + camera.x;
