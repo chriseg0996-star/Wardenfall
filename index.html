@@ -1708,6 +1708,99 @@ window.__setClass = (id) => {
 };
 
 // ─────────────────────────────────────────────
+// MODULE: GEAR (Phase Q — RPG pivot)
+// Generated equipment: 5 slots × 5 rarities × ilvl-budget stat rolls.
+// Replaces the fixed LOOT table. ilvl == floorNum until Phase S stages.
+// Loot rolls use Math.random() (mid-game stochastic, same as drop rolls);
+// dungeon RNG is never touched here.
+// ─────────────────────────────────────────────
+const GEAR_SLOTS = ['weapon','helm','armor','boots','ring'];
+const GEAR_ICON  = { weapon:'⚔', helm:'🪖', armor:'🛡', boots:'👟', ring:'💍' };
+const GEAR_LABEL = { weapon:'Weapon', helm:'Helm', armor:'Armor', boots:'Boots', ring:'Ring' };
+const RARITY_MULT = { common:1, uncommon:1.35, rare:1.8, epic:2.4, legendary:3.2 };
+// stat points → stat units (hp/mp are cheaper per point; spd is % based)
+const STAT_RATE = { atk:1, def:1, hp:3, mp:2, spdPct:0.8 };
+// slot stat-weight profiles; highest weight = the slot's primary stat
+const SLOT_PROFILE = {
+  weapon: { atk:0.70, def:0.10, hp:0.10, mp:0.10 },
+  helm:   { def:0.40, hp:0.30, mp:0.30 },
+  armor:  { hp:0.45, def:0.40, mp:0.15 },
+  boots:  { spdPct:0.55, def:0.20, hp:0.25 },
+  ring:   { atk:0.25, def:0.25, hp:0.20, mp:0.20, spdPct:0.10 },
+};
+const GEAR_NAME = {
+  weapon: ['Sword','Blade','Saber','Claymore'],
+  helm:   ['Helm','Hood','Visor','Circlet'],
+  armor:  ['Vest','Plate','Cloak','Mail'],
+  boots:  ['Boots','Greaves','Striders','Treads'],
+  ring:   ['Ring','Band','Loop','Signet'],
+};
+const RARITY_PREFIX = {
+  common:    ['Rusted','Worn','Plain'],
+  uncommon:  ["Soldier's",'Sturdy','Keen'],
+  rare:      ["Knight's",'Runed','Gleaming'],
+  epic:      ['Royal','Shadowforged','Sunblessed'],
+  legendary: ["Warden's",'Kingsbane','Doomforged'],
+};
+const RARITY_LINES = { common:1, uncommon:2, rare:2, epic:3, legendary:4 };
+
+function gearBudget(ilvl) { return 6 + ilvl * 4; }
+
+// opts: { rarity, minRarity, slot } — all optional.
+function generateItem(ilvl, opts) {
+  opts = opts || {};
+  let rarity = opts.rarity || _pickRarity(ilvl);
+  if (opts.minRarity && RARITY_RANK[rarity] < RARITY_RANK[opts.minRarity]) rarity = opts.minRarity;
+  const slot   = opts.slot || GEAR_SLOTS[Math.floor(Math.random()*GEAR_SLOTS.length)];
+  const budget = Math.max(2, Math.round(gearBudget(ilvl) * RARITY_MULT[rarity] * (0.85 + Math.random()*0.3)));
+  const prof   = SLOT_PROFILE[slot];
+  const keys   = Object.keys(prof);
+  const primary = keys.reduce((a,b) => prof[a] >= prof[b] ? a : b);
+  const lines  = Math.min(RARITY_LINES[rarity], keys.length);
+  const stats  = { atk:0, def:0, hp:0, mp:0, spdPct:0 };
+  const primaryPts = Math.max(1, Math.round(budget * (0.55 + Math.random()*0.2)));
+  stats[primary] = Math.max(1, Math.round(primaryPts * STAT_RATE[primary]));
+  let remaining = budget - primaryPts;
+  const secKeys = keys.filter(k => k !== primary);
+  for (let i = 1; i < lines && remaining > 0 && secKeys.length; i++) {
+    const k   = secKeys.splice(Math.floor(Math.random()*secKeys.length), 1)[0];
+    const pts = (i === lines - 1 || secKeys.length === 0)
+      ? remaining
+      : Math.max(1, Math.round(remaining * (0.4 + Math.random()*0.3)));
+    stats[k] += Math.max(1, Math.round(pts * STAT_RATE[k]));
+    remaining -= pts;
+  }
+  const base = GEAR_NAME[slot][Math.floor(Math.random()*GEAR_NAME[slot].length)];
+  const pre  = RARITY_PREFIX[rarity][Math.floor(Math.random()*RARITY_PREFIX[rarity].length)];
+  return {
+    slot, rarity, ilvl, stats,
+    name: pre + ' ' + base,
+    icon: GEAR_ICON[slot],
+    type: GEAR_LABEL[slot] + ' · ilvl ' + ilvl,
+    desc: '',
+    gold: Math.max(10, Math.round(budget * 3)),
+  };
+}
+
+// Comparable power score ≈ budget points spent (inverse of STAT_RATE).
+function itemScore(it) {
+  const s = it.stats;
+  return s.atk / STAT_RATE.atk + s.def / STAT_RATE.def + s.hp / STAT_RATE.hp
+       + s.mp / STAT_RATE.mp + s.spdPct / STAT_RATE.spdPct;
+}
+
+// Display-stat lines for tooltip/cards, e.g. { ATK:'+12', SPD:'+8%' }.
+function _dispStats(it) {
+  const d = {};
+  if (it.stats.atk)    d.ATK = '+' + it.stats.atk;
+  if (it.stats.def)    d.DEF = '+' + it.stats.def;
+  if (it.stats.hp)     d.HP  = '+' + it.stats.hp;
+  if (it.stats.mp)     d.MP  = '+' + it.stats.mp;
+  if (it.stats.spdPct) d.SPD = '+' + it.stats.spdPct + '%';
+  return d;
+}
+
+// ─────────────────────────────────────────────
 // GAME STATE
 // ─────────────────────────────────────────────
 let dungeon = null;
