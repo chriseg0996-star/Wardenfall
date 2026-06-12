@@ -4909,7 +4909,7 @@ let currentChestOffer  = null;   // { items:[3], rerollUsed:bool, gold, cx, cy }
 let gearOpen = false;
 
 function openGearScreen() {
-  if (!gameRunning || player.dead || GameState.transitioning || inventoryOpen) return;
+  if (!gameRunning || player.dead || GameState.transitioning || inventoryOpen || settingsOpen) return;
   gearOpen = true;
   renderGearScreen();
   document.getElementById('gear-overlay').classList.add('open');
@@ -5219,7 +5219,7 @@ canvas.addEventListener('pointerdown', e => {
 // while inventoryOpen=true. Gold drops on close regardless of choice.
 function openChest(tx, ty) {
   // Block re-opens during the modal (defensive against double-taps).
-  if (inventoryOpen) return;
+  if (inventoryOpen || gearOpen) return;
   dungeon.map[ty][tx] = T.FLOOR;
   const cx = tx*TILE + TILE/2, cy = ty*TILE + TILE/2;
   const gold = Math.floor(Math.random()*200 + 100);
