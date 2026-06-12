@@ -4453,11 +4453,7 @@ function update(dt) {
         addLog(`Found: ${it.icon} ${it.name}`, 'loot');
         SFX.pickup_item();          // Phase G
         updateBestItem(it);         // Phase L
-        if(it.dAtk) { player.atk+=it.dAtk; }
-        if(it.dDef) { player.def+=it.dDef; }
-        if(it.dHp)  { player.maxHp+=it.dHp; player.hp=Math.min(player.hp+it.dHp,player.maxHp); }
-        if(it.dMp)  { player.maxMp+=it.dMp; }
-        if(it.dSpd) { player.speed+=player.speed*(it.dSpd/100); }
+        _applyItemToPlayer(it);        // Phase P — single application path
         showItemTooltip(it);
         updateHUD();
       }
@@ -4740,11 +4736,13 @@ function pickItemByRarity(floorNum) {
 // (vs. base) and pick a high-delta item in that field, biased toward
 // rare+ tiers on deeper floors. Always returns a positive net-stat pick.
 function pickUpgradeItem(floorNum) {
+  // Phase P — gear growth comes directly from gearStats; no hardcoded class baselines.
+  const g = player.gearStats;
   const grown = {
-    Atk: player.atk - 12,    // base atk
-    Def: player.def -  5,    // base def
-    Hp:  player.maxHp - 100, // base hp
-    Mp:  player.maxMp -  50, // base mp
+    Atk: g.atk,
+    Def: g.def,
+    Hp:  g.hp,
+    Mp:  g.mp,
   };
   let bestKey = 'Atk', bestVal = -Infinity;
   for (const k in grown) if (grown[k] > bestVal) { bestVal = grown[k]; bestKey = k; }
@@ -4778,11 +4776,16 @@ function computeStatDeltas(it) {
 }
 
 function _applyItemToPlayer(it) {
-  if (it.dAtk) player.atk += it.dAtk;
-  if (it.dDef) player.def += it.dDef;
-  if (it.dHp)  { player.maxHp += it.dHp; player.hp = Math.min(player.hp + it.dHp, player.maxHp); }
-  if (it.dMp)  player.maxMp += it.dMp;
-  if (it.dSpd) player.speed += player.speed * (it.dSpd / 100);
+  // Phase P — items accumulate into gearStats; totals are derived.
+  const g = player.gearStats;
+  if (it.dAtk) g.atk    += it.dAtk;
+  if (it.dDef) g.def    += it.dDef;
+  if (it.dHp)  g.hp     += it.dHp;
+  if (it.dMp)  g.mp     += it.dMp;
+  if (it.dSpd) g.spdPct += it.dSpd;
+  recomputeStats();
+  // Preserve the old heal-on-pickup feel for +HP items.
+  if (it.dHp) player.hp = Math.min(player.hp + it.dHp, player.maxHp);
 }
 
 function renderInventoryModal() {
