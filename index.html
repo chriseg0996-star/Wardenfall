@@ -1988,6 +1988,8 @@ const player = {
   hotHeal:0,         // HP per HoT tick
   // Phase K — Boss Floors: slow debuff (Brood Mother web hits set this)
   slowTimer:0,       // ms remaining of 50% movement-speed reduction
+  // Phase R — Knight Stalwart Stance: halves incoming damage while active
+  stanceTimer:0,     // ms remaining of damage-reduction stance
   // Phase N — Polish: footstep dust pacing
   footstepTimer:0,
 };
@@ -2136,6 +2138,61 @@ const SKILLS = {
       addLog(hits ? `Nova hits ${hits} for AoE` : `Nova — no targets`, hits?'dmg':'sys');
     },
   },
+  // ── Phase R: Knight kit ──
+  bash: {
+    name:'Shield Bash', icon:'🛡', mp:8, cd:5000, sfx:'shielder_bash',
+    cast(p) {
+      const reach = 30, ax = p.x + p.facing*reach, ay = p.y;
+      const toKill = [];
+      enemies.forEach(e => {
+        if (!e.alive) return;
+        if (Math.hypot(ax-e.x, ay-e.y) < 52) {
+          const dmg = shieldedDamage(e, Math.max(1, Math.round(p.atk*1.3)));
+          e.hp -= dmg; RunStats.damageDealt += dmg;
+          e.iframes = 300; e.stunTimer = 1200;
+          const ang = Math.atan2(e.y-p.y, e.x-p.x);
+          e.x += Math.cos(ang)*24; e.y += Math.sin(ang)*24;
+          spawnFloatingText(e.x, e.y - e.h/2, dmg, '#fff');
+          if (e.hp <= 0) toKill.push(e);
+        }
+      });
+      toKill.forEach(killEnemy);
+      spawnParticles(ax, ay, 8, '#80c0ff');
+      triggerShake(3, 150);
+    },
+  },
+  stance: {
+    name:'Stalwart Stance', icon:'🏰', mp:12, cd:12000, sfx:'heal',
+    cast(p) {
+      p.stanceTimer = 5000;
+      addLog('Stalwart Stance! Damage halved for 5s.', 'heal');
+      spawnParticles(p.x, p.y, 12, '#80c0ff');
+    },
+  },
+  whirlwind: {
+    name:'Whirlwind', icon:'🌀', mp:18, cd:6000, sfx:'nova',
+    cast(p) {
+      const R = 80, toKill = [];
+      enemies.forEach(e => {
+        if (!e.alive) return;
+        if (Math.hypot(p.x-e.x, p.y-e.y) < R) {
+          const dmg = shieldedDamage(e, Math.max(1, Math.round(p.atk*1.2)));
+          e.hp -= dmg; RunStats.damageDealt += dmg;
+          e.iframes = 280;
+          const ang = Math.atan2(e.y-p.y, e.x-p.x);
+          e.x += Math.cos(ang)*26; e.y += Math.sin(ang)*26;
+          spawnFloatingText(e.x, e.y - e.h/2, dmg, '#fff');
+          if (e.hp <= 0) toKill.push(e);
+        }
+      });
+      toKill.forEach(killEnemy);
+      for (let i=0;i<14;i++) {
+        const a = (i/14)*Math.PI*2;
+        spawnParticles(p.x+Math.cos(a)*40, p.y+Math.sin(a)*40, 2, '#d0d8e8');
+      }
+      triggerShake(4, 200);
+    },
+  },
 };
 // Phase R: SPELL_ORDER removed — slot → id now resolved via kitSkills()[slot].
 
@@ -2180,6 +2237,8 @@ function spawnEnemy(tx, ty, type) {
     // Phase N — attack telegraph
     windupTimer:   0,       // ms remaining of pre-attack flash
     pendingAttack: null,    // 'melee'|'bash'|'slam'|'bone'|'arrow'|'web' or null
+    // Phase R — Knight bash stun
+    stunTimer:     0,       // ms remaining of stun (frozen, no attack, no move)
   });
 }
 
@@ -2492,7 +2551,8 @@ function updateProjectiles(dt) {
           spawnFloatingText(player.x, player.y - player.h/2, 'SLOW', '#a0c0ff');  // Phase N
           projectiles.splice(i,1);
         } else if (player.iframes <= 0) {
-          const dmg = Math.max(1, pr.damage - Math.floor(player.def*0.5));
+          let dmg = Math.max(1, pr.damage - Math.floor(player.def*0.5));
+          if (player.stanceTimer > 0) dmg = Math.max(1, Math.round(dmg * 0.5));
           player.hp = Math.max(0, player.hp - dmg);
           player.iframes = 700;
           RunStats.damageTaken += dmg;    // Phase L
@@ -3131,7 +3191,8 @@ function killEnemy(e) {
 
 function enemyAttackPlayer(e) {
   if(player.iframes>0) return;
-  const dmg = Math.max(1, e.atk - player.def + Math.floor(Math.random()*4-2));
+  let dmg = Math.max(1, e.atk - player.def + Math.floor(Math.random()*4-2));
+  if (player.stanceTimer > 0) dmg = Math.max(1, Math.round(dmg * 0.5));
   player.hp = Math.max(0, player.hp-dmg);
   player.iframes = 700;
   RunStats.damageTaken += dmg;             // Phase L
@@ -3889,6 +3950,13 @@ function drawGame(dt) {
         ctx.fillRect(sx, sy, sprites[e.sprite].width, sprites[e.sprite].height);
         ctx.globalAlpha = 1;
       }
+      // Phase R — stun flicker: white bar strobing at ~4Hz while stunned.
+      if (e.stunTimer > 0 && Math.floor(torchPhase*8)%2===0) {
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle   = '#ffffff';
+        ctx.fillRect(sx, sy - 4, sprites[e.sprite].width, 2);
+        ctx.globalAlpha = 1;
+      }
       // Phase I — shielder: highlight when actively blocking.
       if (e.type === 'shielder' && e.shieldedNow) {
         ctx.globalAlpha = 0.55;
@@ -4056,7 +4124,8 @@ function archerFire(e) {
 // through walls/pillars).
 function shielderBash(e) {
   if (player.iframes <= 0) {
-    const dmg = Math.max(1, Math.round(e.atk * 1.5) - Math.floor(player.def * 0.5));
+    let dmg = Math.max(1, Math.round(e.atk * 1.5) - Math.floor(player.def * 0.5));
+    if (player.stanceTimer > 0) dmg = Math.max(1, Math.round(dmg * 0.5));
     player.hp = Math.max(0, player.hp - dmg);
     player.iframes = 800;
     RunStats.damageTaken += dmg;        // Phase L
@@ -4146,7 +4215,8 @@ function colossusSlam(e) {
   // Damage check
   const d = Math.hypot(player.x - e.x, player.y - e.y);
   if (d < 60 && player.iframes <= 0) {
-    const dmg = Math.max(1, e.atk * 2 - Math.floor(player.def * 0.5));
+    let dmg = Math.max(1, e.atk * 2 - Math.floor(player.def * 0.5));
+    if (player.stanceTimer > 0) dmg = Math.max(1, Math.round(dmg * 0.5));
     player.hp = Math.max(0, player.hp - dmg);
     player.iframes = 700;
     RunStats.damageTaken += dmg;        // Phase L
@@ -4465,13 +4535,15 @@ function update(dt) {
     const pTile = tileAt(player.x, player.y);
     const hz = hazardProfile(pTile);
     if (hz && player.iframes <= 0) {
-      player.hp = Math.max(0, player.hp - hz.dmg);
+      let hzDmg = hz.dmg;
+      if (player.stanceTimer > 0) hzDmg = Math.max(1, Math.round(hzDmg * 0.5));
+      player.hp = Math.max(0, player.hp - hzDmg);
       player.iframes = hz.iframes;
-      RunStats.damageTaken += hz.dmg;
-      addLog(`${hz.label} -${hz.dmg} HP`, 'dmg');
+      RunStats.damageTaken += hzDmg;
+      addLog(`${hz.label} -${hzDmg} HP`, 'dmg');
       triggerDamageVignette();
       triggerShake(2, 80);                // Phase N — light tactile hazard tell
-      spawnFloatingText(player.x, player.y - player.h/2, hz.dmg, '#e05050');  // Phase N
+      spawnFloatingText(player.x, player.y - player.h/2, hzDmg, '#e05050');  // Phase N
       updateHUD();
       if (player.hp <= 0) playerDie();
     }
@@ -4485,6 +4557,12 @@ function update(dt) {
   // ── ENEMIES ──
   enemies.forEach(e => {
     if(!e.alive) return;
+    // Phase R — stun: frozen enemy cannot move, attack, or tick windup.
+    if (e.stunTimer > 0) {
+      e.stunTimer = Math.max(0, e.stunTimer - dt);
+      e.iframes   = Math.max(0, e.iframes   - dt);
+      return;
+    }
     e.attackCd = Math.max(0, e.attackCd - dt);
     e.bashCd   = Math.max(0, e.bashCd   - dt);     // Phase I (shielder)
     e.iframes  = Math.max(0, e.iframes  - dt);
@@ -4763,7 +4841,8 @@ function update(dt) {
   // Phase N — adds a low-HP pulse (red sin wave @ 1Hz) when player HP < 25%
   // of maxHp, layered AFTER damage flash + slow tint so it doesn't override
   // those higher-priority cues.
-  player.slowTimer = Math.max(0, player.slowTimer - dt);
+  player.slowTimer  = Math.max(0, player.slowTimer  - dt);
+  player.stanceTimer = Math.max(0, player.stanceTimer - dt);
   vigTimer -= dt;
   if (vigTimer <= 0) {
     if (player.slowTimer > 0) {
