@@ -1005,6 +1005,118 @@ function buildSprites() {
     g.fillStyle = S.sh;  g.fillRect(3, 18, 2, 3);
   });
 
+  // PLAYER_KNIGHT — armoured silhouette (Phase R)
+  // Wider body, metal-helm strip instead of hood rim, tower-shield slab left,
+  // sword arm retained. Ember eyes preserved (cursed knight variant).
+  makeSprite('player_knight', 24, 32, (g) => {
+    const H = PAL.hood, C = PAL.cloak, B = PAL.belt,
+          S = PAL.skin, M = PAL.metal, GP = PAL.gold;
+
+    // ── cloak / tabard (wider than mage) ──
+    g.fillStyle = C.sh;  g.fillRect(2, 11, 20, 21);             // wide shadow flare
+    g.fillStyle = C.base;g.fillRect(3, 12, 18, 19);             // body
+    g.fillStyle = C.hi;  g.fillRect(4, 14, 4,  14);             // left highlight
+    g.fillStyle = C.hi;  g.fillRect(14,14, 1,  14);             // center pleat
+
+    // ── boots peek ──
+    g.fillStyle = '#0a0810'; g.fillRect(5, 30, 5, 2);
+    g.fillStyle = '#0a0810'; g.fillRect(13,30, 5, 2);
+
+    // ── belt ──
+    g.fillStyle = B.sh;  g.fillRect(3, 21, 18, 2);
+    g.fillStyle = B.base;g.fillRect(3, 21, 18, 1);
+    g.fillStyle = GP.base; g.fillRect(11,21, 2, 2);             // buckle
+
+    // ── metal helm (replaces hood rim — full plate head) ──
+    g.fillStyle = M.sh;  g.fillRect(3,  3, 18, 12);             // helm shadow
+    g.fillStyle = M.base;g.fillRect(4,  4, 16, 10);             // helm body
+    g.fillStyle = M.hi;  g.fillRect(4,  4, 16,  2);             // top catch-light
+    g.fillStyle = M.hi;  g.fillRect(4,  5,  2,  9);             // left edge
+    g.fillStyle = M.sh;  g.fillRect(5,  2,  14, 3);             // visor band
+    g.fillStyle = '#060408'; g.fillRect(6,  3,  12, 2);         // visor slit
+
+    // ── face wedge visible through visor gap ──
+    g.fillStyle = S.sh;  g.fillRect(8,  9,  8,  4);
+    g.fillStyle = S.base;g.fillRect(9, 10,  6,  2);
+
+    // ── ember eyes (cursed knight — same signature dots) ──
+    g.fillStyle = PAL.emberE; g.fillRect(10,10, 1, 1); g.fillRect(13,10, 1, 1);
+
+    // ── tower shield slab (left side, covers left arm) ──
+    g.fillStyle = M.sh;  g.fillRect(0, 12, 5, 14);              // shield shadow
+    g.fillStyle = M.base;g.fillRect(1, 13, 4, 12);              // shield face
+    g.fillStyle = M.hi;  g.fillRect(1, 13, 1, 12);              // shield edge
+    g.fillStyle = GP.base; g.fillRect(2, 18, 2, 2);             // boss stud
+
+    // ── sword arm (right side — same as mage) ──
+    g.fillStyle = M.sh;  g.fillRect(18,15, 5, 6);               // bracer shadow
+    g.fillStyle = M.base;g.fillRect(19,16, 4, 4);               // bracer (heavier)
+    g.fillStyle = M.hi;  g.fillRect(19,16, 1, 4);               // bracer edge
+    g.fillStyle = GP.sh; g.fillRect(18,20, 5, 2);               // crossguard sh
+    g.fillStyle = GP.base;g.fillRect(18,20, 5, 1);              // crossguard
+    g.fillStyle = M.sh;  g.fillRect(20, 5, 2, 15);              // blade core
+    g.fillStyle = M.hi;  g.fillRect(20, 5, 1, 15);              // blade edge
+    g.fillStyle = '#fff'; g.fillRect(20, 6, 1, 2);              // glint
+  });
+
+  // PLAYER_RANGER — hooded silhouette (Phase R)
+  // Existing hood kept, sword arm replaced by bow arc + string on the right,
+  // quiver hint on the back-left. Ember eyes signature retained.
+  makeSprite('player_ranger', 24, 32, (g) => {
+    const H = PAL.hood, C = PAL.cloak, B = PAL.belt,
+          S = PAL.skin, M = PAL.metal, GP = PAL.gold;
+
+    // ── cloak (identical silhouette to mage) ──
+    g.fillStyle = C.sh;  g.fillRect(3, 11, 18, 21);
+    g.fillStyle = C.base;g.fillRect(4, 12, 16, 19);
+    g.fillStyle = C.hi;  g.fillRect(5, 14, 4,  14);
+    g.fillStyle = C.hi;  g.fillRect(14,14, 1,  14);
+
+    // ── boots peek ──
+    g.fillStyle = '#0a0810'; g.fillRect(6, 30, 4, 2);
+    g.fillStyle = '#0a0810'; g.fillRect(13,30, 4, 2);
+
+    // ── belt ──
+    g.fillStyle = B.sh;  g.fillRect(4, 21, 16, 2);
+    g.fillStyle = B.base;g.fillRect(4, 21, 16, 1);
+    g.fillStyle = GP.base; g.fillRect(11,21, 2, 2);
+
+    // ── hood (identical to mage) ──
+    g.fillStyle = H.sh;  g.fillRect(2,  3, 20, 12);
+    g.fillStyle = H.base;g.fillRect(3,  4, 18, 10);
+    g.fillStyle = H.hi;  g.fillRect(3,  4, 18,  2);
+    g.fillStyle = H.hi;  g.fillRect(3,  5,  2,  9);
+
+    // ── face wedge ──
+    g.fillStyle = S.sh;  g.fillRect(8,  9,  8,  5);
+    g.fillStyle = S.base;g.fillRect(9, 10,  6,  3);
+
+    // ── ember eyes ──
+    g.fillStyle = PAL.emberE; g.fillRect(10,11, 1, 1); g.fillRect(13,11, 1, 1);
+
+    // ── quiver hint on back-left (thin vertical slab behind cloak) ──
+    g.fillStyle = B.sh;  g.fillRect(2, 12, 2, 10);              // quiver body
+    g.fillStyle = B.base;g.fillRect(2, 12, 1, 10);              // quiver face
+    // arrow nocks sticking up
+    g.fillStyle = M.sh;  g.fillRect(2, 10, 1, 2);
+    g.fillStyle = M.sh;  g.fillRect(3, 11, 1, 2);
+
+    // ── bow (right side) — limb arc + string ──
+    // Upper limb: 2-px-wide arc from upper-right sweeping right
+    g.fillStyle = B.base; g.fillRect(20, 7, 2, 3);              // upper limb top
+    g.fillStyle = B.sh;   g.fillRect(21, 9, 2, 3);              // upper limb bend
+    // Lower limb mirrors
+    g.fillStyle = B.base; g.fillRect(20,20, 2, 3);              // lower limb bottom
+    g.fillStyle = B.sh;   g.fillRect(21,17, 2, 3);              // lower limb bend
+    // Bow grip (wood, slightly thicker)
+    g.fillStyle = B.hi;   g.fillRect(20,12, 2, 8);              // grip
+    // Bowstring — single pixel vertical line, offset for tension
+    g.fillStyle = M.hi;   g.fillRect(22, 8, 1,16);              // string
+
+    // ── draw hand at grip ──
+    g.fillStyle = S.sh;   g.fillRect(18,15, 2, 3);
+  });
+
   // SPIDER — organic redesign (Phase B)
   // 8 single-pixel articulated legs (body→knee→foot), bulbous segmented
   // abdomen, smaller cephalothorax, glowing 4-pixel red eye cluster.
@@ -1521,6 +1633,9 @@ function buildSprites() {
     grad.addColorStop(1, 'rgba(160,80,255,0)');
     g.fillStyle = grad; g.fillRect(0, 0, 80, 80);
   });
+
+  // Phase R — mage alias so sprites['player_' + classId] always resolves
+  sprites.player_mage = sprites.player;
 }
 
 // ─────────────────────────────────────────────
@@ -2847,6 +2962,182 @@ const SFX = {
 // Load persisted audio settings as soon as the script runs.
 loadAudio();
 
+// ─────────────────────────────────────────────
+// MODULE: PORTRAITS (Phase R)
+// 96×96 chibi busts — fully deterministic (zero Math.random / zero RNG).
+// Must not depend on `sprites` — runs at script load before buildSprites.
+// Each portrait: big head (~60% height), narrow shoulders, class prop edge,
+// transparent bg, dark palette from PAL constants.
+// ─────────────────────────────────────────────
+const portraits = {};
+
+function buildPortraits() {
+  // Shared palette refs (PAL is already defined at this point)
+  const H = PAL.hood, C = PAL.cloak, B = PAL.belt,
+        S = PAL.skin, M = PAL.metal, GP = PAL.gold;
+
+  // Helper: make a 96×96 offscreen canvas and return [canvas, ctx]
+  function makePortrait() {
+    const c = document.createElement('canvas');
+    c.width = 96; c.height = 96;
+    return [c, c.getContext('2d')];
+  }
+
+  // ── KNIGHT portrait ──────────────────────────────────────────────────────
+  // Big horned helm, narrow armoured shoulders, shield rim left edge,
+  // sword hilt right, ember eyes visible through visor gap.
+  {
+    const [c, g] = makePortrait();
+
+    // narrow shoulders / body base
+    g.fillStyle = C.sh;  g.fillRect(28, 68, 40, 28);           // body shadow
+    g.fillStyle = C.base;g.fillRect(30, 70, 36, 26);           // body
+    g.fillStyle = M.sh;  g.fillRect(26, 62, 8, 14);            // left pauldron sh
+    g.fillStyle = M.base;g.fillRect(27, 63, 7, 12);            // left pauldron
+    g.fillStyle = M.sh;  g.fillRect(62, 62, 8, 14);            // right pauldron sh
+    g.fillStyle = M.base;g.fillRect(62, 63, 7, 12);            // right pauldron
+
+    // tower shield slab — left edge
+    g.fillStyle = M.sh;  g.fillRect(14, 58, 14, 36);           // shield shadow
+    g.fillStyle = M.base;g.fillRect(16, 60, 12, 34);           // shield face
+    g.fillStyle = M.hi;  g.fillRect(16, 60, 2,  34);           // shield edge
+    g.fillStyle = GP.base; g.fillRect(20, 76, 5, 5);           // boss stud
+    g.fillStyle = GP.hi;   g.fillRect(21, 77, 3, 3);           // stud hi
+
+    // sword hilt — right edge
+    g.fillStyle = M.sh;  g.fillRect(70, 66, 4, 12);            // hilt shadow
+    g.fillStyle = M.base;g.fillRect(71, 67, 3, 10);            // grip
+    g.fillStyle = GP.sh; g.fillRect(68, 65, 10, 3);            // crossguard sh
+    g.fillStyle = GP.base; g.fillRect(69, 65, 9, 2);           // crossguard
+
+    // HEAD — big (~57px tall, fills top 60%)
+    // helm body
+    g.fillStyle = M.sh;  g.fillRect(20,  4, 56, 58);           // helm outer sh
+    g.fillStyle = M.base;g.fillRect(22,  6, 52, 54);           // helm face
+    g.fillStyle = M.hi;  g.fillRect(22,  6, 52,  4);           // top catch-light
+    g.fillStyle = M.hi;  g.fillRect(22,  8,  4, 52);           // left edge
+
+    // horns
+    g.fillStyle = M.sh;  g.fillRect(22,  0,  6, 10);           // left horn shadow
+    g.fillStyle = M.base;g.fillRect(23,  0,  5,  9);           // left horn
+    g.fillStyle = M.hi;  g.fillRect(23,  0,  2,  8);           // left horn hi
+    g.fillStyle = M.sh;  g.fillRect(68,  0,  6, 10);           // right horn shadow
+    g.fillStyle = M.base;g.fillRect(68,  0,  5,  9);           // right horn
+    g.fillStyle = M.hi;  g.fillRect(70,  0,  2,  8);           // right horn hi
+
+    // visor band
+    g.fillStyle = M.sh;  g.fillRect(22, 34, 52,  8);           // visor band
+    g.fillStyle = '#060408'; g.fillRect(24, 36, 48,  4);       // visor slit
+
+    // face/skin peek through visor
+    g.fillStyle = S.sh;  g.fillRect(30, 38, 36, 10);
+    g.fillStyle = S.base;g.fillRect(32, 39, 32,  8);
+
+    // ember eyes
+    g.fillStyle = PAL.emberE; g.fillRect(37, 41, 4, 4); g.fillRect(55, 41, 4, 4);
+
+    // chin guard
+    g.fillStyle = M.base;g.fillRect(26, 50, 44, 12);
+    g.fillStyle = M.hi;  g.fillRect(26, 50, 44,  2);
+
+    portraits.knight = c;
+  }
+
+  // ── RANGER portrait ──────────────────────────────────────────────────────
+  // Hood with single feather, narrow shoulders, bow limb on the right side.
+  {
+    const [c, g] = makePortrait();
+
+    // body / shoulders
+    g.fillStyle = C.sh;  g.fillRect(28, 68, 40, 28);
+    g.fillStyle = C.base;g.fillRect(30, 70, 36, 26);
+    g.fillStyle = H.sh;  g.fillRect(24, 62, 10, 16);           // left shoulder
+    g.fillStyle = H.base;g.fillRect(25, 63, 9,  14);
+    g.fillStyle = H.sh;  g.fillRect(62, 62, 10, 16);           // right shoulder
+    g.fillStyle = H.base;g.fillRect(62, 63, 9,  14);
+
+    // bow limb right edge
+    g.fillStyle = B.base; g.fillRect(74, 24, 5, 4);            // upper tip
+    g.fillStyle = B.sh;   g.fillRect(76, 28, 5, 6);            // upper bend
+    g.fillStyle = B.hi;   g.fillRect(76, 34, 4, 22);           // grip
+    g.fillStyle = B.sh;   g.fillRect(76, 56, 5, 6);            // lower bend
+    g.fillStyle = B.base; g.fillRect(74, 62, 5, 4);            // lower tip
+    g.fillStyle = M.hi;   g.fillRect(80, 25, 2, 42);           // bowstring
+
+    // feather — left of hood (slight lean)
+    g.fillStyle = '#7ab870'; g.fillRect(22,  4, 4, 20);        // feather shaft
+    g.fillStyle = '#5a9850'; g.fillRect(20,  5, 4, 16);        // feather vane l
+    g.fillStyle = '#9ad890'; g.fillRect(25,  5, 3, 15);        // feather vane r
+
+    // HEAD — big hood
+    g.fillStyle = H.sh;  g.fillRect(18,  8, 60, 58);           // hood outer sh
+    g.fillStyle = H.base;g.fillRect(20, 10, 56, 56);           // hood face
+    g.fillStyle = H.hi;  g.fillRect(20, 10, 56,  4);           // top rim
+    g.fillStyle = H.hi;  g.fillRect(20, 12,  4, 52);           // left rim
+
+    // face wedge deep in shadow
+    g.fillStyle = S.sh;  g.fillRect(30, 34, 36, 22);
+    g.fillStyle = S.base;g.fillRect(32, 36, 32, 18);
+
+    // ember eyes
+    g.fillStyle = PAL.emberE; g.fillRect(37, 40, 4, 4); g.fillRect(55, 40, 4, 4);
+
+    // chin shadow
+    g.fillStyle = H.sh;  g.fillRect(26, 52, 44, 12);
+
+    portraits.ranger = c;
+  }
+
+  // ── MAGE portrait ─────────────────────────────────────────────────────────
+  // Deep hood, ember glow orb beneath chin, staff tip left edge.
+  {
+    const [c, g] = makePortrait();
+
+    // body / shoulders
+    g.fillStyle = C.sh;  g.fillRect(28, 68, 40, 28);
+    g.fillStyle = C.base;g.fillRect(30, 70, 36, 26);
+    g.fillStyle = H.sh;  g.fillRect(24, 62, 10, 16);
+    g.fillStyle = H.base;g.fillRect(25, 63, 9,  14);
+    g.fillStyle = H.sh;  g.fillRect(62, 62, 10, 16);
+    g.fillStyle = H.base;g.fillRect(62, 63, 9,  14);
+
+    // staff tip — left edge (carved rune glow)
+    g.fillStyle = M.sh;  g.fillRect(12, 16, 4, 50);            // staff shadow
+    g.fillStyle = M.base;g.fillRect(13, 17, 3, 48);            // staff body
+    g.fillStyle = PAL.emberE; g.fillRect(12, 14, 6, 6);        // orb glow (ember)
+    g.fillStyle = '#fff'; g.fillRect(14, 15, 2, 3);            // orb core
+
+    // ember glow orb beneath chin (mage's ember-soul)
+    g.fillStyle = 'rgba(255,138,64,0.35)'; g.fillRect(32, 60, 32, 14); // glow halo
+    g.fillStyle = PAL.emberE; g.fillRect(42, 62, 12, 8);               // orb
+    g.fillStyle = '#ffb060'; g.fillRect(45, 63, 6, 5);                 // orb inner
+    g.fillStyle = '#fff';    g.fillRect(46, 64, 2, 2);                 // orb glint
+
+    // HEAD — deep hood
+    g.fillStyle = H.sh;  g.fillRect(18,  6, 60, 60);           // hood outer sh
+    g.fillStyle = H.base;g.fillRect(20,  8, 56, 58);           // hood face
+    g.fillStyle = H.hi;  g.fillRect(20,  8, 56,  4);           // top rim
+    g.fillStyle = H.hi;  g.fillRect(20, 10,  4, 56);           // left rim
+
+    // deep shadow face
+    g.fillStyle = S.sh;  g.fillRect(30, 36, 36, 20);
+    g.fillStyle = S.base;g.fillRect(32, 38, 32, 16);
+
+    // ember eyes — larger than sprite scale, more dramatic
+    g.fillStyle = PAL.emberE; g.fillRect(37, 42, 5, 5); g.fillRect(54, 42, 5, 5);
+    g.fillStyle = '#ffb060';  g.fillRect(38, 43, 3, 3); g.fillRect(55, 43, 3, 3); // inner
+    g.fillStyle = '#fff';     g.fillRect(39, 43, 1, 1); g.fillRect(56, 43, 1, 1); // glint
+
+    // chin shadow
+    g.fillStyle = H.sh;  g.fillRect(26, 54, 44, 12);
+
+    portraits.mage = c;
+  }
+}
+
+// Build portraits at script load — before startGame/buildSprites.
+buildPortraits();
+
 function drawProjectiles() {
   projectiles.forEach(pr => {
     if (pr.kind === 'firebolt') {
@@ -4053,22 +4344,26 @@ function drawGame(dt) {
         ctx.strokeStyle='#000'; ctx.lineWidth=0.5; ctx.strokeRect(bx,by,bw,bh);
       }
     } else if (d.kind === 'player') {
+      // Phase R — route through class-specific sprite; fall back to base player
+      const heroSprite = sprites['player_' + player.classId] || sprites.player;
       const bob = player.idle ? Math.sin(player.breathPhase) * 0.6 : 0;
       // Phase D: attack lunge — forward bob peaks mid-swing.
       const lunge = player.attackPhase > 0
         ? Math.sin((1 - player.attackPhase) * Math.PI) * 6
         : 0;
       const drawCx = player.x + lunge * player.facing;
-      const sx = drawCx - sprites.player.width/2;
-      const sy = player.y - sprites.player.height/2 + bob;
+      const sx = drawCx - heroSprite.width/2;
+      const sy = player.y - heroSprite.height/2 + bob;
       const isHit = player.iframes>0 && Math.floor(player.iframes/100)%2===0;
       const alpha = isHit ? 0.4 : 1;
       if (player.facing < 0) {
         ctx.save(); ctx.scale(-1,1); ctx.globalAlpha = alpha;
-        ctx.drawImage(sprites.player, -drawCx - sprites.player.width/2, sy);
+        ctx.drawImage(heroSprite, -drawCx - heroSprite.width/2, sy);
         ctx.restore();
       } else {
-        drawSprite('player', sx, sy, false, alpha);
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(heroSprite, sx, sy);
+        ctx.globalAlpha = 1;
       }
       // Phase D: slash arc — quick silver sweep during early swing.
       if (player.attackPhase > 0.5) {
