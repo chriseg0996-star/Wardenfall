@@ -507,9 +507,9 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   <div id="attack-btn">⚔</div>
   <div id="potion-btn">🧪</div>
   <div id="spell-btns">
-    <div class="spell-btn" id="spell-btn-0" title="Firebolt (2)">🔥<span class="mp-cost">10</span><div class="cd-mask"></div></div>
-    <div class="spell-btn" id="spell-btn-1" title="Mend (3)">✚<span class="mp-cost">15</span><div class="cd-mask"></div></div>
-    <div class="spell-btn" id="spell-btn-2" title="Nova (4)">💥<span class="mp-cost">25</span><div class="cd-mask"></div></div>
+    <div class="spell-btn" id="spell-btn-0" title="Firebolt (2)"><span class="sk-icon">🔥</span><span class="mp-cost">10</span><div class="cd-mask"></div></div>
+    <div class="spell-btn" id="spell-btn-1" title="Mend (3)"><span class="sk-icon">✚</span><span class="mp-cost">15</span><div class="cd-mask"></div></div>
+    <div class="spell-btn" id="spell-btn-2" title="Nova (4)"><span class="sk-icon">💥</span><span class="mp-cost">25</span><div class="cd-mask"></div></div>
   </div>
   <div id="gear-btn" title="Gear">🎒</div>
   <div id="damage-vignette"></div>
@@ -1758,14 +1758,13 @@ function initPlayerStats(classId) {
   player.gearStats = { atk:0, def:0, hp:0, mp:0, spdPct:0 };
   player.dead = false;                 // review fix: __setClass after death must revive
   recomputeStats({ fullHeal: true });
+  refreshKitButtons();                 // Phase R: sync touch buttons to new class kit
 }
 
-// Dev helper until the Phase R character-select screen exists. Resets to
-// Lv.1 of the given class. NOTE: hotbar kit stays the mage spells until
-// Phase R wires per-class kits.
+// Dev helper — Phase R: now kit-aware (initPlayerStats → refreshKitButtons).
 window.__setClass = (id) => {
   if (!CLASS_DEFS[id]) return 'unknown class: ' + id;
-  initPlayerStats(id);
+  initPlayerStats(id);   // resets stats + calls refreshKitButtons
   updateHUD();
   updateHotbar();
   return `now ${id} Lv.1 — atk ${player.atk} def ${player.def} hp ${player.maxHp}`;
@@ -2067,9 +2066,15 @@ function pickEnemyType(floorNum) {
 const SPAWN_POINTS = []; // legacy — replaced by room-based spawning (see populateFloor)
 
 // ─────────────────────────────────────────────
-// MODULE: SPELLS (slots 2-4; reuses particle/hitFlash FX, projectile module)
+// MODULE: SKILLS (Phase R — kit-driven hotbar; replaces SPELLS+SPELL_ORDER)
+// Each entry: { name, icon, mp, cd, sfx?, cast(p) }
+// The active kit (3 skill ids) comes from the class definition.
 // ─────────────────────────────────────────────
-const SPELLS = {
+function kitSkills() {
+  return (CLASS_DEFS[player.classId] || CLASS_DEFS.mage).kit;
+}
+
+const SKILLS = {
   firebolt: {
     name:'Firebolt', icon:'🔥', mp:10, cd:600,
     cast(p) {
@@ -2132,8 +2137,7 @@ const SPELLS = {
     },
   },
 };
-// Slot index (0,1,2) → spell id. Maps to keyboard keys 2,3,4 and player.spellCd[i].
-const SPELL_ORDER = ['firebolt','mend','nova'];
+// Phase R: SPELL_ORDER removed — slot → id now resolved via kitSkills()[slot].
 
 // Floor scaling: HP/ATK geometric, rewards additive. Stacks with player-level mult.
 function floorStatMul(floorNum) { return Math.pow(1.22, floorNum - 1); }     // ~+22%/floor
@@ -3151,34 +3155,63 @@ function usePotion() {
   updateHUD(); updateHotbar();
 }
 
-// ── Phase 3: cast a spell by slot index (0..2) ──
+// ── Phase R: cast a skill by slot index (0..2) ──
 function castSpell(slot) {
   if (player.dead) return;
-  const id = SPELL_ORDER[slot]; if(!id) return;
-  const s = SPELLS[id];
+  const id = kitSkills()[slot]; if (!id) return;
+  const s = SKILLS[id];
+  if (!s) return;                  // Phase R: knight/ranger ids land in Tasks 2-3 — no-op
   if (player.spellCd[slot] > 0) { addLog(`${s.name} on cooldown`, 'sys'); return; }
   if (player.mp < s.mp)         { addLog(`Not enough MP for ${s.name}`, 'sys'); return; }
   player.mp -= s.mp;
   player.spellCd[slot] = s.cd;
   s.cast(player);
-  if (SFX[id]) SFX[id]();          // Phase G: per-spell sound
+  const sfxFn = SFX[s.sfx || id]; if (sfxFn) sfxFn();   // Phase R: sfx field support
   RunStats.spellsCast++;           // Phase L
   updateHUD(); updateHotbar();
 }
 
-// Per-frame visual refresh for the right-side touch spell buttons.
+// Per-frame visual refresh for the right-side touch skill buttons.
 // Only writes style on changed slots; cheap enough to run every frame.
 function refreshSpellButtons() {
-  for (let i=0; i<SPELL_ORDER.length; i++) {
+  const kit = kitSkills();
+  for (let i=0; i<3; i++) {
     const el = document.getElementById('spell-btn-'+i);
     if (!el) continue;
-    const s  = SPELLS[SPELL_ORDER[i]];
+    const s  = SKILLS[kit[i]];
+    if (!s) { el.classList.add('disabled'); continue; }   // placeholder — no-op slot
     const cd = player.spellCd[i] || 0;
     const cdPct = cd > 0 ? Math.min(1, cd / s.cd) : 0;
     const ok = player.mp >= s.mp && cd <= 0 && !player.dead;
     el.classList.toggle('disabled', !ok);
     const mask = el.querySelector('.cd-mask');
     if (mask) mask.style.height = (cdPct*100).toFixed(1) + '%';
+  }
+}
+
+// Phase R: rewrite touch button icon/cost/title from current kit.
+// Called by initPlayerStats (start + __setClass). Guard against pre-DOM calls.
+function refreshKitButtons() {
+  if (!document.getElementById('spell-btn-0')) return;
+  const kit = kitSkills();
+  for (let i=0; i<3; i++) {
+    const el = document.getElementById('spell-btn-'+i);
+    if (!el) continue;
+    const s = SKILLS[kit[i]];
+    const iconEl  = el.querySelector('.sk-icon');
+    const costEl  = el.querySelector('.mp-cost');
+    if (!s) {
+      // Skill not yet registered (knight/ranger Tasks 2-3) — dim placeholder
+      if (iconEl) iconEl.textContent = '—';
+      if (costEl) costEl.textContent = '';
+      el.title = `(slot ${i+1} — coming soon)`;
+      el.classList.add('disabled');
+    } else {
+      if (iconEl) iconEl.textContent = s.icon;
+      if (costEl) costEl.textContent = s.mp;
+      el.title = `${s.name} (${i+2})`;
+      el.classList.remove('disabled');
+    }
   }
 }
 
@@ -3603,8 +3636,14 @@ function updateHotbar() {
       <span class="hb-key">H</span>🧪<span class="hb-cnt">${player.potions}</span>
     </div>
   `);
-  for (let i=0; i<SPELL_ORDER.length; i++) {
-    const s  = SPELLS[SPELL_ORDER[i]];
+  const kit = kitSkills();
+  for (let i=0; i<3; i++) {
+    const s = SKILLS[kit[i]];
+    if (!s) {
+      // Phase R: skill not yet in registry (knight/ranger Tasks 2-3) — dim placeholder
+      slots.push(`<div class="hb-slot"><span class="hb-key">${i+2}</span><span style="font-size:15px;opacity:0.3">—</span></div>`);
+      continue;
+    }
     const cd = player.spellCd[i] || 0;
     const cdPct = cd > 0 ? Math.min(1, cd/s.cd) : 0;
     const ok = player.mp >= s.mp && cd<=0 && !player.dead;
@@ -4394,8 +4433,8 @@ function update(dt) {
   potionKey_prev = potionKeyHeld;
   potionPressed_prev = potionPressed;
 
-  // ── SPELL INPUT (keyboard via bindings + right-side touch buttons; edge-triggered) ──
-  for (let i=0; i<SPELL_ORDER.length; i++) {
+  // ── SKILL INPUT (keyboard via bindings + right-side touch buttons; edge-triggered) ──
+  for (let i=0; i<3; i++) {
     const isDown = !!(actionActive('spell'+i) || spellPressed[i]);
     if (isDown && !spellPressed_prev[i]) castSpell(i);
     spellPressed_prev[i] = isDown;
