@@ -5862,7 +5862,7 @@ function startGame() {
   GameState.floorNum = 1;
   GameState.transitioning = false;
 
-  initPlayerStats(player.classId || 'mage');   // Phase P — derived stat model
+  applyCharacter(player.classId || account.lastPlayed || 'mage');   // Phase R — load the persistent character slot
   resetRunStats();                 // Phase L — fresh run telemetry
   loadFloor();
 
