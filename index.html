@@ -2149,7 +2149,7 @@ const SKILLS = {
         if (Math.hypot(ax-e.x, ay-e.y) < 52) {
           const dmg = shieldedDamage(e, Math.max(1, Math.round(p.atk*1.3)));
           e.hp -= dmg; RunStats.damageDealt += dmg;
-          e.iframes = 300; e.stunTimer = 1200;
+          e.iframes = 300; e.stunTimer = isBossEnemy(e) ? 360 : 1200;   // bosses resist stun (0.3×)
           const ang = Math.atan2(e.y-p.y, e.x-p.x);
           e.x += Math.cos(ang)*24; e.y += Math.sin(ang)*24;
           spawnFloatingText(e.x, e.y - e.h/2, dmg, '#fff');
@@ -2162,7 +2162,7 @@ const SKILLS = {
     },
   },
   stance: {
-    name:'Stalwart Stance', icon:'🏰', mp:12, cd:12000, sfx:'heal',
+    name:'Stalwart Stance', icon:'🏰', mp:12, cd:12000, sfx:'mend',
     cast(p) {
       p.stanceTimer = 5000;
       addLog('Stalwart Stance! Damage halved for 5s.', 'heal');
