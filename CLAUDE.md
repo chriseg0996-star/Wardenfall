@@ -34,24 +34,11 @@ single file: `index.html`.
   on XP/gold; stacks with the per-player-level multiplier.
 
 ## Roadmap status
-- DONE — Phase 1: Combat, loot, HUD, minimap, touch controls.
-- DONE — Phase 2: BSP procedural map, multi-floor via stairs, per-floor difficulty scaling.
-- NEXT — Phase 3: Spells & MP. MP currently regenerates but does nothing. Add 2-3 spells
-  bound to hotbar slots 2-4 (e.g. firebolt projectile, heal-over-time, AoE), with MP cost,
-  cooldowns, and FX reusing existing particle/hitFlash systems. Build a reusable projectile
-  system (Phase 4 ranged enemies will depend on it). Projectiles must collide with walls
-  using the same `isSolid` tile check `moveEntity` uses.
-- Phase 4: Bosses & enemy variety (state-machine AI, boss every 5th floor gating the stairs).
-- Phase 5: Gear & inventory (equip slots; refactor player stats to base + equipped derived total).
-- Phase 6: Audio & game feel (Web Audio synth SFX — no asset files; unlock AudioContext on
-  first user gesture in startGame; juice pass). First real module file-split candidate.
-- Phase 7: Meta-progression & release (run-summary death screen, localStorage save,
-  full balance pass floors 1-20, title/credits).
-
-## Known issue to be aware of (pre-existing, not urgent)
-- Camera clamp uses `Math.min(WW-WW, ...)` which pins camera to 0. Harmless today
-  because canvas == world size, so the whole floor renders scaled-to-fit. Only revisit
-  if a viewport smaller than the world is ever wanted.
+- DONE — Phases 1-3 and A-O: full game through render-perf pass (see git log).
+- ACTIVE — RPG pivot: spec at docs/superpowers/specs/2026-06-12-wardenfall-rpg-pivot-design.md,
+  phase index at docs/superpowers/plans/2026-06-12-rpg-pivot-master.md.
+- DONE — RPG Phase P: derived stat model (classBase + gearStats) + CLASS_DEFS (knight/ranger/mage).
+- NEXT — RPG Phase Q: gear system core (generated items, 5 slots × 5 rarities, equip/inventory).
 
 ## First instruction to expect
 "Read index.html and this file, then implement Phase 3."
