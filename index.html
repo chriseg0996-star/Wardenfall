@@ -6352,7 +6352,35 @@ function ssResetBody(){
   const s = ss.level.spawn;
   ss.body = { x:s.x, y:s.y, w:18, h:26, vx:0, vy:0, onGround:false, facing:1,
               jumpsLeft:0, coyote:0, buffer:0, dropthru:0, iframes:0, onRope:false, blinkCd:0,
-              jumpHeld:false, blinkHeld:false };
+              jumpHeld:false, blinkHeld:false, fireCd:0 };
+}
+function ssRespawn(){
+  ssResetBody();
+  recomputeStats({ fullHeal: true });
+  if (typeof updateHUD === 'function') updateHUD();
+  ss.projectiles = [];
+  ss.enemies = [];
+  // Re-seed the one enemy
+  ssSpawnEnemy();
+}
+function ssSpawnEnemy(){
+  // Goblin-like enemy on the ground floor (row 17 = y 17*32 = 544 → foot at 544)
+  const footY = 17 * TILE;          // rests on row-17 ground
+  const homeX  = 22 * TILE + TILE/2; // col 22, right section
+  ss.enemies.push({
+    x: homeX, y: footY,
+    w: 22, h: 24,
+    vx: 0, vy: 0,
+    hp: 30, maxHp: 30,
+    atk: Math.max(1, Math.round(player.atk * 0.6)),
+    facing: -1,
+    aggro: false,
+    alive: true,
+    attackCd: 0,
+    homeX,
+    leftX:  19 * TILE + TILE/2,   // patrol bounds
+    rightX: 26 * TILE + TILE/2,
+  });
 }
 
 function ssUpdate(dt){
@@ -6360,6 +6388,21 @@ function ssUpdate(dt){
   ss.acc += Math.min(dt, 50) / 1000;
   while (ss.acc >= SS_PLAT.STEP){ ssStep(SS_PLAT.STEP); ss.acc -= SS_PLAT.STEP; }
   ssCamera();
+  // Tick global FX arrays (top-down update() is NOT called in sidescroll mode,
+  // so we must advance them here to avoid memory leak + stale state).
+  const dtS = Math.min(dt, 50);   // same cap used elsewhere
+  for (let i=particles.length-1; i>=0; i--){
+    const p=particles[i]; p.x+=p.vx*dtS*0.001; p.y+=p.vy*dtS*0.001; p.life-=dtS*0.001;
+    if(p.life<=0) particles.splice(i,1);
+  }
+  for (let i=floatingTexts.length-1; i>=0; i--){
+    const t=floatingTexts[i]; t.y+=t.vy*dtS*0.001; t.life-=dtS*0.00125;
+    if(t.life<=0) floatingTexts.splice(i,1);
+  }
+  for (let i=hitFlashes.length-1; i>=0; i--){
+    const h=hitFlashes[i]; h.life-=dtS*0.006; h.scale+=dtS*0.002;
+    if(h.life<=0) hitFlashes.splice(i,1);
+  }
 }
 function ssStep(h){
   const b = ss.body; if (!b) return;
@@ -6430,6 +6473,25 @@ function ssStep(h){
     spawnParticles(b.x, b.y - b.h/2, 8, '#b090ff');
   }
   b.blinkHeld = bk;
+  // ── FIREBOLT (edge-detected via b.fireCd gating) ──
+  // fireCd<=0 means ready; we do NOT use a held-flag because the cooldown
+  // itself prevents repeat-fire. No fireCd init needed (undefined is falsy/NaN → <=0 true once).
+  if (b.fireCd === undefined) b.fireCd = 0;
+  if (SSK.fire() && b.fireCd <= 0){
+    const dmg = Math.max(1, Math.round(player.atk * 1.6 + player.level * 1.5));
+    ss.projectiles.push({
+      x: b.x + b.facing * 10,
+      y: b.y - b.h / 2,
+      vx: b.facing * 420, vy: 0,
+      w: 10, h: 10,
+      life: 1.4,
+      dmg,
+      hit: new Set(),
+    });
+    b.fireCd = 0.28;
+    if (SFX && SFX.firebolt) SFX.firebolt();
+  }
+  if (b.fireCd > 0) b.fireCd -= h;
   // gravity (skipped when on rope)
   if (!b.onRope) b.vy = Math.min(P.MAX_FALL, b.vy + P.GRAVITY * h);
   // integrate + resolve (x then y)
@@ -6438,6 +6500,91 @@ function ssStep(h){
   ssMoveY(b, b.vy * h);
   if (b.iframes>0) b.iframes -= h;
   if (b.blinkCd>0) b.blinkCd -= h;
+
+  // ── PROJECTILE UPDATE ──
+  for (let i = ss.projectiles.length - 1; i >= 0; i--){
+    const p = ss.projectiles[i];
+    p.x += p.vx * h;
+    p.y += p.vy * h;
+    p.life -= h;
+    // despawn on wall or expired
+    const ptx = Math.floor(p.x / TILE), pty = Math.floor(p.y / TILE);
+    if (p.life <= 0 || ssSolidAt(ptx, pty)){
+      ss.projectiles.splice(i, 1); continue;
+    }
+    // AABB vs enemies
+    for (const e of ss.enemies){
+      if (!e.alive || p.hit.has(e)) continue;
+      // AABB: projectile centre vs enemy box (e.y=foot, spans e.y-e.h..e.y, e.x±e.w/2)
+      // Tolerance pad of 16px vertically handles body/enemy height differences when
+      // both stand on the same ground row (player h=26, enemy h=24, TILE=32).
+      const overlapX = Math.abs(p.x - e.x) < (p.w / 2 + e.w / 2);
+      const overlapY = p.y > e.y - e.h - p.h/2 - 16 && p.y < e.y + p.h/2 + 16;
+      if (overlapX && overlapY){
+        p.hit.add(e);
+        e.hp -= p.dmg;
+        spawnFloatingText(e.x, e.y - e.h, p.dmg, '#fff');
+        hitFlashes.push({ x: e.x, y: e.y - e.h/2, life: 1, maxLife: 1, scale: 1 });
+        spawnParticles(e.x, e.y - e.h/2, 6, '#ff9944');
+        if (e.hp <= 0){
+          e.alive = false;
+          spawnParticleBurst(e.x, e.y - e.h/2, 14, ['#ff6622','#ffcc44','#ffffff'],
+                             { speed: 120, upBias: 40, lifeMul: 1.2 });
+          if (SFX && SFX.death_spider) SFX.death_spider();
+        }
+        // no pierce — consume bolt
+        ss.projectiles.splice(i, 1); break;
+      }
+    }
+  }
+
+  // ── ENEMY AI UPDATE ──
+  for (const e of ss.enemies){
+    if (!e.alive) continue;
+    if (e.attackCd > 0) e.attackCd -= h;
+
+    // Simple gravity + ground clamp for enemy
+    e.vy = (e.vy || 0) + P.GRAVITY * h;
+    e.vy = Math.min(P.MAX_FALL, e.vy);
+    // Move enemy (reuse ssMoveX/ssMoveY on the enemy body proxy)
+    ssMoveX(e, e.vx * h);
+    ssMoveY(e, e.vy * h);
+
+    // Patrol / aggro
+    const dx = b.x - e.x;
+    const sameHeight = Math.abs((b.y - b.h/2) - (e.y - e.h/2)) < 64;
+    e.aggro = Math.abs(dx) < 180 && sameHeight;
+
+    if (e.aggro){
+      const dir = dx > 0 ? 1 : -1;
+      e.facing = dir;
+      e.vx = dir * 60;   // approach speed
+    } else {
+      // Patrol between leftX and rightX
+      if (e.x >= e.rightX){ e.facing = -1; }
+      else if (e.x <= e.leftX){ e.facing = 1; }
+      e.vx = e.facing * 40;
+      // Turn at solid wall
+      const wallTX = Math.floor((e.x + e.facing * (e.w/2 + 2)) / TILE);
+      const wallTY = Math.floor((e.y - e.h/2) / TILE);
+      if (ssSolidAt(wallTX, wallTY)) e.facing *= -1;
+    }
+
+    // Contact attack
+    const cOverlapX = Math.abs(b.x - e.x) < (b.w/2 + e.w/2);
+    const cOverlapY = b.y > e.y - e.h - 2 && b.y < e.y + b.h;
+    if (cOverlapX && cOverlapY && e.attackCd <= 0){
+      if (b.iframes <= 0){
+        player.hp = Math.max(0, player.hp - e.atk);
+        b.iframes = 0.7;
+        spawnFloatingText(b.x, b.y - b.h, '-'+e.atk, '#f55');
+        hitFlashes.push({ x: b.x, y: b.y - b.h/2, life: 1, maxLife: 1, scale: 1 });
+        if (typeof updateHUD === 'function') updateHUD();
+        if (player.hp <= 0) ssRespawn();
+      }
+      e.attackCd = 0.9;
+    }
+  }
 }
 // Swept-ish AABB by tile sampling. Solids only in this task; one-way in Task 4.
 function ssMoveX(b, dx){
@@ -6504,6 +6651,7 @@ function ssDraw(dt){
   ctx.save(); ctx.translate(-Math.round(ss.cam.x), -Math.round(ss.cam.y));
   const x0=Math.floor(ss.cam.x/TILE), x1=Math.ceil((ss.cam.x+VIEW_W)/TILE);
   const y0=Math.floor(ss.cam.y/TILE), y1=Math.ceil((ss.cam.y+VIEW_H)/TILE);
+  // tiles
   for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++){
     if(ssSolidAt(tx,ty) && tx>=0 && ty>=0 && tx<L.cols && ty<L.rows){
       ctx.fillStyle='#5a4632'; ctx.fillRect(tx*TILE,ty*TILE,TILE,TILE);
@@ -6512,8 +6660,56 @@ function ssDraw(dt){
   }
   L.oneWay.forEach(p=>{ ctx.fillStyle='#7a6a4a'; ctx.fillRect(p.x*TILE, p.y*TILE, TILE, 6); });
   L.ropes.forEach(p=>{ ctx.fillStyle='#caa050'; ctx.fillRect(p.x*TILE+TILE/2-1, p.y*TILE, 2, TILE); });
+  // enemies
+  for (const e of ss.enemies){
+    if (!e.alive) continue;
+    ctx.fillStyle = '#cc4422';
+    ctx.fillRect(e.x - e.w/2, e.y - e.h, e.w, e.h);
+    // HP bar above enemy
+    const bw = e.w + 4;
+    ctx.fillStyle = '#330000'; ctx.fillRect(e.x - bw/2, e.y - e.h - 6, bw, 4);
+    ctx.fillStyle = '#ff4422'; ctx.fillRect(e.x - bw/2, e.y - e.h - 6, bw * (e.hp/e.maxHp), 4);
+  }
+  // player body
   const b=ss.body;
   if(b){ ctx.fillStyle='#6db0ff'; ctx.fillRect(b.x-b.w/2, b.y-b.h, b.w, b.h); }
+  // projectiles — warm firebolt look: orange outer ellipse + bright yellow core
+  for (const p of ss.projectiles){
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, p.life * 2);
+    // outer glow
+    ctx.fillStyle = '#ff6600';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, p.w * 0.9, p.h * 0.55, 0, 0, Math.PI*2); ctx.fill();
+    // core
+    ctx.fillStyle = '#ffee44';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, p.w * 0.45, p.h * 0.28, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+  // particles (global array, drawn inside camera transform so they sit at world coords)
+  for (const p of particles){
+    ctx.save(); ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.col;
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+    ctx.restore();
+  }
+  // hit flashes (simple bright circle — sprites.hit is top-down only)
+  for (const h of hitFlashes){
+    ctx.save(); ctx.globalAlpha = Math.max(0, h.life * 0.7);
+    ctx.fillStyle = '#ffffff';
+    const r = 8 * h.scale;
+    ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+  // floating texts (world-space damage numbers)
+  if (floatingTexts.length > 0){
+    ctx.font = 'bold 10px Courier New';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    for (const t of floatingTexts){
+      ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, t.life));
+      ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
+      ctx.restore();
+    }
+  }
   ctx.restore();
 }
 
@@ -6562,6 +6758,9 @@ window.__sidescroll = function(){
     '##############   #########################', // row 17  ground: cols 0-13, gap 14-16, cols 17-41
   ]);
   ssResetBody();
+  ss.projectiles = [];
+  ss.enemies = [];
+  ssSpawnEnemy();
   ss.acc = 0;
   if (!loopStarted && !loopStartedSS) { loopStartedSS = true; requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); }); }
   return 'sidescroll mode';
