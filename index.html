@@ -225,6 +225,57 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   font-size:9px; color:#666; text-align:center; max-width:420px;
   line-height:1.8; padding:0 12px;
 }
+/* Phase S — Chapter Map overlay */
+#chaptermap-overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,0.93);
+  display:none; flex-direction:column; align-items:center;
+  z-index:100; font-family:'Courier New',monospace; overflow:hidden;
+}
+#chaptermap-overlay.open { display:flex; }
+.cmap-header {
+  width:100%; padding:14px 16px 8px;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  border-bottom:1px solid #2a2a3a;
+}
+.cmap-title { color:#f0c060; font-size:16px; letter-spacing:5px; }
+.cmap-info  { display:flex; gap:16px; font-size:10px; color:#a0a0c0; }
+.cmap-chapters {
+  flex:1; width:100%; overflow-y:auto; padding:8px 12px;
+}
+.cmap-chapter { margin-bottom:10px; }
+.cmap-ch-header {
+  font-size:11px; color:#8fa7c4; letter-spacing:2px;
+  padding:5px 4px 4px; border-bottom:1px solid #1e2030;
+  display:flex; align-items:center; gap:6px;
+}
+.cmap-stage-row {
+  display:flex; align-items:center; gap:8px;
+  min-height:44px; padding:4px 8px; cursor:pointer;
+  border-radius:4px; transition:background 0.1s;
+  border-bottom:1px solid #111318;
+}
+.cmap-stage-row:last-child { border-bottom:none; }
+.cmap-stage-row.unlocked:hover  { background:rgba(100,80,180,0.18); }
+.cmap-stage-row.unlocked:active { background:rgba(100,80,180,0.30); }
+.cmap-stage-row.locked { opacity:0.38; cursor:default; }
+.cmap-stage-name { flex:1; font-size:10px; color:#c8c0d8; letter-spacing:1px; }
+.cmap-stage-id   { font-size:9px; color:#666; width:28px; flex-shrink:0; }
+.cmap-stage-rec  { font-size:8px; color:#556; width:44px; flex-shrink:0; text-align:right; }
+.cmap-stage-stars { font-size:12px; width:32px; text-align:right; flex-shrink:0; }
+.cmap-stage-lock  { font-size:12px; width:16px; flex-shrink:0; }
+.cmap-footer {
+  width:100%; padding:8px 12px 10px;
+  border-top:1px solid #2a2a3a;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+}
+.cmap-change-btn {
+  background:#1e1830; border:1px solid #4a3870; color:#c0a0ff;
+  font-family:'Courier New',monospace; font-size:10px; letter-spacing:2px;
+  padding:6px 18px; border-radius:4px; cursor:pointer;
+}
+.cmap-change-btn:hover { background:#2a2040; border-color:#7050c0; }
+.cmap-hints { font-size:8px; color:#444; text-align:center; }
+.cmap-hints .key { background:#1a1a2a; border:1px solid #333; border-radius:2px; padding:1px 3px; color:#666; }
 #damage-vignette {
   position:absolute; inset:0; pointer-events:none;
   box-shadow:inset 0 0 60px rgba(200,30,30,0);
@@ -581,6 +632,22 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
     </div>
   </div>
 
+  <!-- Phase S: Chapter Map overlay -->
+  <div id="chaptermap-overlay">
+    <div class="cmap-header">
+      <div class="cmap-title">WARDENFALL</div>
+      <div class="cmap-info">
+        <span id="cmap-hero"></span>
+        <span id="cmap-gold"></span>
+      </div>
+    </div>
+    <div class="cmap-chapters" id="cmap-chapters"></div>
+    <div class="cmap-footer">
+      <button class="cmap-change-btn" onclick="syncAccount();hideChapterMap();showCharSelect();">CHANGE HERO</button>
+      <div class="cmap-hints"><span class="key">WASD</span>/<span class="key">↑↓←→</span> Move &nbsp; <span class="key">SPACE</span> Attack &nbsp; <span class="key">H</span> Potion &nbsp; <span class="key">ESC</span> Pause &nbsp; <span class="key">I</span> Gear</div>
+    </div>
+  </div>
+
   <!-- Phase F: settings / pause overlay -->
   <div id="settings-overlay">
     <div class="settings-panel">
@@ -599,15 +666,15 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   <!-- Phase L — Death Screen & Run Meta -->
   <div id="death-overlay">
     <div class="death-panel">
-      <div class="death-header">YOU HAVE FALLEN</div>
-      <div class="death-saved-note">Your level and gear are saved.</div>
+      <div class="death-header">STAGE FAILED</div>
+      <div class="death-saved-note">XP and gear are kept. The stage can be retried.</div>
       <div class="death-seed-row">
         <span>Run seed: <span id="death-seed-val">0x00000000</span></span>
         <button class="death-btn-small" id="death-copy-seed">COPY</button>
       </div>
       <div class="death-stats" id="death-stats"></div>
       <div class="death-actions">
-        <button class="death-btn primary" onclick="location.reload()">RETURN TO THE KEEP</button>
+        <button class="death-btn primary" onclick="returnToMap()">STAGE FAILED — RETURN TO MAP</button>
         <button class="death-btn" id="death-view-scores">VIEW SCORES</button>
       </div>
       <div class="death-scores" id="death-scores"></div>
@@ -2286,6 +2353,10 @@ const GameState = {
   runSeed: 0,
   transitioning: false,
   biome: 'cursed_keep',     // Phase M — set per floor in loadFloor()
+  // Phase S — stage-based navigation
+  chapter: 1,
+  stageIdx: 1,
+  difficulty: 'normal',
 };
 const player = {
   x:0, y:0, // world px (center)
@@ -4125,17 +4196,12 @@ function clearScoresConfirm() {
 // Build/replace the current floor and place the player at its spawn.
 function loadFloor() {
   dungeon = buildDungeon(GameState.floorNum);
-  // Phase M — Biome Variety: 10-floor cycle determines current biome.
-  // cycle = 0..2 → Cursed Keep, 3..5 → Bone Crypt, 6..9 → Infernal Depths.
-  // Boss floors (every 5th) keep biome visuals but override the floor label.
-  {
-    const cycle = ((GameState.floorNum - 1) % 10);
-    GameState.biome = (cycle < 3) ? 'cursed_keep'
-                   : (cycle < 6) ? 'bone_crypt'
-                   : 'infernal_depths';
-  }
-  // Infernal Depths swaps spike hazards for lava pits (deadlier hazard).
-  if (GameState.biome === 'infernal_depths') {
+  // Phase S — Biome from chapter (replaces the 10-floor cycle used in Phase M).
+  GameState.biome = CHAPTERS[GameState.chapter - 1]
+    ? CHAPTERS[GameState.chapter - 1].biome
+    : 'cursed_keep';
+  // Swap spike hazards for lava pits on biomes whose hazardType is 'lava'.
+  if (_currentBiome().hazardType === 'lava') {
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         if (dungeon.map[y][x] === T.SPIKE) dungeon.map[y][x] = T.LAVA;
@@ -4176,53 +4242,24 @@ function loadFloor() {
   projectiles = [];
   populateFloor();
   drawMinimap();
-  // Phase K — boss-themed floor label when this is a boss floor.
-  if (dungeon.bossRoom) {
-    const bossName = ((GameState.floorNum / 5) % 2 === 1) ? 'Bone Colossus' : 'Brood Mother';
-    document.getElementById('floor-label').textContent =
-      `☠ BOSS FLOOR — ${bossName}`;
-  } else {
-    // Phase M — biome-themed label.
-    const biomeName = _currentBiome().ambientName;
-    document.getElementById('floor-label').textContent =
-      `☠ ${biomeName} — Floor ${GameState.floorNum}`;
+  // Phase S — stage-based floor label.
+  {
+    const c = GameState.chapter, s = GameState.stageIdx;
+    const chName = CHAPTERS[c - 1] ? CHAPTERS[c - 1].name : '';
+    const stageName = STAGE_NAMES[c - 1] ? STAGE_NAMES[c - 1][s - 1] : '';
+    if (dungeon.bossRoom) {
+      const bossName = ((GameState.floorNum / 5) % 2 === 1) ? 'Bone Colossus' : 'Brood Mother';
+      document.getElementById('floor-label').textContent = `☠ BOSS — ${bossName}`;
+    } else {
+      document.getElementById('floor-label').textContent =
+        `☠ ${chName} ${c}-${s} — ${stageName}`;
+    }
   }
   updateBossHP();   // immediately sync the boss HP bar (hide on non-boss floors)
   syncAccount();    // Phase R — persist progress on every floor transition
 }
 
-function descendFloor() {
-  GameState.transitioning = true;
-  SFX.descend();                   // Phase G
-  const fade = document.getElementById('floor-fade');
-  GameState.floorNum++;
-  RunStats.floorsCleared = Math.max(RunStats.floorsCleared, GameState.floorNum);  // Phase L
-  addLog(`Descending to Floor ${GameState.floorNum}...`, 'lvl');
-  // Small reward for clearing a floor
-  player.hp = Math.min(player.maxHp, player.hp + Math.round(player.maxHp*0.25));
-  // BUG-3 (Phase N) FIXED — potion stockpile capped at 5 so descents don't snowball.
-  if (player.potions < 5) player.potions++;
-  // Phase M — transition card shows the NEW floor's biome banner.
-  {
-    const cycle = ((GameState.floorNum - 1) % 10);
-    const nextBiomeId = (cycle < 3) ? 'cursed_keep'
-                     : (cycle < 6) ? 'bone_crypt'
-                     : 'infernal_depths';
-    const nb = BIOMES[nextBiomeId];
-    fade.innerHTML =
-      `<div class="ff-biome" style="color:${nb.accent}">${nb.ambientName.toUpperCase()}</div>` +
-      `<div class="ff-floor">FLOOR ${GameState.floorNum}</div>`;
-  }
-  fade.style.opacity = '1';
-  setTimeout(() => {
-    loadFloor();
-    updateHUD(); updateHotbar();
-    fade.style.opacity = '0';
-    // brief invuln so we don't instantly get hit on arrival
-    player.iframes = 600;
-    GameState.transitioning = false;
-  }, 460);
-}
+// descendFloor() removed — Phase S: stages replace endless descent.
 
 // ─────────────────────────────────────────────
 // SCREEN FX
@@ -5133,9 +5170,9 @@ function update(dt) {
     }
   }
 
-  // ── STAIR / DESCENT ──
+  // ── STAIR / STAGE EXIT ──
   if(!GameState.transitioning && tileAt(player.x, player.y)===T.STAIR) {
-    descendFloor();
+    completeStage();
   }
 
   // ── ENEMIES ──
@@ -5331,20 +5368,7 @@ function update(dt) {
     if (!enemies[i].alive) enemies.splice(i, 1);
   }
 
-  // Auto-respawn if low: pick a room not containing the player, spawn off-screen-ish
-  if(enemies.length < 3 && dungeon) {
-    for (let tries=0; tries<12; tries++) {
-      const r = dungeon.rooms[Math.floor(Math.random()*dungeon.rooms.length)];
-      const tx = r.x + Math.floor(Math.random()*r.w);
-      const ty = r.y + Math.floor(Math.random()*r.h);
-      const t = dungeon.map[ty][tx];
-      if (t!==T.FLOOR && t!==T.TORCH) continue;
-      const wx = tx*TILE+TILE/2, wy = ty*TILE+TILE/2;
-      if (Math.hypot(wx-player.x, wy-player.y) < 200) continue; // not on top of player
-      spawnEnemy(tx, ty, pickEnemyType(GameState.floorNum));   // Phase I — weighted by floor
-      break;
-    }
-  }
+  // Phase S — auto-respawn removed: full clear (enemies.length===0) awards ★★★.
 
   // ── PICKUPS ──
   // Phase O — backward in-place splice (was .filter(), a new array every frame).
@@ -6014,7 +6038,7 @@ function showCharSelect() {
     card.addEventListener('click', () => {
       if (gameRunning) return;   // already started — ignore
       document.getElementById('charselect-overlay').classList.remove('open');
-      startGame(cid);
+      selectCharacter(cid);
     });
 
     container.appendChild(card);
@@ -6023,15 +6047,17 @@ function showCharSelect() {
   document.getElementById('charselect-overlay').classList.add('open');
 }
 
-function startGame(classId) {
-  // Default to lastPlayed if no classId supplied.
+// Phase S — one-shot flag: loop() calls requestAnimationFrame(loop) unconditionally
+// (never stops once started). Use this to avoid double-starting the RAF loop.
+let loopStarted = false;
+
+// selectCharacter(cid): called when user picks a hero on the char-select screen.
+// Runs the sprite-build RNG-isolated block once, applies the character, then shows
+// the chapter map. The RAF loop is NOT started here — that's launchStage's job.
+function selectCharacter(classId) {
   if (!classId) classId = account.lastPlayed || 'mage';
 
-  // Hide both title and char-select overlays.
-  document.getElementById('overlay').style.display = 'none';
-  document.getElementById('charselect-overlay').classList.remove('open');
-
-  ensureAudio();                   // Phase G: unlock AudioContext on user gesture (idempotent)
+  ensureAudio();   // Phase G: unlock AudioContext on user gesture (idempotent)
 
   // BUG-4 FIXED — isolate buildSprites' RNG.next() calls so they don't pollute
   // dungeon-gen RNG state. Seed to a fixed constant so sprite grunge is
@@ -6041,21 +6067,138 @@ function startGame(classId) {
   buildSprites();
   RNG.setState(_rngStateBefore);
 
-  // Seed the whole run; each floor derives deterministically from this.
-  GameState.runSeed = (Date.now() ^ (Math.random()*0xFFFFFFFF)) >>> 0;
-  GameState.floorNum = 1;
-  GameState.transitioning = false;
-
-  applyCharacter(classId);         // Phase R — load the persistent character slot
-  resetRunStats();                 // Phase L — fresh run telemetry
-  loadFloor();
-
+  applyCharacter(classId);   // Phase R — load the persistent character slot
   updateHUD(); updateHotbar();
-  addLog('You enter the Cursed Keep...', 'sys');
-  addLog('WASD to move, SPACE to attack.', 'sys');
-  addLog('Find the glowing stairs to descend.', 'sys');
+  showChapterMap();
+}
+
+// Phase S — Chapter Map: rebuilds list from live account.progress every call.
+function showChapterMap() {
+  const overlay = document.getElementById('chaptermap-overlay');
+  const def = CLASS_DEFS[player.classId];
+  const icon = def ? def.icon : '';
+  document.getElementById('cmap-hero').textContent = `${icon} Lv.${player.level} ${(def ? def.name : '').toUpperCase()}`;
+  document.getElementById('cmap-gold').textContent = `${player.gold}g`;
+
+  const container = document.getElementById('cmap-chapters');
+  container.innerHTML = '';
+  CHAPTERS.forEach(ch => {
+    const sec = document.createElement('div');
+    sec.className = 'cmap-chapter';
+    const hdr = document.createElement('div');
+    hdr.className = 'cmap-ch-header';
+    hdr.textContent = `${ch.icon} ${ch.name.toUpperCase()}`;
+    sec.appendChild(hdr);
+
+    for (let s = 1; s <= 5; s++) {
+      const recLvl = stageRecLevel(ch.id, s);
+      const stars  = starsFor(ch.id, s);
+      const locked = !isStageUnlocked(ch.id, s);
+      const isBoss = (s === 5);
+      const stageName = STAGE_NAMES[ch.id - 1][s - 1];
+
+      const row = document.createElement('div');
+      row.className = 'cmap-stage-row ' + (locked ? 'locked' : 'unlocked');
+
+      const starStr = (stars > 0)
+        ? '★'.repeat(stars) + '☆'.repeat(3 - stars)
+        : '☆☆☆';
+
+      row.innerHTML = `
+        <div class="cmap-stage-id">${ch.id}-${s}</div>
+        <div class="cmap-stage-name">${isBoss ? '☠ ' : ''}${stageName}</div>
+        <div class="cmap-stage-rec">rec.${recLvl}</div>
+        <div class="cmap-stage-stars" style="color:${stars>0?'#f0c060':'#333'}">${starStr}</div>
+        <div class="cmap-stage-lock">${locked ? '🔒' : ''}</div>
+      `;
+
+      if (!locked) {
+        row.addEventListener('click', () => launchStage(ch.id, s));
+      }
+      sec.appendChild(row);
+    }
+    container.appendChild(sec);
+  });
+
+  overlay.classList.add('open');
+}
+
+function hideChapterMap() {
+  document.getElementById('chaptermap-overlay').classList.remove('open');
+}
+
+// Phase S — launchStage: wires GameState to the chosen (chapter, stage),
+// sets the deterministic seed, calls loadFloor, and starts the RAF loop
+// exactly once (loopStarted guards against double-start after death returns).
+function launchStage(c, s) {
+  if (!isStageUnlocked(c, s)) return;
+  GameState.chapter = c; GameState.stageIdx = s;
+  GameState.runSeed = stageSeed(c, s, GameState.difficulty);
+  GameState.floorNum = stageRecLevel(c, s);   // drives ALL existing scaling
+  GameState.transitioning = false;
+  player.potions = 3;                          // stage-scoped resource
+  resetRunStats();
+  hideChapterMap();
+  loadFloor();
+  updateHUD(); updateHotbar();
+  addLog(`Chapter ${c}-${s}: ${STAGE_NAMES[c-1][s-1]}`, 'sys');
   gameRunning = true;
-  requestAnimationFrame(ts=>{ lastTime=ts; requestAnimationFrame(loop); });
+  if (!loopStarted) {
+    loopStarted = true;
+    requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); });
+  }
+}
+
+// Phase S — completeStage: player touched the exit stair.
+// Records stars, fades to a toast, returns to chapter map.
+function stageStars() {
+  let stars = 1;
+  if (player.hp >= player.maxHp * 0.5) stars = 2;
+  if (enemies.length === 0) stars = 3;    // full clear overrides hp condition
+  return stars;
+}
+
+function completeStage() {
+  if (GameState.transitioning) return;
+  GameState.transitioning = true;
+  SFX.descend();
+  const c = GameState.chapter, s = GameState.stageIdx;
+  const stars = stageStars();
+  recordStageResult(c, s, stars);
+  syncAccount();
+  // Task 3 replaces this block with the full results screen:
+  const biome = CHAPTERS[c - 1] ? BIOMES[CHAPTERS[c - 1].biome] : BIOMES.cursed_keep;
+  const fade = document.getElementById('floor-fade');
+  fade.innerHTML = `<div class="ff-biome" style="color:${biome ? biome.accent : '#f0c060'}">STAGE CLEAR</div><div class="ff-floor">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div>`;
+  fade.style.opacity = '1';
+  setTimeout(() => {
+    fade.style.opacity = '0';
+    gameRunning = false;
+    GameState.transitioning = false;
+    showChapterMap();
+  }, 1100);
+}
+
+// Phase S — returnToMap: called from the death overlay.
+// Revives the player (applyCharacter does fullHeal + recomputeStats),
+// hides the death screen, and shows the chapter map.
+function returnToMap() {
+  const overlay = document.getElementById('death-overlay');
+  overlay.classList.remove('show', 'show-anim');
+  gameRunning = false;
+  GameState.transitioning = false;
+  applyCharacter(player.classId);   // revive + reload synced state
+  updateHUD(); updateHotbar();
+  showChapterMap();
+}
+
+// Legacy entry point kept in case external code references it.
+// Now routes through selectCharacter → showChapterMap.
+function startGame(classId) {
+  if (!classId) classId = account.lastPlayed || 'mage';
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('charselect-overlay').classList.remove('open');
+  selectCharacter(classId);
 }
 
 // ─────────────────────────────────────────────
