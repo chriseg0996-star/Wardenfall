@@ -6352,7 +6352,7 @@ function ssResetBody(){
   const s = ss.level.spawn;
   ss.body = { x:s.x, y:s.y, w:18, h:26, vx:0, vy:0, onGround:false, facing:1,
               jumpsLeft:0, coyote:0, buffer:0, dropthru:0, iframes:0, onRope:false, blinkCd:0,
-              jumpHeld:false, blinkHeld:false, fireCd:0 };
+              jumpHeld:false, blinkHeld:false, fireCd:0, attackAnim:0 };
 }
 function ssRespawn(){
   ssResetBody();
@@ -6489,9 +6489,11 @@ function ssStep(h){
       hit: new Set(),
     });
     b.fireCd = 0.28;
+    b.attackAnim = 0.18;   // ~180 ms attack animation window
     if (SFX && SFX.firebolt) SFX.firebolt();
   }
   if (b.fireCd > 0) b.fireCd -= h;
+  if (b.attackAnim > 0) b.attackAnim -= h;
   // gravity (skipped when on rope)
   if (!b.onRope) b.vy = Math.min(P.MAX_FALL, b.vy + P.GRAVITY * h);
   // integrate + resolve (x then y)
@@ -6644,55 +6646,438 @@ function ssCamera(){
   ss.cam.y = Math.max(0, Math.min(L.h - VIEW_H, (b.y - b.h/2) - VIEW_H/2));
 }
 
+// ── SPRITES ──────────────────────────────────────────────────────────────────
+// ssSprites holds offscreen-canvas frame arrays drawn procedurally.
+// All frames face RIGHT; ssDraw flips via ctx.scale(-1,1) for facing<0.
+// Dimensions: mage 24×32, enemy 24×26.
+// Palette: bright Maple-ish — warm skin, light robe, glowing staff, ember eyes.
+const ssSprites = { built: false };
+
+function ssBuildSprites(){
+  if (ssSprites.built) return;
+  ssSprites.built = true;
+
+  // ── helpers ──
+  function makeCanvas(w, h){ const c = document.createElement('canvas'); c.width=w; c.height=h; return c; }
+
+  // ── MAGE FRAMES ──  24×32 each, facing right
+  // Colour constants for the mage
+  const SKIN   = '#f5c89a';
+  const ROBE_L = '#b0c8f8';   // light blue robe highlight
+  const ROBE_D = '#6888cc';   // robe shadow
+  const HAIR   = '#d07020';   // warm orange hair
+  const STAFF  = '#c8a050';   // staff shaft
+  const STAFF_T= '#60ffcc';   // glowing staff tip
+  const BELT   = '#e0d080';   // belt / trim
+
+  // Draw a standing mage base (no weapon arm). phase 0|1 for idle sway.
+  function drawMageBase(ctx, phase){
+    const W=24, H=32;
+    ctx.clearRect(0,0,W,H);
+    // robe body (tall rectangle, rounded at top)
+    ctx.fillStyle = ROBE_D;
+    ctx.fillRect(5, 14, 14, 17);   // skirt
+    ctx.fillStyle = ROBE_L;
+    ctx.fillRect(6, 10, 12, 14);   // torso
+    // belt
+    ctx.fillStyle = BELT;
+    ctx.fillRect(5, 20, 14, 2);
+    // head
+    const hy = phase === 1 ? 3 : 4;  // idle bob
+    ctx.fillStyle = SKIN;
+    ctx.fillRect(8, hy, 8, 8);
+    // hair
+    ctx.fillStyle = HAIR;
+    ctx.fillRect(7, hy-2, 10, 3);   // top
+    ctx.fillRect(7, hy, 2, 6);      // side locks
+    // eyes
+    ctx.fillStyle = '#cc3300';
+    ctx.fillRect(10, hy+2, 2, 2);
+    ctx.fillRect(14, hy+2, 2, 2);
+    // feet
+    ctx.fillStyle = ROBE_D;
+    ctx.fillRect(6,  29, 5, 3);
+    ctx.fillRect(13, 29, 5, 3);
+  }
+
+  // Draw staff arm (right arm extended forward, staff in hand)
+  // armY offsets for running animation
+  function drawMageStaff(ctx, armY, glowPulse){
+    // arm
+    ctx.fillStyle = SKIN;
+    ctx.fillRect(17, armY, 3, 7);
+    // shaft
+    ctx.fillStyle = STAFF;
+    ctx.fillRect(19, armY - 8, 2, 14);
+    // glowing tip
+    const r = glowPulse ? 4 : 3;
+    ctx.fillStyle = '#002244';
+    ctx.beginPath(); ctx.arc(20, armY - 9, r+1, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = STAFF_T;
+    ctx.beginPath(); ctx.arc(20, armY - 9, r, 0, Math.PI*2); ctx.fill();
+    // inner bright spot
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(20, armY - 9, 1, 0, Math.PI*2); ctx.fill();
+  }
+
+  // IDLE 0 — still, arm at side
+  {
+    const c = makeCanvas(24,32);
+    const x = c.getContext('2d');
+    drawMageBase(x, 0);
+    drawMageStaff(x, 16, false);
+    ssSprites.mageIdle = [c];
+  }
+  // IDLE 1 — slight bob up
+  {
+    const c = makeCanvas(24,32);
+    const x = c.getContext('2d');
+    drawMageBase(x, 1);
+    drawMageStaff(x, 15, true);
+    ssSprites.mageIdle.push(c);
+  }
+
+  // RUN frames (4) — legs alternate, body shifts
+  ssSprites.mageRun = [];
+  for (let f=0; f<4; f++){
+    const c = makeCanvas(24,32); const x = c.getContext('2d');
+    x.clearRect(0,0,24,32);
+    // robe body
+    x.fillStyle = ROBE_D; x.fillRect(5, 14, 14, 16);
+    x.fillStyle = ROBE_L; x.fillRect(6, 10, 12, 13);
+    x.fillStyle = BELT;   x.fillRect(5, 20, 14, 2);
+    // head (slight forward lean)
+    x.fillStyle = SKIN; x.fillRect(9, 3, 8, 8);
+    x.fillStyle = HAIR; x.fillRect(8, 1, 10, 3); x.fillRect(8, 3, 2, 5);
+    x.fillStyle = '#cc3300'; x.fillRect(11, 5, 2, 2); x.fillRect(15, 5, 2, 2);
+    // alternating feet
+    const legPhase = f % 2;
+    x.fillStyle = ROBE_D;
+    if (legPhase === 0){
+      x.fillRect(6, 29, 5, 3);
+      x.fillRect(14, 27, 5, 3);
+    } else {
+      x.fillRect(6, 27, 5, 3);
+      x.fillRect(14, 29, 5, 3);
+    }
+    // staff arm swings
+    const armY = 14 + (f<2 ? 0 : 2);
+    drawMageStaff(x, armY, f===1||f===3);
+    ssSprites.mageRun.push(c);
+  }
+
+  // JUMP frame (1) — body crouches up, knees tuck
+  {
+    const c = makeCanvas(24,32); const x = c.getContext('2d');
+    x.clearRect(0,0,24,32);
+    x.fillStyle = ROBE_D; x.fillRect(5, 16, 14, 14);
+    x.fillStyle = ROBE_L; x.fillRect(6, 10, 12, 14);
+    x.fillStyle = BELT;   x.fillRect(5, 21, 14, 2);
+    x.fillStyle = SKIN;   x.fillRect(8, 2, 8, 8);
+    x.fillStyle = HAIR;   x.fillRect(7, 0, 10, 3); x.fillRect(7, 2, 2, 5);
+    x.fillStyle = '#cc3300'; x.fillRect(10, 4, 2, 2); x.fillRect(14, 4, 2, 2);
+    // feet tucked
+    x.fillStyle = ROBE_D; x.fillRect(7, 28, 4, 4); x.fillRect(13, 28, 4, 4);
+    drawMageStaff(x, 13, true);
+    ssSprites.mageJump = [c];
+  }
+
+  // FALL frame (1) — arms out slightly, body relaxed
+  {
+    const c = makeCanvas(24,32); const x = c.getContext('2d');
+    x.clearRect(0,0,24,32);
+    x.fillStyle = ROBE_D; x.fillRect(5, 15, 14, 16);
+    x.fillStyle = ROBE_L; x.fillRect(6, 10, 12, 13);
+    x.fillStyle = BELT;   x.fillRect(5, 21, 14, 2);
+    x.fillStyle = SKIN;   x.fillRect(8, 5, 8, 8);
+    x.fillStyle = HAIR;   x.fillRect(7, 3, 10, 3); x.fillRect(7, 5, 2, 5);
+    x.fillStyle = '#cc3300'; x.fillRect(10, 7, 2, 2); x.fillRect(14, 7, 2, 2);
+    x.fillStyle = ROBE_D; x.fillRect(6, 29, 5, 3); x.fillRect(13, 29, 5, 3);
+    drawMageStaff(x, 16, false);
+    ssSprites.mageFall = [c];
+  }
+
+  // ATTACK frames (2) — staff thrust forward, glow large
+  ssSprites.mageAttack = [];
+  for (let f=0; f<2; f++){
+    const c = makeCanvas(24,32); const x = c.getContext('2d');
+    x.clearRect(0,0,24,32);
+    x.fillStyle = ROBE_D; x.fillRect(5, 14, 14, 17);
+    x.fillStyle = ROBE_L; x.fillRect(6, 10, 12, 14);
+    x.fillStyle = BELT;   x.fillRect(5, 20, 14, 2);
+    x.fillStyle = SKIN;   x.fillRect(8, 3, 8, 8);
+    x.fillStyle = HAIR;   x.fillRect(7, 1, 10, 3); x.fillRect(7, 3, 2, 5);
+    x.fillStyle = '#cc3300'; x.fillRect(10, 5, 2, 2); x.fillRect(14, 5, 2, 2);
+    x.fillStyle = ROBE_D; x.fillRect(6, 29, 5, 3); x.fillRect(13, 29, 5, 3);
+    // staff thrust out farther on frame 0, recoil frame 1
+    if (f === 0){
+      // arm punched forward
+      x.fillStyle = SKIN; x.fillRect(18, 13, 3, 6);
+      x.fillStyle = STAFF; x.fillRect(20, 6, 2, 16);
+      // big glow
+      x.fillStyle = 'rgba(0,34,68,0.8)';
+      x.beginPath(); x.arc(21, 5, 6, 0, Math.PI*2); x.fill();
+      x.fillStyle = STAFF_T;
+      x.beginPath(); x.arc(21, 5, 5, 0, Math.PI*2); x.fill();
+      x.fillStyle = '#ffffff';
+      x.beginPath(); x.arc(21, 5, 2, 0, Math.PI*2); x.fill();
+    } else {
+      drawMageStaff(x, 15, true);
+    }
+    ssSprites.mageAttack.push(c);
+  }
+
+  // ── ENEMY FRAMES ──  24×26 each, facing right
+  // A goblin-like creature: green skin, dark clothes, ember eyes
+  const GOBLIN_SKIN = '#6dbf50';
+  const GOBLIN_DARK = '#3a6a28';
+  const GOBLIN_EYE  = '#ff9900';
+  const GOBLIN_CLOTH= '#5a4030';
+
+  ssSprites.enemyWalk = [];
+  for (let f=0; f<2; f++){
+    const c = makeCanvas(24,26); const x = c.getContext('2d');
+    x.clearRect(0,0,24,26);
+    // body
+    x.fillStyle = GOBLIN_CLOTH; x.fillRect(7, 12, 10, 10);
+    // arms
+    x.fillStyle = GOBLIN_SKIN;
+    if (f === 0){
+      x.fillRect(3, 13, 4, 6);    // left arm down
+      x.fillRect(17, 11, 4, 6);   // right arm up
+    } else {
+      x.fillRect(3, 11, 4, 6);    // left arm up
+      x.fillRect(17, 13, 4, 6);   // right arm down
+    }
+    // head
+    x.fillStyle = GOBLIN_SKIN; x.fillRect(6, 2, 12, 10);
+    // ears
+    x.fillStyle = GOBLIN_DARK; x.fillRect(4, 4, 3, 4); x.fillRect(17, 4, 3, 4);
+    // eyes (ember glow)
+    x.fillStyle = '#000'; x.fillRect(8, 5, 3, 3); x.fillRect(13, 5, 3, 3);
+    x.fillStyle = GOBLIN_EYE; x.fillRect(9, 6, 2, 2); x.fillRect(14, 6, 2, 2);
+    // teeth
+    x.fillStyle = '#ffffcc'; x.fillRect(9, 10, 2, 2); x.fillRect(13, 10, 2, 2);
+    // legs alternate
+    x.fillStyle = GOBLIN_DARK;
+    if (f === 0){
+      x.fillRect(8,  22, 4, 4);
+      x.fillRect(12, 20, 4, 4);
+    } else {
+      x.fillRect(8,  20, 4, 4);
+      x.fillRect(12, 22, 4, 4);
+    }
+    ssSprites.enemyWalk.push(c);
+  }
+}
+
+// ── ANIMATION FRAME SELECTOR ─────────────────────────────────────────────────
+// Returns {frames, idx} — caller draws frames[idx].
+// b.attackAnim is a countdown timer (seconds) set when the player fires.
+function ssMageFrame(){
+  const b = ss.body;
+  if (!b) return { frames: ssSprites.mageIdle, idx: 0, key: 'idle' };
+  // attack — recent fire
+  if (b.attackAnim > 0){
+    const total = 0.18;
+    const idx = b.attackAnim > total * 0.5 ? 0 : 1;
+    return { frames: ssSprites.mageAttack, idx, key: 'attack' };
+  }
+  // airborne
+  if (!b.onGround){
+    if (b.vy < 0) return { frames: ssSprites.mageJump, idx: 0, key: 'jump' };
+    return { frames: ssSprites.mageFall, idx: 0, key: 'fall' };
+  }
+  // run
+  if (Math.abs(b.vx) > 20){
+    const cycleMs = 180;   // ms per full 4-frame cycle
+    const idx = Math.floor((ss.frameT / cycleMs) % 4);
+    return { frames: ssSprites.mageRun, idx: Math.abs(idx) % 4, key: 'run' };
+  }
+  // idle
+  const idleMs = 600;
+  const idx = Math.floor((ss.frameT / idleMs) % 2);
+  return { frames: ssSprites.mageIdle, idx: Math.abs(idx) % 2, key: 'idle' };
+}
+
 function ssDraw(dt){
   ctx.clearRect(0,0,VIEW_W,VIEW_H);
-  ctx.fillStyle = '#3a4a6a'; ctx.fillRect(0,0,VIEW_W,VIEW_H);   // bright bg (Maple direction)
+
+  // ── PARALLAX BACKGROUND (drawn before camera translate, in screen space) ──
+  // Sky gradient
+  ctx.fillStyle = '#5a8fc8'; ctx.fillRect(0,0,VIEW_W,VIEW_H);
+  // Horizon fade
+  const grad = ctx.createLinearGradient(0,0,0,VIEW_H);
+  grad.addColorStop(0, '#4a7ab8');
+  grad.addColorStop(0.55, '#8abce0');
+  grad.addColorStop(1,  '#bcd8f0');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,VIEW_W,VIEW_H);
+
+  // Distant layer (parallax factor 0.25) — far mountain silhouettes
+  {
+    const offX = Math.round(ss.cam.x * 0.25) % (VIEW_W + 80);
+    ctx.save();
+    ctx.fillStyle = '#7090b8';
+    // Draw two repeating mountain peaks (simple triangles / trapezoids)
+    const peaks = [
+      { bx: -offX,        bw: 80,  ty: 80  },
+      { bx: 80 - offX,    bw: 60,  ty: 95  },
+      { bx: 160 - offX,   bw: 90,  ty: 72  },
+      { bx: 260 - offX,   bw: 70,  ty: 88  },
+      { bx: 340 - offX,   bw: 80,  ty: 80  },
+      { bx: 430 - offX,   bw: 60,  ty: 95  },
+      { bx: 510 - offX,   bw: 90,  ty: 72  },
+    ];
+    for (const pk of peaks){
+      ctx.beginPath();
+      ctx.moveTo(pk.bx, VIEW_H);
+      ctx.lineTo(pk.bx, pk.ty + 40);
+      ctx.lineTo(pk.bx + pk.bw/2, pk.ty);
+      ctx.lineTo(pk.bx + pk.bw, pk.ty + 40);
+      ctx.lineTo(pk.bx + pk.bw, VIEW_H);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Mid layer (parallax factor 0.55) — closer hills + pillars
+  {
+    const offX = Math.round(ss.cam.x * 0.55);
+    ctx.save();
+    ctx.fillStyle = '#4a7050';   // forest green hills
+    // Rolling hill strip
+    ctx.beginPath();
+    ctx.moveTo(0, VIEW_H);
+    const hillW = 96;
+    const hillCount = Math.ceil(VIEW_W / hillW) + 3;
+    const hillStart = -Math.floor(offX % hillW);
+    for (let i = 0; i < hillCount; i++){
+      const hx = hillStart + i * hillW;
+      ctx.lineTo(hx, VIEW_H * 0.70);
+      ctx.quadraticCurveTo(hx + hillW * 0.5, VIEW_H * 0.55, hx + hillW, VIEW_H * 0.70);
+    }
+    ctx.lineTo(VIEW_W, VIEW_H); ctx.closePath(); ctx.fill();
+
+    // Ancient stone pillars
+    ctx.fillStyle = '#3a5040';
+    const pillarPositions = [60, 200, 310];
+    for (const px of pillarPositions){
+      const sx = px - offX % VIEW_W;
+      // only draw if on screen (±40px tolerance)
+      if (sx > -40 && sx < VIEW_W + 40){
+        ctx.fillRect(sx, VIEW_H * 0.40, 10, VIEW_H * 0.32);   // shaft
+        ctx.fillRect(sx - 4, VIEW_H * 0.40, 18, 6);            // capital
+      }
+    }
+    ctx.restore();
+  }
+
   const L=ss.level; if(!L){ return; }
   ctx.save(); ctx.translate(-Math.round(ss.cam.x), -Math.round(ss.cam.y));
   const x0=Math.floor(ss.cam.x/TILE), x1=Math.ceil((ss.cam.x+VIEW_W)/TILE);
   const y0=Math.floor(ss.cam.y/TILE), y1=Math.ceil((ss.cam.y+VIEW_H)/TILE);
-  // tiles
+  // tiles — warmer stone palette
   for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++){
     if(ssSolidAt(tx,ty) && tx>=0 && ty>=0 && tx<L.cols && ty<L.rows){
-      ctx.fillStyle='#5a4632'; ctx.fillRect(tx*TILE,ty*TILE,TILE,TILE);
-      ctx.fillStyle='#6e573e'; ctx.fillRect(tx*TILE,ty*TILE,TILE,4);
+      ctx.fillStyle='#6a5840'; ctx.fillRect(tx*TILE,ty*TILE,TILE,TILE);
+      ctx.fillStyle='#8a7050'; ctx.fillRect(tx*TILE,ty*TILE,TILE,5);   // top highlight
+      ctx.fillStyle='#584830'; ctx.fillRect(tx*TILE,ty*TILE+TILE-3,TILE,3); // bottom shadow
+      // mortar lines
+      ctx.fillStyle='#504030';
+      ctx.fillRect(tx*TILE, ty*TILE, TILE, 1);
+      ctx.fillRect(tx*TILE, ty*TILE, 1, TILE);
     }
   }
-  L.oneWay.forEach(p=>{ ctx.fillStyle='#7a6a4a'; ctx.fillRect(p.x*TILE, p.y*TILE, TILE, 6); });
-  L.ropes.forEach(p=>{ ctx.fillStyle='#caa050'; ctx.fillRect(p.x*TILE+TILE/2-1, p.y*TILE, 2, TILE); });
-  // enemies
+  L.oneWay.forEach(p=>{
+    ctx.fillStyle='#a09060'; ctx.fillRect(p.x*TILE, p.y*TILE, TILE, 7);
+    ctx.fillStyle='#c0b080'; ctx.fillRect(p.x*TILE, p.y*TILE, TILE, 3);  // bright top
+  });
+  L.ropes.forEach(p=>{
+    ctx.fillStyle='#c8a040'; ctx.fillRect(p.x*TILE+TILE/2-2, p.y*TILE, 4, TILE);
+    ctx.fillStyle='#e8c060'; ctx.fillRect(p.x*TILE+TILE/2-1, p.y*TILE, 2, TILE);  // highlight
+  });
+
+  // ── ENEMIES ──
   for (const e of ss.enemies){
     if (!e.alive) continue;
-    ctx.fillStyle = '#cc4422';
-    ctx.fillRect(e.x - e.w/2, e.y - e.h, e.w, e.h);
+    // pick walk frame by world clock
+    if (ssSprites.built && ssSprites.enemyWalk){
+      const walkMs = 240;
+      const fIdx = Math.floor((ss.frameT / walkMs) % 2);
+      const frame = ssSprites.enemyWalk[fIdx];
+      ctx.save();
+      if (e.facing < 0){
+        // flip horizontally around the sprite's centre x
+        ctx.translate(e.x + e.w/2, e.y - e.h);
+        ctx.scale(-1, 1);
+        ctx.drawImage(frame, 0, 0, frame.width, frame.height);
+      } else {
+        ctx.translate(e.x - e.w/2, e.y - e.h);
+        ctx.drawImage(frame, 0, 0, frame.width, frame.height);
+      }
+      ctx.restore();
+    } else {
+      // fallback rectangle while sprites not yet built
+      ctx.fillStyle = '#cc4422';
+      ctx.fillRect(e.x - e.w/2, e.y - e.h, e.w, e.h);
+    }
     // HP bar above enemy
     const bw = e.w + 4;
-    ctx.fillStyle = '#330000'; ctx.fillRect(e.x - bw/2, e.y - e.h - 6, bw, 4);
-    ctx.fillStyle = '#ff4422'; ctx.fillRect(e.x - bw/2, e.y - e.h - 6, bw * (e.hp/e.maxHp), 4);
+    ctx.fillStyle = '#330000'; ctx.fillRect(e.x - bw/2, e.y - e.h - 7, bw, 4);
+    ctx.fillStyle = '#ff4422'; ctx.fillRect(e.x - bw/2, e.y - e.h - 7, bw * (e.hp/e.maxHp), 4);
   }
-  // player body
-  const b=ss.body;
-  if(b){ ctx.fillStyle='#6db0ff'; ctx.fillRect(b.x-b.w/2, b.y-b.h, b.w, b.h); }
-  // projectiles — warm firebolt look: orange outer ellipse + bright yellow core
+
+  // ── PLAYER MAGE ──
+  const b = ss.body;
+  if (b){
+    if (ssSprites.built){
+      const { frames, idx } = ssMageFrame();
+      const frame = frames[idx];
+      const SW = frame.width, SH = frame.height;  // 24, 32
+      ctx.save();
+      if (b.facing < 0){
+        // flip: translate to right edge of sprite, scale -1
+        ctx.translate(b.x + SW/2, b.y - SH);
+        ctx.scale(-1, 1);
+        ctx.drawImage(frame, 0, 0, SW, SH);
+      } else {
+        ctx.translate(b.x - SW/2, b.y - SH);
+        ctx.drawImage(frame, 0, 0, SW, SH);
+      }
+      // i-frame flash (semi-transparent white overlay)
+      if (b.iframes > 0 && Math.floor(b.iframes * 12) % 2 === 0){
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, SW, SH);
+      }
+      ctx.restore();
+    } else {
+      // fallback rectangle
+      ctx.fillStyle = '#6db0ff';
+      ctx.fillRect(b.x - b.w/2, b.y - b.h, b.w, b.h);
+    }
+  }
+
+  // ── PROJECTILES — warm firebolt ──
   for (const p of ss.projectiles){
     ctx.save();
     ctx.globalAlpha = Math.min(1, p.life * 2);
-    // outer glow
     ctx.fillStyle = '#ff6600';
     ctx.beginPath(); ctx.ellipse(p.x, p.y, p.w * 0.9, p.h * 0.55, 0, 0, Math.PI*2); ctx.fill();
-    // core
     ctx.fillStyle = '#ffee44';
     ctx.beginPath(); ctx.ellipse(p.x, p.y, p.w * 0.45, p.h * 0.28, 0, 0, Math.PI*2); ctx.fill();
     ctx.restore();
   }
-  // particles (global array, drawn inside camera transform so they sit at world coords)
+
+  // ── PARTICLES ──
   for (const p of particles){
     ctx.save(); ctx.globalAlpha = Math.max(0, p.life);
     ctx.fillStyle = p.col;
     ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
     ctx.restore();
   }
-  // hit flashes (simple bright circle — sprites.hit is top-down only)
+
+  // ── HIT FLASHES ──
   for (const h of hitFlashes){
     ctx.save(); ctx.globalAlpha = Math.max(0, h.life * 0.7);
     ctx.fillStyle = '#ffffff';
@@ -6700,7 +7085,8 @@ function ssDraw(dt){
     ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI*2); ctx.fill();
     ctx.restore();
   }
-  // floating texts (world-space damage numbers)
+
+  // ── FLOATING TEXTS ──
   if (floatingTexts.length > 0){
     ctx.font = 'bold 10px Courier New';
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
@@ -6757,6 +7143,7 @@ window.__sidescroll = function(){
     ' S                  #                 E   ', // row 16  spawn col 1; wall col 20; exit col 38
     '##############   #########################', // row 17  ground: cols 0-13, gap 14-16, cols 17-41
   ]);
+  ssBuildSprites();   // build offscreen sprite frames once (guarded internally)
   ssResetBody();
   ss.projectiles = [];
   ss.enemies = [];
