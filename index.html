@@ -342,6 +342,24 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 .settings-close:hover { background:#333; }
 .settings-hint { color:#666; font-size:9px; margin-top:8px; text-align:center; }
 
+/* Phase S Task 4 — Touch pause button + PAUSED banner */
+#pause-btn {
+  position:absolute; top:100px; right:8px;
+  width:44px; height:44px; border-radius:50%;
+  background:rgba(60,60,100,0.35); border:1px solid rgba(140,160,200,0.5);
+  color:#8fa7c4; font-size:18px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; user-select:none; -webkit-user-select:none; z-index:10;
+}
+#pause-btn:active { background:rgba(60,60,100,0.6); transform:scale(0.95); }
+#paused-banner {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:rgba(0,0,0,0.82); border:1px solid #8fa7c4;
+  border-radius:4px; padding:8px 22px;
+  font-size:13px; letter-spacing:4px; color:#8fa7c4;
+  font-family:'Courier New',monospace;
+  z-index:199; display:none; pointer-events:none;
+}
+
 /* Phase J — Inventory & Item Decisions: chest-opened modal */
 #inventory-overlay {
   position:absolute; inset:0; background:rgba(0,0,0,0.88);
@@ -661,6 +679,8 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
     <div class="spell-btn" id="spell-btn-2" title="Nova (4)"><span class="sk-icon">💥</span><span class="mp-cost">25</span><div class="cd-mask"></div></div>
   </div>
   <div id="gear-btn" title="Gear">🎒</div>
+  <div id="pause-btn" title="Pause / Settings" onclick="toggleSettings()">⚙</div>
+  <div id="paused-banner">PAUSED</div>
   <div id="damage-vignette"></div>
   <div id="floor-fade"></div>
 
@@ -5806,8 +5826,19 @@ let settingsOpen = false;
 let rebindTarget = null;     // action name being rebound, or null
 // (BUG-2 FIXED — escPrev moved up to module-state block)
 
-function openSettings()  { settingsOpen = true;  ensureAudio(); document.getElementById('settings-overlay').classList.add('open');    renderSettings(); }
-function closeSettings() { settingsOpen = false; document.getElementById('settings-overlay').classList.remove('open'); rebindTarget = null; }
+function openSettings()  {
+  settingsOpen = true;
+  ensureAudio();
+  document.getElementById('settings-overlay').classList.add('open');
+  if (gameRunning) document.getElementById('paused-banner').style.display = 'block';
+  renderSettings();
+}
+function closeSettings() {
+  settingsOpen = false;
+  document.getElementById('settings-overlay').classList.remove('open');
+  document.getElementById('paused-banner').style.display = 'none';
+  rebindTarget = null;
+}
 function toggleSettings(){ settingsOpen ? closeSettings() : openSettings(); }
 
 function renderSettings() {
@@ -5915,6 +5946,13 @@ for (let i=0; i<3; i++) {
 
 // Gear button (mobile touch — Phase Q)
 document.getElementById('gear-btn').addEventListener('click', () => { gearOpen ? closeGearScreen() : openGearScreen(); });
+
+// Phase S Task 4 — auto-pause on tab hide / app switch
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && gameRunning && !settingsOpen && !inventoryOpen && !gearOpen && !player.dead && !GameState.transitioning) {
+    openSettings();
+  }
+});
 
 // (Number-key preventDefault now handled by isBoundKey check in the main
 // keydown listener above — bindings drive what we suppress.)
