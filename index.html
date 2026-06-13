@@ -6161,6 +6161,7 @@ function stageStars() {
 function completeStage() {
   if (GameState.transitioning) return;
   GameState.transitioning = true;
+  gameRunning = false;                 // freeze sim immediately; drawGame keeps rendering frozen scene
   SFX.descend();
   const c = GameState.chapter, s = GameState.stageIdx;
   const stars = stageStars();
@@ -6172,8 +6173,8 @@ function completeStage() {
   fade.innerHTML = `<div class="ff-biome" style="color:${biome ? biome.accent : '#f0c060'}">STAGE CLEAR</div><div class="ff-floor">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div>`;
   fade.style.opacity = '1';
   setTimeout(() => {
+    if (player.dead) return;           // belt-and-suspenders: death path owns flow if anything slips through
     fade.style.opacity = '0';
-    gameRunning = false;
     GameState.transitioning = false;
     showChapterMap();
   }, 1100);
