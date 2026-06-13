@@ -350,6 +350,21 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 }
 .settings-close:hover { background:#333; }
 .settings-hint { color:#666; font-size:9px; margin-top:8px; text-align:center; }
+.settings-subtle { color:#777; font-size:9px; margin:2px 0 6px; }
+.kb-toggle {
+  margin-top:8px; width:100%; background:#161620; border:1px solid #3a3a4a;
+  border-radius:3px; padding:7px 10px; color:#a0a0c0; cursor:pointer;
+  font-size:10px; font-family:'Courier New',monospace; letter-spacing:1px; text-align:left;
+}
+.kb-toggle:hover { background:#1e1e2c; color:#c0c0e0; }
+.kb-collapse { display:none; margin-top:4px; }
+.kb-collapse.open { display:block; }
+.kb-reset {
+  margin-top:6px; background:#1a1a22; border:1px solid #555; border-radius:3px;
+  padding:4px 10px; color:#aaa; cursor:pointer; font-size:10px;
+  font-family:'Courier New',monospace; letter-spacing:1px;
+}
+.kb-reset:hover { background:#2a2a34; color:#ddd; }
 
 /* Phase S Task 4 — Touch pause button + PAUSED banner */
 #pause-btn {
@@ -733,13 +748,17 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   <div id="settings-overlay">
     <div class="settings-panel">
       <div class="settings-title">⚙ SETTINGS</div>
-      <div class="settings-section">PRESETS</div>
-      <div class="preset-row" id="preset-row"></div>
-      <div class="settings-section">KEY BINDINGS</div>
-      <div id="kb-list"></div>
-      <div class="settings-hint">Click <b>Rebind</b>, then press the new key. ESC cancels rebind.</div>
       <div class="settings-section">AUDIO</div>
       <div id="audio-list"></div>
+      <div class="settings-section">CONTROLS</div>
+      <div class="settings-subtle">Pick a control scheme, or expand to rebind individual keys.</div>
+      <div class="preset-row" id="preset-row"></div>
+      <button class="kb-toggle" id="kb-toggle" onclick="toggleKbList()">⌨ Customize keys ▸</button>
+      <div id="kb-collapse" class="kb-collapse">
+        <div id="kb-list"></div>
+        <div class="settings-hint">Click <b>Rebind</b>, then press the new key. ESC cancels rebind.</div>
+        <button class="kb-reset" onclick="applyPreset('default')">Reset keys to default</button>
+      </div>
       <button class="settings-close" onclick="closeSettings()">RESUME</button>
     </div>
   </div>
@@ -5834,11 +5853,13 @@ function _closeChestModal(itemSelected) {
 // ─────────────────────────────────────────────
 let settingsOpen = false;
 let rebindTarget = null;     // action name being rebound, or null
+let kbExpanded   = false;    // keybind list starts collapsed each open
 // (BUG-2 FIXED — escPrev moved up to module-state block)
 
 function openSettings()  {
   settingsOpen = true;
   ensureAudio();
+  kbExpanded = false;        // always reopen collapsed — Audio + presets lead
   document.getElementById('settings-overlay').classList.add('open');
   if (gameRunning) document.getElementById('paused-banner').style.display = 'block';
   renderSettings();
@@ -5858,7 +5879,6 @@ function renderSettings() {
     <button class="preset-btn" onclick="applyPreset('default')">DEFAULT</button>
     <button class="preset-btn" onclick="applyPreset('wow')">WoW (QER+F)</button>
     <button class="preset-btn" onclick="applyPreset('arrows')">ARROWS</button>
-    <button class="preset-btn reset" onclick="applyPreset('default')">RESET</button>
   `;
   // Binding rows
   const list = document.getElementById('kb-list');
@@ -5905,7 +5925,16 @@ function renderSettings() {
       saveAudio();
     });
   }
+  // Keybind list is collapsed by default; sync visibility + toggle caret.
+  const collapse = document.getElementById('kb-collapse');
+  const toggle   = document.getElementById('kb-toggle');
+  if (collapse && toggle) {
+    collapse.classList.toggle('open', kbExpanded);
+    toggle.textContent = kbExpanded ? '⌨ Customize keys ▾' : '⌨ Customize keys ▸';
+  }
 }
+
+function toggleKbList() { kbExpanded = !kbExpanded; renderSettings(); }
 
 function beginRebind(act) {
   rebindTarget = act;
