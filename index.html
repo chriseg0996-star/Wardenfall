@@ -495,17 +495,6 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 .death-saved-note {
   text-align:center; font-size:9px; color:#999; margin-bottom:8px; letter-spacing:1px;
 }
-.death-seed-row {
-  display:flex; align-items:center; justify-content:center; gap:8px;
-  font-size:10px; color:#888; margin-bottom:12px;
-}
-.death-seed-row #death-seed-val { color:#a080ff; font-weight:bold; letter-spacing:1px; }
-.death-btn-small {
-  background:#222; border:1px solid #555; color:#eee; padding:1px 7px;
-  border-radius:2px; font-family:'Courier New',monospace; font-size:9px; cursor:pointer;
-  letter-spacing:1px;
-}
-.death-btn-small:hover { background:#333; }
 .death-stats {
   display:grid; grid-template-columns: repeat(3, 1fr); gap:6px 10px;
   margin-bottom:14px;
@@ -532,27 +521,89 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   border-color:#c04040; color:#ffe0e0;
 }
 .death-btn.primary:hover { background:linear-gradient(135deg,#8a2020,#c03030); }
-.death-scores {
-  display:none; margin-top:14px; border-top:1px solid #3a2a2a; padding-top:10px;
-}
-.death-scores.show { display:block; }
-.scores-title { color:#a080ff; font-size:11px; letter-spacing:2px; text-align:center; margin-bottom:8px; }
-.scores-table { width:100%; border-collapse:collapse; font-size:10px; }
-.scores-table th, .scores-table td { padding:3px 5px; text-align:left; border-bottom:1px solid #1f1f28; }
-.scores-table th { color:#666; font-weight:normal; font-size:8px; letter-spacing:1px; text-transform:uppercase; }
-.scores-table td.col-score { color:#f0c060; font-weight:bold; }
-.scores-table tr.you td { background:rgba(160,80,255,0.13); }
-.scores-table tr.you td.col-rank { color:#e0c0ff; font-weight:bold; }
-.scores-clear {
-  margin:10px 0 0; background:#1a1a22; border:1px solid #555; color:#888;
-  padding:3px 10px; border-radius:2px; font-family:'Courier New',monospace; font-size:9px;
-  cursor:pointer; display:block; margin-left:auto;
-}
-.scores-clear:hover { background:#2a2a32; color:#eee; }
 @media (max-width: 540px) {
   .death-stats { grid-template-columns: repeat(2, 1fr); }
-  .scores-table th:nth-child(4), .scores-table td:nth-child(4),
-  .scores-table th:nth-child(7), .scores-table td:nth-child(7) { display:none; }
+}
+
+/* Phase S Task 3 — Results Screen */
+#results-overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,0.94);
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  z-index:220; font-family:'Courier New',monospace; color:#aaa;
+  opacity:0; transition: opacity 0.6s ease-out;
+}
+#results-overlay.show { display:flex; }
+#results-overlay.show-anim { opacity:1; }
+.results-panel {
+  background:#0a0c14; border:1px solid #5a4a20; border-radius:4px;
+  padding:18px 22px; min-width:340px; max-width:96vw; max-height:92vh; overflow-y:auto;
+  box-shadow:0 0 60px rgba(200,160,30,0.28);
+}
+.results-header {
+  color:#f0c060; font-size:20px; letter-spacing:5px; text-align:center;
+  margin-bottom:8px; text-shadow:0 0 14px rgba(240,190,60,0.55);
+}
+.results-stars {
+  display:flex; justify-content:center; gap:10px; margin-bottom:8px;
+}
+.results-star {
+  font-size:28px; opacity:0.25; transition: opacity 0.25s ease, transform 0.25s ease;
+  transform:scale(0.7);
+}
+.results-star.lit {
+  opacity:1; transform:scale(1.15); color:#f0c060;
+  text-shadow:0 0 12px rgba(240,190,60,0.8);
+}
+.results-stage-name {
+  text-align:center; font-size:10px; color:#8090b0; letter-spacing:2px;
+  margin-bottom:12px; text-transform:uppercase;
+}
+.results-levelup {
+  text-align:center; font-size:11px; color:#c060ff; letter-spacing:3px;
+  margin-bottom:10px; text-shadow:0 0 8px rgba(160,60,255,0.6);
+}
+.results-stats {
+  display:grid; grid-template-columns: repeat(2, 1fr); gap:6px 10px;
+  margin-bottom:14px;
+}
+.results-stat {
+  background:#15151c; border:1px solid #2a2a3a; border-radius:3px;
+  padding:6px 6px 7px; text-align:center;
+}
+.results-stat .ds-label { font-size:8px; color:#666; letter-spacing:1px; text-transform:uppercase; }
+.results-stat .ds-value { font-size:14px; color:#f0c060; font-weight:bold; margin-top:3px; font-family:'Courier New',monospace; }
+.results-loot-label {
+  font-size:8px; color:#666; letter-spacing:2px; text-transform:uppercase;
+  margin-bottom:6px;
+}
+.results-loot-chips {
+  display:flex; flex-wrap:wrap; gap:4px; margin-bottom:14px; min-height:20px;
+}
+.loot-chip {
+  background:#15151c; border:1px solid #333; border-radius:3px;
+  padding:2px 6px; font-size:9px; color:#ccc; letter-spacing:0.5px;
+}
+.loot-chip-more {
+  background:#111; border:1px solid #2a2a3a; border-radius:3px;
+  padding:2px 6px; font-size:9px; color:#555;
+}
+.results-actions {
+  display:flex; justify-content:center; gap:10px; margin-top:6px;
+}
+.results-btn {
+  background:linear-gradient(135deg,#2a1840,#4a2870);
+  border:1px solid #6040a0; border-radius:3px; padding:7px 18px;
+  color:#e0c0ff; font-size:11px; cursor:pointer; letter-spacing:2px;
+  font-family:'Courier New',monospace;
+}
+.results-btn:hover { background:linear-gradient(135deg,#3a2060,#5a30a0); }
+.results-btn.primary {
+  background:linear-gradient(135deg,#403010,#806020);
+  border-color:#c09030; color:#ffe0a0;
+}
+.results-btn.primary:hover { background:linear-gradient(135deg,#504020,#907030); }
+@media (max-width: 540px) {
+  .results-stats { grid-template-columns: repeat(2, 1fr); }
 }
 </style>
 </head>
@@ -663,21 +714,36 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
     </div>
   </div>
 
-  <!-- Phase L — Death Screen & Run Meta -->
+  <!-- Phase L — Death Screen & Run Meta (leaderboard retired Phase S Task 3) -->
   <div id="death-overlay">
     <div class="death-panel">
       <div class="death-header">STAGE FAILED</div>
       <div class="death-saved-note">XP and gear are kept. The stage can be retried.</div>
-      <div class="death-seed-row">
-        <span>Run seed: <span id="death-seed-val">0x00000000</span></span>
-        <button class="death-btn-small" id="death-copy-seed">COPY</button>
-      </div>
       <div class="death-stats" id="death-stats"></div>
       <div class="death-actions">
-        <button class="death-btn primary" onclick="returnToMap()">STAGE FAILED — RETURN TO MAP</button>
-        <button class="death-btn" id="death-view-scores">VIEW SCORES</button>
+        <button class="death-btn primary" onclick="returnToMap()">RETURN TO MAP</button>
       </div>
-      <div class="death-scores" id="death-scores"></div>
+    </div>
+  </div>
+
+  <!-- Phase S Task 3 — Results Screen -->
+  <div id="results-overlay">
+    <div class="results-panel">
+      <div class="results-header">STAGE CLEAR</div>
+      <div class="results-stars" id="results-stars">
+        <div class="results-star" id="results-star-0">★</div>
+        <div class="results-star" id="results-star-1">★</div>
+        <div class="results-star" id="results-star-2">★</div>
+      </div>
+      <div class="results-stage-name" id="results-stage-name"></div>
+      <div class="results-levelup" id="results-levelup" style="display:none"></div>
+      <div class="results-stats" id="results-stats"></div>
+      <div class="results-loot-label">LOOT ACQUIRED</div>
+      <div class="results-loot-chips" id="results-loot-chips"></div>
+      <div class="results-actions">
+        <button class="results-btn primary" onclick="hideResults();showChapterMap()">CONTINUE</button>
+        <button class="results-btn" onclick="hideResults();launchStage(GameState.chapter,GameState.stageIdx)">RETRY</button>
+      </div>
     </div>
   </div>
 
@@ -2187,6 +2253,8 @@ function sellStashItem(idx) {
 // Single acquisition path for every loot source.
 function acquireItem(it) {
   updateBestItem(it);
+  // Phase S Task 3 — track per-stage loot for the results screen
+  stageLoot.push({ icon: it.icon, name: it.name, rarity: it.rarity });
   const cur = player.equipped[it.slot];
   if (!cur || itemScore(it) > itemScore(cur)) {
     equipItem(it);
@@ -3950,12 +4018,10 @@ function playerDie() {
 
 // ─────────────────────────────────────────────
 // Phase L — Death Screen & Run Meta
-// RunStats accumulates per-run telemetry from event hooks scattered across
-// combat / pickup / cast / descend / boss-kill sites. On death the values
-// are flushed into a count-up animation overlay and (if the score ranks)
-// persisted to a top-5 localStorage leaderboard.
+// RunStats accumulates per-stage telemetry from event hooks scattered across
+// combat / pickup / cast / boss-kill sites. On death or stage clear the values
+// are flushed into a count-up animation overlay.
 // ─────────────────────────────────────────────
-const SCORE_STORAGE_KEY = 'wardenfall.scores.v1';
 const RARITY_RANK = { common:0, uncommon:1, rare:2, epic:3, legendary:4 };
 
 let RunStats = {
@@ -3996,42 +4062,6 @@ function updateBestItem(item) {
   }
 }
 
-function loadScores() {
-  try {
-    const raw = localStorage.getItem(SCORE_STORAGE_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
-  } catch { return []; }
-}
-function saveScores(arr) {
-  try { localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(arr)); } catch {}
-}
-
-function submitRunToScores() {
-  const score =
-    RunStats.floorsCleared * 1000 +
-    RunStats.enemiesKilled * 10 +
-    RunStats.goldCollected;
-  const entry = {
-    score,
-    floorsCleared: RunStats.floorsCleared,
-    enemiesKilled: RunStats.enemiesKilled,
-    gold:          RunStats.goldCollected,
-    bestItem:      RunStats.bestItem,
-    seed:          RunStats.seed,
-    date:          new Date().toISOString(),
-  };
-  const list = loadScores();
-  list.push(entry);
-  list.sort((a, b) => b.score - a.score);
-  const top5 = list.slice(0, 5);
-  saveScores(top5);
-  const rank = top5.findIndex(e =>
-    e.score === entry.score && e.seed === entry.seed && e.date === entry.date) + 1;
-  return { entry, scores: top5, rank };
-}
-
 function _formatRunTime(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
   const mm = Math.floor(total / 60);
@@ -4059,136 +4089,100 @@ function _animateCountUp(items, durationMs) {
   requestAnimationFrame(tick);
 }
 
-function _formatSeed(seed) {
-  return '0x' + (seed >>> 0).toString(16).padStart(8, '0').toUpperCase();
-}
-
 function showDeathScreen() {
   const overlay = document.getElementById('death-overlay');
   if (!overlay) return;
-  const submission = submitRunToScores();
   const elapsed = Date.now() - RunStats.startTime;
-  // Seed display
-  document.getElementById('death-seed-val').textContent = _formatSeed(RunStats.seed);
-  // Stats grid (Time + Best Item rendered final; numeric stats start at 0
-  // and animate up over 1200ms via _animateCountUp).
-  const bestColor = RunStats.bestItem ? (RARITY_COL[RunStats.bestItem.rarity] || '#aaa') : '#666';
-  const bestText  = RunStats.bestItem
-    ? `${RunStats.bestItem.icon} ${RunStats.bestItem.name}`
-    : 'None';
+  // Stats grid: Enemies Slain / Gold Collected / Damage Dealt / Damage Taken / Time
   const stats = document.getElementById('death-stats');
   stats.innerHTML = `
-    <div class="death-stat"><div class="ds-label">Floor Reached</div><div class="ds-value"      data-target="${RunStats.floorsCleared}">0</div></div>
-    <div class="death-stat"><div class="ds-label">Enemies Slain</div><div class="ds-value"      data-target="${RunStats.enemiesKilled}">0</div></div>
-    <div class="death-stat"><div class="ds-label">Gold Collected</div><div class="ds-value"     data-target="${RunStats.goldCollected}">0</div></div>
-    <div class="death-stat"><div class="ds-label">Damage Dealt</div><div class="ds-value"       data-target="${RunStats.damageDealt}">0</div></div>
-    <div class="death-stat"><div class="ds-label">Damage Taken</div><div class="ds-value"       data-target="${RunStats.damageTaken}">0</div></div>
-    <div class="death-stat"><div class="ds-label">Bosses Defeated</div><div class="ds-value"    data-target="${RunStats.bossesKilled}">0</div></div>
-    <div class="death-stat"><div class="ds-label">Spells Cast</div><div class="ds-value"        data-target="${RunStats.spellsCast}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Enemies Slain</div><div class="ds-value"  data-target="${RunStats.enemiesKilled}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Gold Collected</div><div class="ds-value" data-target="${RunStats.goldCollected}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Damage Dealt</div><div class="ds-value"   data-target="${RunStats.damageDealt}">0</div></div>
+    <div class="death-stat"><div class="ds-label">Damage Taken</div><div class="ds-value"   data-target="${RunStats.damageTaken}">0</div></div>
     <div class="death-stat"><div class="ds-label">Time Survived</div><div class="ds-value">${_formatRunTime(elapsed)}</div></div>
-    <div class="death-stat"><div class="ds-label">Best Item Found</div><div class="ds-value best" style="color:${bestColor}">${bestText}</div></div>
   `;
-  // Animate numeric stats
   const numEls = stats.querySelectorAll('.ds-value[data-target]');
   const items = [];
   numEls.forEach(el => items.push({ el, target: parseInt(el.dataset.target, 10) || 0 }));
   _animateCountUp(items, 1200);
-  // Build the scores panel (hidden until user clicks VIEW SCORES)
-  renderScores(submission);
-  document.getElementById('death-scores').classList.remove('show');
-  // Trigger fade-in (display:flex first, then add show-anim on next frame so
-  // the opacity transition actually fires).
   overlay.classList.add('show');
   requestAnimationFrame(() => overlay.classList.add('show-anim'));
 }
 
-function renderScores(submission) {
-  const div = document.getElementById('death-scores');
-  if (!div) return;
-  const scores  = submission.scores;
-  const youEntry = submission.entry;
-  const youRank  = submission.rank;
-  if (!scores || scores.length === 0) {
-    div.innerHTML = `
-      <div class="scores-title">★ TOP 5 ★</div>
-      <div style="text-align:center; color:#666; font-size:10px; padding:10px 0">No runs recorded yet.</div>
-      <button class="scores-clear" onclick="clearScoresConfirm()">CLEAR SCORES</button>
-    `;
-    return;
+// ─────────────────────────────────────────────
+// Phase S Task 3 — Results Screen
+// Per-stage loot tracking + victory overlay.
+// ─────────────────────────────────────────────
+let stageLoot = [];            // [{icon, name, rarity}] — reset in launchStage
+let levelAtStageStart = 1;    // captured in launchStage to detect level-up during stage
+
+function showResults(stars) {
+  const overlay = document.getElementById('results-overlay');
+  if (!overlay) return;
+  const c = GameState.chapter, s = GameState.stageIdx;
+  // Stage name line
+  const chName    = CHAPTERS[c - 1] ? CHAPTERS[c - 1].name : '';
+  const stageName = STAGE_NAMES[c - 1] ? STAGE_NAMES[c - 1][s - 1] : '';
+  document.getElementById('results-stage-name').textContent =
+    `Chapter ${c}-${s} — ${stageName}`;
+  // Level-up callout
+  const lvlEl = document.getElementById('results-levelup');
+  if (player.level > levelAtStageStart) {
+    lvlEl.textContent = `LEVEL UP!  Lv.${player.level}`;
+    lvlEl.style.display = '';
+  } else {
+    lvlEl.style.display = 'none';
   }
-  const rows = scores.map((s, i) => {
-    const isYou = s.score === youEntry.score && s.seed === youEntry.seed && s.date === youEntry.date;
-    const cls   = isYou ? 'you' : '';
-    const dt    = new Date(s.date);
-    const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-    const bestStr = s.bestItem
-      ? `<span style="color:${RARITY_COL[s.bestItem.rarity]||'#aaa'}">${s.bestItem.icon} ${s.bestItem.name}</span>`
-      : '<span style="color:#555">—</span>';
-    return `<tr class="${cls}">
-      <td class="col-rank">#${i+1}</td>
-      <td class="col-score">${s.score}</td>
-      <td>${s.floorsCleared}</td>
-      <td>${s.enemiesKilled}</td>
-      <td>${s.gold}</td>
-      <td>${bestStr}</td>
-      <td>${dateStr}</td>
-    </tr>`;
-  }).join('');
-  div.innerHTML = `
-    <div class="scores-title">★ TOP 5${youRank > 0 ? ` — YOU RANKED #${youRank}` : ''} ★</div>
-    <table class="scores-table">
-      <thead><tr>
-        <th>Rank</th><th>Score</th><th>Floor</th><th>Kills</th>
-        <th>Gold</th><th>Best Item</th><th>Date</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <button class="scores-clear" onclick="clearScoresConfirm()">CLEAR SCORES</button>
+  // Stats grid with count-up
+  const elapsed = Date.now() - RunStats.startTime;
+  const statsEl = document.getElementById('results-stats');
+  statsEl.innerHTML = `
+    <div class="results-stat"><div class="ds-label">Enemies Slain</div><div class="ds-value" data-target="${RunStats.enemiesKilled}">0</div></div>
+    <div class="results-stat"><div class="ds-label">Gold Gained</div><div class="ds-value"   data-target="${RunStats.goldCollected}">0</div></div>
+    <div class="results-stat"><div class="ds-label">Damage Dealt</div><div class="ds-value"  data-target="${RunStats.damageDealt}">0</div></div>
+    <div class="results-stat"><div class="ds-label">Time</div><div class="ds-value">${_formatRunTime(elapsed)}</div></div>
   `;
-}
-
-function clearScoresConfirm() {
-  if (confirm('Clear all leaderboard scores? This cannot be undone.')) {
-    saveScores([]);
-    renderScores({ entry: {}, scores: [], rank: -1 });
+  const numEls = statsEl.querySelectorAll('.ds-value[data-target]');
+  const countItems = [];
+  numEls.forEach(el => countItems.push({ el, target: parseInt(el.dataset.target, 10) || 0 }));
+  _animateCountUp(countItems, 1200);
+  // Loot chips (max 8 displayed + "+N more")
+  const chipsEl = document.getElementById('results-loot-chips');
+  if (stageLoot.length === 0) {
+    chipsEl.innerHTML = '<span style="color:#444;font-size:9px">None</span>';
+  } else {
+    const shown = stageLoot.slice(0, 8);
+    const extra = stageLoot.length - 8;
+    chipsEl.innerHTML =
+      shown.map(it => {
+        const col = RARITY_COL[it.rarity] || '#aaa';
+        return `<div class="loot-chip" style="border-color:${col}">${it.icon} <span style="color:${col}">${it.name}</span></div>`;
+      }).join('') +
+      (extra > 0 ? `<div class="loot-chip-more">+${extra} more</div>` : '');
   }
+  // Star row — reset all to unlit, then pop them in via staggered timeouts
+  for (let i = 0; i < 3; i++) {
+    const el = document.getElementById('results-star-' + i);
+    if (el) el.classList.remove('lit');
+  }
+  for (let i = 0; i < stars; i++) {
+    const idx = i;
+    setTimeout(() => {
+      const el = document.getElementById('results-star-' + idx);
+      if (el) el.classList.add('lit');
+    }, 300 + idx * 250);
+  }
+  // Show overlay
+  overlay.classList.add('show');
+  requestAnimationFrame(() => overlay.classList.add('show-anim'));
 }
 
-// Wire static event handlers once (these elements live in the DOM from
-// page load — no need to re-bind on each death).
-(function _wireDeathOverlayHandlers() {
-  const onReady = () => {
-    const copyBtn = document.getElementById('death-copy-seed');
-    if (copyBtn) copyBtn.addEventListener('click', () => {
-      const seed = _formatSeed(RunStats.seed);
-      const flash = () => {
-        const orig = copyBtn.textContent;
-        copyBtn.textContent = 'COPIED';
-        setTimeout(() => { copyBtn.textContent = orig; }, 1400);
-      };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(seed).then(flash).catch(flash);
-      } else {
-        // Fallback for non-clipboard contexts: select a temp textarea
-        const ta = document.createElement('textarea');
-        ta.value = seed; document.body.appendChild(ta);
-        ta.select();
-        try { document.execCommand('copy'); } catch {}
-        document.body.removeChild(ta);
-        flash();
-      }
-    });
-    const viewBtn = document.getElementById('death-view-scores');
-    if (viewBtn) viewBtn.addEventListener('click', () => {
-      document.getElementById('death-scores').classList.toggle('show');
-      viewBtn.textContent =
-        document.getElementById('death-scores').classList.contains('show')
-          ? 'HIDE SCORES' : 'VIEW SCORES';
-    });
-  };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady);
-  else onReady();
-})();
+function hideResults() {
+  const overlay = document.getElementById('results-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('show', 'show-anim');
+}
 
 // ─────────────────────────────────────────────
 // MODULE: FLOOR PROGRESSION
@@ -6138,6 +6132,8 @@ function launchStage(c, s) {
   GameState.transitioning = false;
   player.potions = 3;                          // stage-scoped resource
   resetRunStats();
+  stageLoot = [];                              // Phase S Task 3 — fresh loot log per stage
+  levelAtStageStart = player.level;           // Phase S Task 3 — detect level-ups during stage
   hideChapterMap();
   loadFloor();
   updateHUD(); updateHotbar();
@@ -6167,17 +6163,9 @@ function completeStage() {
   const stars = stageStars();
   recordStageResult(c, s, stars);
   syncAccount();
-  // Task 3 replaces this block with the full results screen:
-  const biome = CHAPTERS[c - 1] ? BIOMES[CHAPTERS[c - 1].biome] : BIOMES.cursed_keep;
-  const fade = document.getElementById('floor-fade');
-  fade.innerHTML = `<div class="ff-biome" style="color:${biome ? biome.accent : '#f0c060'}">STAGE CLEAR</div><div class="ff-floor">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div>`;
-  fade.style.opacity = '1';
-  setTimeout(() => {
-    if (player.dead) return;           // belt-and-suspenders: death path owns flow if anything slips through
-    fade.style.opacity = '0';
-    GameState.transitioning = false;
-    showChapterMap();
-  }, 1100);
+  // Phase S Task 3 — show the results screen directly (transitioning ends inside showResults flow).
+  GameState.transitioning = false;
+  showResults(stars);
 }
 
 // Phase S — returnToMap: called from the death overlay.
