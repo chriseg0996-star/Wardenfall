@@ -6347,7 +6347,8 @@ function ssSolidAt(tx,ty){
 function ssResetBody(){
   const s = ss.level.spawn;
   ss.body = { x:s.x, y:s.y, w:18, h:26, vx:0, vy:0, onGround:false, facing:1,
-              jumpsLeft:0, coyote:0, buffer:0, dropthru:0, iframes:0, onRope:false, blinkCd:0 };
+              jumpsLeft:0, coyote:0, buffer:0, dropthru:0, iframes:0, onRope:false, blinkCd:0,
+              jumpHeld:false };
 }
 
 function ssUpdate(dt){
@@ -6368,6 +6369,19 @@ function ssStep(h){
     const s = Math.sign(b.vx); b.vx -= s * P.FRICTION * h; if (Math.sign(b.vx)!==s) b.vx=0;
   }
   b.vx = Math.max(-P.RUN_SPEED, Math.min(P.RUN_SPEED, b.vx));
+  // jump timers
+  if (b.onGround){ b.coyote = P.COYOTE; b.jumpsLeft = 2; } else { b.coyote -= h; }
+  const jp = SSK.jump();
+  if (jp && !b.jumpHeld) b.buffer = P.BUFFER;       // rising edge → buffer a jump
+  else if (b.buffer>0) b.buffer -= h;
+  b.jumpHeld = jp;
+  // consume a buffered jump
+  if (b.buffer>0){
+    if (b.coyote>0 && b.jumpsLeft===2){ b.vy = -P.JUMP_V; b.jumpsLeft=1; b.buffer=0; b.coyote=0; b.onGround=false; }
+    else if (b.jumpsLeft>0 && !b.onGround){ b.vy = -P.DJUMP_V; b.jumpsLeft=0; b.buffer=0; }
+  }
+  // variable height: releasing early cuts the rise
+  if (!jp && b.vy < 0) b.vy *= Math.pow(P.JUMP_CUT, h*60);
   // gravity
   b.vy = Math.min(P.MAX_FALL, b.vy + P.GRAVITY * h);
   // integrate + resolve (x then y)
