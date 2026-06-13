@@ -4059,6 +4059,9 @@ function checkLevelUp() {
 }
 
 function playerDie() {
+  // Guard: a stage already resolving (completeStage froze the sim this frame
+  // but the enemy loop still finishes) must not stack a death over results.
+  if (!gameRunning || GameState.transitioning || player.dead) return;
   player.dead = true;
   addLog('You have fallen...', 'sys');
   syncAccount();               // Phase R — save progress before death screen
