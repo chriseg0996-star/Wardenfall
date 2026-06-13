@@ -5076,6 +5076,8 @@ function necromancerSummon(e) {
 // ─────────────────────────────────────────────
 let lastTime=0, mmTimer=0, regenTimer=0, hotbarTimer=0;
 let chestShimmerTimer = 0;        // Phase N — positional chest_shimmer SFX cadence
+let GAME_MODE = 'topdown';        // 'topdown' (shipped, default) | 'sidescroll' (slice)
+let loopStartedSS = false;        // slice shares the single RAF chain
 
 // Phase N — kicked from update() when the player is actively moving. Spawns
 // two small downward dust motes from the player's feet on a 300 ms cadence,
@@ -5560,8 +5562,8 @@ function update(dt) {
 function loop(ts) {
   const dt = Math.min(ts-lastTime, 50);
   lastTime = ts;
-  update(dt);
-  drawGame(dt);
+  if (GAME_MODE === 'sidescroll') { ssUpdate(dt); ssDraw(dt); }
+  else { update(dt); drawGame(dt); }
   requestAnimationFrame(loop);
 }
 
@@ -6269,6 +6271,74 @@ function startGame(classId) {
   document.getElementById('charselect-overlay').classList.remove('open');
   selectCharacter(classId);
 }
+
+// ─────────────────────────────────────────────
+// MODULE: SIDESCROLL (vertical slice — MapleStory-style platformer)
+// Gated behind GAME_MODE. All slice state lives on `ss`; reads real numbers
+// off `player` (atk/mp/level) but owns its own physics + transient state so
+// it never touches top-down globals. Fixed-timestep physics for stable feel.
+// ─────────────────────────────────────────────
+const SS_PLAT = {
+  STEP: 1/120,            // fixed physics step (s)
+  GRAVITY: 2400,          // px/s^2
+  MAX_FALL: 900,          // px/s terminal
+  RUN_SPEED: 200,         // px/s target
+  RUN_ACCEL: 2600,        // ground accel px/s^2
+  FRICTION: 2600,         // ground decel px/s^2
+  AIR_ACCEL: 1400,        // air control px/s^2
+  JUMP_V: 640,            // initial jump velocity (up)
+  JUMP_CUT: 0.45,         // vy *= this on early release
+  DJUMP_V: 560,           // double-jump velocity
+  COYOTE: 0.08,           // s after leaving ground you can still jump
+  BUFFER: 0.10,           // s a jump press is remembered before landing
+  DROPTHRU: 0.20,         // s of one-way-platform ignore after drop-through
+  CLIMB_SPEED: 130,       // px/s rope climb
+  BLINK_DIST: 130,        // px blink reposition
+  BLINK_IFR: 0.30,        // s i-frames after blink
+  BLINK_CD: 0.7,          // s cooldown
+  BLINK_MP: 12,           // MP cost
+};
+const ss = {
+  acc: 0,                 // fixed-step accumulator
+  body: null,             // {x,y,w,h,vx,vy,onGround,facing,jumpsLeft,coyote,buffer,dropthru,iframes,onRope,blinkCd}
+  level: null,            // {grid, cols, rows, oneWay:[], ropes:[], spawn:{x,y}, exit:{x,y}, w, h}
+  cam: { x:0, y:0 },
+  enemies: [],
+  projectiles: [],
+  frameT: 0,              // animation clock
+};
+
+// Slice-local key state (read straight from the global `keys` map so we do
+// NOT disturb the shipped BINDINGS/settings UI). Down=held.
+function ssKey(...names){ return names.some(n => keys[n]); }
+const SSK = {
+  left:  () => ssKey('ArrowLeft','a'),
+  right: () => ssKey('ArrowRight','d'),
+  up:    () => ssKey('ArrowUp','w'),
+  down:  () => ssKey('ArrowDown','s'),
+  jump:  () => ssKey(' '),          // Space
+  fire:  () => ssKey('j'),
+  blink: () => ssKey('k'),
+};
+
+function ssUpdate(dt){ /* stub — Task 2+ */ ss.frameT += dt; }
+function ssDraw(dt){
+  ctx.clearRect(0,0,VIEW_W,VIEW_H);
+  ctx.fillStyle = '#243042'; ctx.fillRect(0,0,VIEW_W,VIEW_H);
+  ctx.fillStyle = '#cfe0ff'; ctx.font = 'bold 12px Courier New'; ctx.textAlign='center';
+  ctx.fillText('SIDESCROLL SLICE', VIEW_W/2, VIEW_H/2);
+  ctx.textAlign='left';
+}
+
+// Dev entry — launch the slice. Sets the mode, hides overlays, starts the loop.
+window.__sidescroll = function(){
+  ensureAudio();
+  GAME_MODE = 'sidescroll';
+  ['overlay','charselect-overlay','chaptermap-overlay','results-overlay','death-overlay','settings-overlay']
+    .forEach(id => { const el = document.getElementById(id); if (el){ el.style.display='none'; el.classList.remove('open','show','show-anim'); } });
+  if (!loopStarted && !loopStartedSS) { loopStartedSS = true; requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); }); }
+  return 'sidescroll mode';
+};
 
 // ─────────────────────────────────────────────
 // Phase N — Polish (COMPLETE)
