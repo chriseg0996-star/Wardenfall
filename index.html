@@ -6337,13 +6337,17 @@ function ssBuildLevel(rows){
       if (ch==='E') exit  = { x:x*TILE+TILE/2, y:y*TILE+TILE };
     }
   }
-  return { grid, cols, rows:rows.length, oneWay, ropes, spawn, exit, w:cols*TILE, h:rows.length*TILE };
+  const oneWaySet = new Set(oneWay.map(p=>p.y*cols+p.x));
+  const ropeSet   = new Set(ropes.map(p=>p.y*cols+p.x));
+  return { grid, cols, rows:rows.length, oneWay, ropes, oneWaySet, ropeSet, spawn, exit, w:cols*TILE, h:rows.length*TILE };
 }
 function ssSolidAt(tx,ty){
   const L=ss.level; if (!L) return true;
   if (tx<0||tx>=L.cols||ty<0||ty>=L.rows) return true;   // out of bounds = solid wall
   return L.grid[ty][tx]===1;
 }
+function ssOneWayAt(tx,ty){ const L=ss.level; return !!(L && L.oneWaySet.has(ty*L.cols+tx)); }
+function ssRopeAt(tx,ty){   const L=ss.level; return !!(L && L.ropeSet.has(ty*L.cols+tx));   }
 function ssResetBody(){
   const s = ss.level.spawn;
   ss.body = { x:s.x, y:s.y, w:18, h:26, vx:0, vy:0, onGround:false, facing:1,
@@ -6369,21 +6373,50 @@ function ssStep(h){
     const s = Math.sign(b.vx); b.vx -= s * P.FRICTION * h; if (Math.sign(b.vx)!==s) b.vx=0;
   }
   b.vx = Math.max(-P.RUN_SPEED, Math.min(P.RUN_SPEED, b.vx));
+  // drop-through timer
+  if (b.dropthru>0) b.dropthru -= h;
   // jump timers
   if (b.onGround){ b.coyote = P.COYOTE; b.jumpsLeft = 2; } else { b.coyote -= h; }
   const jp = SSK.jump();
-  if (jp && !b.jumpHeld) b.buffer = P.BUFFER;       // rising edge → buffer a jump
+  const jumpEdge = jp && !b.jumpHeld;
+  if (jumpEdge) b.buffer = P.BUFFER;       // rising edge → buffer a jump
   else if (b.buffer>0) b.buffer -= h;
   b.jumpHeld = jp;
-  // consume a buffered jump
-  if (b.buffer>0){
-    if (b.coyote>0 && b.jumpsLeft===2){ b.vy = -P.JUMP_V; b.jumpsLeft=1; b.buffer=0; b.coyote=0; b.onGround=false; }
-    else if (b.jumpsLeft>0 && !b.onGround){ b.vy = -P.DJUMP_V; b.jumpsLeft=0; b.buffer=0; }
+  // drop-through: down held + jump rising-edge while on ground → fall through one-way platforms
+  if (jumpEdge && SSK.down() && b.onGround){
+    b.dropthru = P.DROPTHRU;
+    b.buffer = 0;  // consume the jump, do NOT jump
+  } else {
+    // consume a buffered jump (only when not triggering drop-through this frame)
+    if (b.buffer>0){
+      if (b.coyote>0 && b.jumpsLeft===2){ b.vy = -P.JUMP_V; b.jumpsLeft=1; b.buffer=0; b.coyote=0; b.onGround=false; }
+      else if (b.jumpsLeft>0 && !b.onGround){ b.vy = -P.DJUMP_V; b.jumpsLeft=0; b.buffer=0; }
+    }
   }
   // variable height: releasing early cuts the rise
   if (!jp && b.vy < 0) b.vy *= Math.pow(P.JUMP_CUT, h*60);
-  // gravity
-  b.vy = Math.min(P.MAX_FALL, b.vy + P.GRAVITY * h);
+  // rope climb (before gravity)
+  // Determine which tile the body centre occupies
+  const ropeTX = Math.floor(b.x / TILE);
+  const ropeTY = Math.floor((b.y - b.h/2) / TILE);  // vertical centre tile
+  const onARope = ssRopeAt(ropeTX, ropeTY);
+  if (!onARope) b.onRope = false;
+  if (onARope && (SSK.up() || SSK.down())) b.onRope = true;
+  if (b.onRope){
+    if (!onARope){ b.onRope = false; }  // stepped off the rope column
+    else {
+      // Detach with upward kick on jump rising-edge
+      if (jumpEdge){ b.onRope = false; b.vy = -P.JUMP_V * 0.7; }
+      else {
+        // Zero gravity, drive vy by input, snap x to rope centre
+        b.vy = (SSK.down()?1:SSK.up()?-1:0) * P.CLIMB_SPEED;
+        b.vx = 0;
+        b.x = ropeTX * TILE + TILE/2;  // snap to rope column centre
+      }
+    }
+  }
+  // gravity (skipped when on rope)
+  if (!b.onRope) b.vy = Math.min(P.MAX_FALL, b.vy + P.GRAVITY * h);
   // integrate + resolve (x then y)
   ssMoveX(b, b.vx * h);
   const wasAir = !b.onGround;
@@ -6399,16 +6432,48 @@ function ssMoveX(b, dx){
   else if (dx<0){ const tx=Math.floor((b.x-b.w/2)/TILE); for(let ty=top;ty<=bot;ty++) if(ssSolidAt(tx,ty)){ b.x = (tx+1)*TILE + b.w/2; b.vx=0; break; } }
 }
 function ssMoveY(b, dy){
+  const prevFoot = b.y - dy;  // foot position before this move
   b.y += dy; b.onGround=false;
   const lft=Math.floor((b.x-b.w/2)/TILE), rgt=Math.floor((b.x+b.w/2-1)/TILE);
-  if (dy>0){ const ty=Math.floor((b.y-1)/TILE); for(let tx=lft;tx<=rgt;tx++) if(ssSolidAt(tx,ty)){ b.y=ty*TILE; b.vy=0; b.onGround=true; break; } }
-  else if (dy<0){ const ty=Math.floor((b.y-b.h)/TILE); for(let tx=lft;tx<=rgt;tx++) if(ssSolidAt(tx,ty)){ b.y=(ty+1)*TILE + b.h; b.vy=0; break; } }
+  if (dy>0){
+    // --- downward branch ---
+    const ty=Math.floor((b.y-1)/TILE);
+    // solid tiles
+    for(let tx=lft;tx<=rgt;tx++){
+      if(ssSolidAt(tx,ty)){ b.y=ty*TILE; b.vy=0; b.onGround=true; break; }
+    }
+    // one-way platforms: scan every tile-row boundary the foot crossed this step.
+    // Land when moving down, dropthru<=0, and prevFoot was at or above the platform top.
+    if (!b.onGround && b.dropthru<=0){
+      const tyStart = Math.floor(prevFoot / TILE);   // row containing foot before move
+      const tyEnd   = Math.floor(b.y / TILE);        // row containing foot after move
+      for (let scanTy = tyStart; scanTy <= tyEnd && !b.onGround; scanTy++){
+        const platTop = scanTy * TILE;
+        if (prevFoot <= platTop && b.y >= platTop){   // foot crossed this row's top edge
+          for(let tx=lft; tx<=rgt; tx++){
+            if(ssOneWayAt(tx, scanTy)){ b.y=platTop; b.vy=0; b.onGround=true; break; }
+          }
+        }
+      }
+    }
+  } else if (dy<0){
+    const ty=Math.floor((b.y-b.h)/TILE);
+    for(let tx=lft;tx<=rgt;tx++) if(ssSolidAt(tx,ty)){ b.y=(ty+1)*TILE + b.h; b.vy=0; break; }
+    // one-way tiles are IGNORED when moving upward (pass through freely)
+  }
   // Ground-contact probe: keep onGround true while the foot rests on a solid
   // surface (the snap puts the foot exactly at a tile boundary, which the
   // downward penetration probe alone would miss the following step).
   if (!b.onGround) {
     const gty = Math.floor(b.y / TILE);
     for (let tx = lft; tx <= rgt; tx++) if (ssSolidAt(tx, gty)) { b.onGround = true; break; }
+  }
+  // One-way ground contact probe (same logic: foot snapped to boundary)
+  if (!b.onGround && b.dropthru<=0){
+    const gty = Math.floor(b.y / TILE);
+    for (let tx = lft; tx <= rgt; tx++){
+      if(ssOneWayAt(tx,gty)){ b.onGround=true; break; }
+    }
   }
 }
 function ssCamera(){
@@ -6443,13 +6508,43 @@ window.__sidescroll = function(){
   GAME_MODE = 'sidescroll';
   ['overlay','charselect-overlay','chaptermap-overlay','results-overlay','death-overlay','settings-overlay']
     .forEach(id => { const el = document.getElementById(id); if (el){ el.style.display='none'; el.classList.remove('open','show','show-anim'); } });
+  // Authored stage — 42 cols × 18 rows (42×32=1344px wide, 18×32=576px tall)
+  // Body convention: b.y=foot; spawn row 16 means foot on row-17 ground.
+  //
+  // Layout (left → right, no character overlaps):
+  //   Ground: cols 0-13 solid, GAP cols 14-16 (3-tile gap → needs double-jump),
+  //           cols 17-41 solid.
+  //   Solid wall pillar: col 22, rows 13-16 (4 tiles tall; go around via platforms).
+  //   One-way platforms (=):
+  //     Row 13: cols  4-6   (low ledge near spawn)
+  //     Row 11: cols  9-12  (mid ledge, spans just before gap)
+  //     Row  9: cols 18-21  (right of gap; note: no overlap with wall col 22)
+  //     Row  6: cols 27-30  (upper platform)
+  //     Row  4: cols 33-36  (high platform near exit)
+  //   Rope (|): col 25, rows 7-12 (6 tiles, right section climb shortcut)
+  //   Spawn (S): col 1, row 16
+  //   Exit  (E): col 40, row 16
   ss.level = ssBuildLevel([
-    '                                        ',
-    '                                        ',
-    '   S                                    ',
-    '                                        ',
-    '########################################',
-    '########################################',
+  //0         1         2         3         4
+  //0123456789012345678901234567890123456789012
+    '                                          ', // row  0
+    '                                          ', // row  1
+    '                                          ', // row  2
+    '                                          ', // row  3
+    '                                 ====     ', // row  4  high platform cols 33-36
+    '                                          ', // row  5
+    '                           ====           ', // row  6  upper platform cols 27-30
+    '                        |                 ', // row  7  rope col 24
+    '                        |                 ', // row  8  rope col 24
+    '                  ====  |                 ', // row  9  platform cols 18-21; rope col 24
+    '                        |                 ', // row 10  rope col 24
+    '         ====           |                 ', // row 11  platform cols 9-12; rope col 24
+    '                        |                 ', // row 12  rope col 24 ends here
+    '    ===             #                     ', // row 13  platform cols 4-6; wall col 20
+    '                    #                     ', // row 14  wall col 20
+    '                    #                     ', // row 15  wall col 20
+    ' S                  #                 E   ', // row 16  spawn col 1; wall col 20; exit col 38
+    '##############   #########################', // row 17  ground: cols 0-13, gap 14-16, cols 17-41
   ]);
   ssResetBody();
   ss.acc = 0;
