@@ -6389,6 +6389,13 @@ function ssMoveY(b, dy){
   const lft=Math.floor((b.x-b.w/2)/TILE), rgt=Math.floor((b.x+b.w/2-1)/TILE);
   if (dy>0){ const ty=Math.floor((b.y-1)/TILE); for(let tx=lft;tx<=rgt;tx++) if(ssSolidAt(tx,ty)){ b.y=ty*TILE; b.vy=0; b.onGround=true; break; } }
   else if (dy<0){ const ty=Math.floor((b.y-b.h)/TILE); for(let tx=lft;tx<=rgt;tx++) if(ssSolidAt(tx,ty)){ b.y=(ty+1)*TILE + b.h; b.vy=0; break; } }
+  // Ground-contact probe: keep onGround true while the foot rests on a solid
+  // surface (the snap puts the foot exactly at a tile boundary, which the
+  // downward penetration probe alone would miss the following step).
+  if (!b.onGround) {
+    const gty = Math.floor(b.y / TILE);
+    for (let tx = lft; tx <= rgt; tx++) if (ssSolidAt(tx, gty)) { b.onGround = true; break; }
+  }
 }
 function ssCamera(){
   const b=ss.body, L=ss.level; if(!b||!L) return;
