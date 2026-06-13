@@ -40,7 +40,8 @@ single file: `index.html`.
 - DONE — RPG Phase P: derived stat model (classBase + gearStats) + CLASS_DEFS (knight/ranger/mage).
 - DONE — RPG Phase Q: gear system core (generateItem, equip/stash, gear screen, loot cards).
 - DONE — RPG Phase R: SKILLS kits (knight/ranger/mage), class sprites+portraits, account save, title/char-select.
-- NEXT — RPG Phase S: chapter/stage select, stage seeds, stars, results screen, touch pause.
+- DONE — RPG Phase S: chapter/stage select (4×5), stage seeds, stars, results screen, touch pause.
+- NEXT — RPG Phase T: bosses & endgame (Grave Monarch ch3, The Warden ch4, victory, Nightmare unlock).
 
 ## First instruction to expect
 "Read index.html and this file, then implement Phase 3."
