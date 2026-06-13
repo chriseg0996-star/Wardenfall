@@ -6150,7 +6150,7 @@ function launchStage(c, s) {
 function stageStars() {
   let stars = 1;
   if (player.hp >= player.maxHp * 0.5) stars = 2;
-  if (enemies.length === 0) stars = 3;    // full clear overrides hp condition
+  if (!enemies.some(e => e.alive)) stars = 3;   // alive check, not array length — kills splice later in the frame
   return stars;
 }
 
