@@ -6403,16 +6403,13 @@ function ssStep(h){
   if (!onARope) b.onRope = false;
   if (onARope && (SSK.up() || SSK.down())) b.onRope = true;
   if (b.onRope){
-    if (!onARope){ b.onRope = false; }  // stepped off the rope column
+    // Detach with upward kick on jump rising-edge
+    if (jumpEdge){ b.onRope = false; b.vy = -P.JUMP_V * 0.7; }
     else {
-      // Detach with upward kick on jump rising-edge
-      if (jumpEdge){ b.onRope = false; b.vy = -P.JUMP_V * 0.7; }
-      else {
-        // Zero gravity, drive vy by input, snap x to rope centre
-        b.vy = (SSK.down()?1:SSK.up()?-1:0) * P.CLIMB_SPEED;
-        b.vx = 0;
-        b.x = ropeTX * TILE + TILE/2;  // snap to rope column centre
-      }
+      // Zero gravity, drive vy by input, snap x to rope centre
+      b.vy = (SSK.down()?1:SSK.up()?-1:0) * P.CLIMB_SPEED;
+      b.vx = 0;
+      b.x = ropeTX * TILE + TILE/2;  // snap to rope column centre
     }
   }
   // gravity (skipped when on rope)
@@ -6432,7 +6429,7 @@ function ssMoveX(b, dx){
   else if (dx<0){ const tx=Math.floor((b.x-b.w/2)/TILE); for(let ty=top;ty<=bot;ty++) if(ssSolidAt(tx,ty)){ b.x = (tx+1)*TILE + b.w/2; b.vx=0; break; } }
 }
 function ssMoveY(b, dy){
-  const prevFoot = b.y - dy;  // foot position before this move
+  const prevFoot = b.y;  // foot position before this move
   b.y += dy; b.onGround=false;
   const lft=Math.floor((b.x-b.w/2)/TILE), rgt=Math.floor((b.x+b.w/2-1)/TILE);
   if (dy>0){
@@ -6512,18 +6509,18 @@ window.__sidescroll = function(){
   // Body convention: b.y=foot; spawn row 16 means foot on row-17 ground.
   //
   // Layout (left → right, no character overlaps):
-  //   Ground: cols 0-13 solid, GAP cols 14-16 (3-tile gap → needs double-jump),
+  //   Ground: cols 0-13 solid, GAP cols 14-16 (3-tile gap → clearable with single jump),
   //           cols 17-41 solid.
-  //   Solid wall pillar: col 22, rows 13-16 (4 tiles tall; go around via platforms).
+  //   Solid wall pillar: col 20, rows 13-16 (4 tiles tall; go around via platforms).
   //   One-way platforms (=):
   //     Row 13: cols  4-6   (low ledge near spawn)
   //     Row 11: cols  9-12  (mid ledge, spans just before gap)
-  //     Row  9: cols 18-21  (right of gap; note: no overlap with wall col 22)
+  //     Row  9: cols 18-21  (right of gap; note: no overlap with wall col 20)
   //     Row  6: cols 27-30  (upper platform)
   //     Row  4: cols 33-36  (high platform near exit)
-  //   Rope (|): col 25, rows 7-12 (6 tiles, right section climb shortcut)
+  //   Rope (|): col 24, rows 7-12 (6 tiles, right section climb shortcut)
   //   Spawn (S): col 1, row 16
-  //   Exit  (E): col 40, row 16
+  //   Exit  (E): col 38, row 16
   ss.level = ssBuildLevel([
   //0         1         2         3         4
   //0123456789012345678901234567890123456789012
