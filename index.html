@@ -6352,7 +6352,7 @@ function ssResetBody(){
   const s = ss.level.spawn;
   ss.body = { x:s.x, y:s.y, w:18, h:26, vx:0, vy:0, onGround:false, facing:1,
               jumpsLeft:0, coyote:0, buffer:0, dropthru:0, iframes:0, onRope:false, blinkCd:0,
-              jumpHeld:false };
+              jumpHeld:false, blinkHeld:false };
 }
 
 function ssUpdate(dt){
@@ -6412,6 +6412,24 @@ function ssStep(h){
       b.x = ropeTX * TILE + TILE/2;  // snap to rope column centre
     }
   }
+  // blink (edge-detected on the blink key)
+  const bk = SSK.blink();
+  if (bk && !b.blinkHeld && b.blinkCd<=0 && player.mp >= P.BLINK_MP){
+    let dist=0; const step=4*b.facing;
+    while (Math.abs(dist) < P.BLINK_DIST){
+      const nx = b.x + step;
+      const tx = Math.floor((nx + (b.facing>0?b.w/2:-b.w/2))/TILE);
+      const tTop=Math.floor((b.y-b.h)/TILE), tBot=Math.floor((b.y-1)/TILE);
+      let blocked=false; for(let ty=tTop;ty<=tBot;ty++) if(ssSolidAt(tx,ty)){ blocked=true; break; }
+      if (blocked) break;
+      b.x = nx; dist += step;
+    }
+    b.iframes = P.BLINK_IFR; b.blinkCd = P.BLINK_CD; player.mp -= P.BLINK_MP;
+    if (typeof updateHUD==='function') updateHUD();
+    if (SFX && SFX.dash) SFX.dash();
+    spawnParticles(b.x, b.y - b.h/2, 8, '#b090ff');
+  }
+  b.blinkHeld = bk;
   // gravity (skipped when on rope)
   if (!b.onRope) b.vy = Math.min(P.MAX_FALL, b.vy + P.GRAVITY * h);
   // integrate + resolve (x then y)
