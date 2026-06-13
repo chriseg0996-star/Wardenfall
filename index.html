@@ -6321,13 +6321,99 @@ const SSK = {
   blink: () => ssKey('k'),
 };
 
-function ssUpdate(dt){ /* stub — Task 2+ */ ss.frameT += dt; }
+// Build a solid-tile collision grid from an ASCII rows array. '#'=solid,
+// '='=one-way platform, '|'=rope, 'S'=spawn, 'E'=exit, ' '=empty.
+function ssBuildLevel(rows){
+  const cols = Math.max(...rows.map(r=>r.length));
+  const grid = []; const oneWay = []; const ropes = []; let spawn={x:64,y:64}, exit={x:0,y:0};
+  for (let y=0;y<rows.length;y++){
+    grid[y] = [];
+    for (let x=0;x<cols;x++){
+      const ch = rows[y][x] || ' ';
+      grid[y][x] = (ch==='#') ? 1 : 0;
+      if (ch==='=') oneWay.push({x, y});
+      if (ch==='|') ropes.push({x, y});
+      if (ch==='S') spawn = { x:x*TILE+TILE/2, y:y*TILE+TILE };
+      if (ch==='E') exit  = { x:x*TILE+TILE/2, y:y*TILE+TILE };
+    }
+  }
+  return { grid, cols, rows:rows.length, oneWay, ropes, spawn, exit, w:cols*TILE, h:rows.length*TILE };
+}
+function ssSolidAt(tx,ty){
+  const L=ss.level; if (!L) return true;
+  if (tx<0||tx>=L.cols||ty<0||ty>=L.rows) return true;   // out of bounds = solid wall
+  return L.grid[ty][tx]===1;
+}
+function ssResetBody(){
+  const s = ss.level.spawn;
+  ss.body = { x:s.x, y:s.y, w:18, h:26, vx:0, vy:0, onGround:false, facing:1,
+              jumpsLeft:0, coyote:0, buffer:0, dropthru:0, iframes:0, onRope:false, blinkCd:0 };
+}
+
+function ssUpdate(dt){
+  ss.frameT += dt;
+  ss.acc += Math.min(dt, 50) / 1000;
+  while (ss.acc >= SS_PLAT.STEP){ ssStep(SS_PLAT.STEP); ss.acc -= SS_PLAT.STEP; }
+  ssCamera();
+}
+function ssStep(h){
+  const b = ss.body; if (!b) return;
+  const P = SS_PLAT;
+  // horizontal intent
+  let dir = (SSK.right()?1:0) - (SSK.left()?1:0);
+  if (dir!==0) b.facing = dir;
+  const accel = b.onGround ? P.RUN_ACCEL : P.AIR_ACCEL;
+  if (dir!==0) b.vx += dir * accel * h;
+  else if (b.onGround) { // friction
+    const s = Math.sign(b.vx); b.vx -= s * P.FRICTION * h; if (Math.sign(b.vx)!==s) b.vx=0;
+  }
+  b.vx = Math.max(-P.RUN_SPEED, Math.min(P.RUN_SPEED, b.vx));
+  // gravity
+  b.vy = Math.min(P.MAX_FALL, b.vy + P.GRAVITY * h);
+  // integrate + resolve (x then y)
+  ssMoveX(b, b.vx * h);
+  const wasAir = !b.onGround;
+  ssMoveY(b, b.vy * h);
+  if (b.iframes>0) b.iframes -= h;
+  if (b.blinkCd>0) b.blinkCd -= h;
+}
+// Swept-ish AABB by tile sampling. Solids only in this task; one-way in Task 4.
+function ssMoveX(b, dx){
+  b.x += dx;
+  const top = Math.floor((b.y-b.h)/TILE), bot = Math.floor((b.y-1)/TILE);
+  if (dx>0){ const tx=Math.floor((b.x+b.w/2)/TILE); for(let ty=top;ty<=bot;ty++) if(ssSolidAt(tx,ty)){ b.x = tx*TILE - b.w/2; b.vx=0; break; } }
+  else if (dx<0){ const tx=Math.floor((b.x-b.w/2)/TILE); for(let ty=top;ty<=bot;ty++) if(ssSolidAt(tx,ty)){ b.x = (tx+1)*TILE + b.w/2; b.vx=0; break; } }
+}
+function ssMoveY(b, dy){
+  b.y += dy; b.onGround=false;
+  const lft=Math.floor((b.x-b.w/2)/TILE), rgt=Math.floor((b.x+b.w/2-1)/TILE);
+  if (dy>0){ const ty=Math.floor((b.y-1)/TILE); for(let tx=lft;tx<=rgt;tx++) if(ssSolidAt(tx,ty)){ b.y=ty*TILE; b.vy=0; b.onGround=true; break; } }
+  else if (dy<0){ const ty=Math.floor((b.y-b.h)/TILE); for(let tx=lft;tx<=rgt;tx++) if(ssSolidAt(tx,ty)){ b.y=(ty+1)*TILE + b.h; b.vy=0; break; } }
+}
+function ssCamera(){
+  const b=ss.body, L=ss.level; if(!b||!L) return;
+  ss.cam.x = Math.max(0, Math.min(L.w - VIEW_W, b.x - VIEW_W/2));
+  ss.cam.y = Math.max(0, Math.min(L.h - VIEW_H, (b.y - b.h/2) - VIEW_H/2));
+}
+
 function ssDraw(dt){
   ctx.clearRect(0,0,VIEW_W,VIEW_H);
-  ctx.fillStyle = '#243042'; ctx.fillRect(0,0,VIEW_W,VIEW_H);
-  ctx.fillStyle = '#cfe0ff'; ctx.font = 'bold 12px Courier New'; ctx.textAlign='center';
-  ctx.fillText('SIDESCROLL SLICE', VIEW_W/2, VIEW_H/2);
-  ctx.textAlign='left';
+  ctx.fillStyle = '#3a4a6a'; ctx.fillRect(0,0,VIEW_W,VIEW_H);   // bright bg (Maple direction)
+  const L=ss.level; if(!L){ return; }
+  ctx.save(); ctx.translate(-Math.round(ss.cam.x), -Math.round(ss.cam.y));
+  const x0=Math.floor(ss.cam.x/TILE), x1=Math.ceil((ss.cam.x+VIEW_W)/TILE);
+  const y0=Math.floor(ss.cam.y/TILE), y1=Math.ceil((ss.cam.y+VIEW_H)/TILE);
+  for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++){
+    if(ssSolidAt(tx,ty) && tx>=0 && ty>=0 && tx<L.cols && ty<L.rows){
+      ctx.fillStyle='#5a4632'; ctx.fillRect(tx*TILE,ty*TILE,TILE,TILE);
+      ctx.fillStyle='#6e573e'; ctx.fillRect(tx*TILE,ty*TILE,TILE,4);
+    }
+  }
+  L.oneWay.forEach(p=>{ ctx.fillStyle='#7a6a4a'; ctx.fillRect(p.x*TILE, p.y*TILE, TILE, 6); });
+  L.ropes.forEach(p=>{ ctx.fillStyle='#caa050'; ctx.fillRect(p.x*TILE+TILE/2-1, p.y*TILE, 2, TILE); });
+  const b=ss.body;
+  if(b){ ctx.fillStyle='#6db0ff'; ctx.fillRect(b.x-b.w/2, b.y-b.h, b.w, b.h); }
+  ctx.restore();
 }
 
 // Dev entry — launch the slice. Sets the mode, hides overlays, starts the loop.
@@ -6336,6 +6422,16 @@ window.__sidescroll = function(){
   GAME_MODE = 'sidescroll';
   ['overlay','charselect-overlay','chaptermap-overlay','results-overlay','death-overlay','settings-overlay']
     .forEach(id => { const el = document.getElementById(id); if (el){ el.style.display='none'; el.classList.remove('open','show','show-anim'); } });
+  ss.level = ssBuildLevel([
+    '                                        ',
+    '                                        ',
+    '   S                                    ',
+    '                                        ',
+    '########################################',
+    '########################################',
+  ]);
+  ssResetBody();
+  ss.acc = 0;
   if (!loopStarted && !loopStartedSS) { loopStartedSS = true; requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); }); }
   return 'sidescroll mode';
 };
