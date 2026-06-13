@@ -777,6 +777,18 @@ const BIOMES = {
     ambient:     'ember',                  // slow rising red dots
     floorInlay:  null,
   },
+  black_bastion: {
+    ambientName: 'The Black Bastion',
+    accent:      '#9a86c8',
+    wallTint:    '#06060c', wallTintAlpha: 0.62,
+    floorTint:   '#0a0a12', floorTintAlpha: 0.55,
+    lightColor:  'rgba(0,0,5,0.95)',
+    torchColor:  '#b070ff',
+    enemyBias:   { skeleton:0.20, archer:0.20, shielder:0.25, necromancer:0.35 },
+    hazardType:  'spike',
+    ambient:     'dust',
+    floorInlay:  null,
+  },
 };
 
 // Tinted-tile cache (per biome). Built lazily on first access so we don't
@@ -2136,10 +2148,12 @@ function _freshCharacter() {
   return { level:1, xp:0, xpNext:100,
            equipped:{ weapon:null, helm:null, armor:null, boots:null, ring:null } };
 }
+function _freshProgress() { return { stages:{}, nightmareUnlocked:false }; }
 function _freshAccount() {
   return { v:1, gold:0, stash:[],
            characters:{ knight:_freshCharacter(), ranger:_freshCharacter(), mage:_freshCharacter() },
-           lastPlayed:'mage' };
+           lastPlayed:'mage',
+           progress: _freshProgress() };
 }
 let account = _freshAccount();
 
@@ -2168,6 +2182,16 @@ function loadAccount() {
         const it = c.equipped[s];
         if (it && it.slot === s && it.stats) f.equipped[s] = it;
       }
+    }
+    account.progress = _freshProgress();
+    if (p.progress && p.progress.stages && typeof p.progress.stages === 'object') {
+      for (const k in p.progress.stages) {
+        const e = p.progress.stages[k];
+        if (/^c[1-4]s[1-5]$/.test(k) && e && typeof e.stars === 'number') {
+          account.progress.stages[k] = { stars: Math.max(0, Math.min(3, e.stars|0)), clears: Math.max(0, e.clears|0) };
+        }
+      }
+      account.progress.nightmareUnlocked = p.progress.nightmareUnlocked === true;
     }
   } catch {}
 }
@@ -2203,6 +2227,52 @@ function applyCharacter(classId) {
   recomputeStats({ fullHeal:true });              // start runs at full hp/mp
 }
 loadAccount();
+
+// ─────────────────────────────────────────────
+// MODULE: STAGES (Phase S — RPG pivot)
+// 4 chapters × 5 stages. recLevel = (chapter-1)*5 + stage ∈ 1..20 and is
+// fed into GameState.floorNum so every existing scaling/boss/ilvl system
+// works untouched. Stage seeds are pure integer hashes → farmable layouts.
+// ─────────────────────────────────────────────
+const CHAPTERS = [
+  { id:1, name:'The Cursed Keep',  biome:'cursed_keep',     icon:'🏰' },
+  { id:2, name:'Bone Crypt',       biome:'bone_crypt',      icon:'💀' },
+  { id:3, name:'Infernal Depths',  biome:'infernal_depths', icon:'🔥' },
+  { id:4, name:'The Black Bastion',biome:'black_bastion',   icon:'👑' },
+];
+const STAGE_NAMES = [
+  ['Outer Ward','Collapsed Hall','Gaol Stairs','Warden\'s Shadow','Colossus Gate'],
+  ['Ossuary','Marrow Pits','Silent Chapel','Gravewind Pass','Brood Nest'],
+  ['Ash Causeway','Cinder Vaults','Magma Throat','Furnace Row','Molten Court'],
+  ['Black Gate','Starless Yard','Throne Approach','Last Vigil','The Warden'],
+];
+function stageKey(c, s)      { return 'c' + c + 's' + s; }
+function stageRecLevel(c, s) { return (c - 1) * 5 + s; }
+function stageSeed(c, s, diff) {
+  let h = 0x57A9D;
+  h = Math.imul(h ^ c, 0x9E3779B1);
+  h = Math.imul(h ^ s, 0x85EBCA6B);
+  h = Math.imul(h ^ (diff === 'nightmare' ? 0xBEEF : 1), 0xC2B2AE35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+function starsFor(c, s) {
+  const e = account.progress.stages[stageKey(c, s)];
+  return e ? (e.stars | 0) : 0;
+}
+function isStageUnlocked(c, s) {
+  if (c === 1 && s === 1) return true;
+  if (s > 1) return starsFor(c, s - 1) > 0;
+  return starsFor(c - 1, 5) > 0;            // chapter gate: beat the prior boss stage
+}
+function recordStageResult(c, s, stars) {
+  const k = stageKey(c, s);
+  const e = account.progress.stages[k] || { stars:0, clears:0 };
+  e.stars  = Math.max(e.stars, stars);
+  e.clears = (e.clears | 0) + 1;
+  account.progress.stages[k] = e;
+  saveAccount();
+}
 
 // ─────────────────────────────────────────────
 // GAME STATE
