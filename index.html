@@ -6392,7 +6392,7 @@ function ssUpdate(dt){
   // so we must advance them here to avoid memory leak + stale state).
   const dtS = Math.min(dt, 50);   // same cap used elsewhere
   for (let i=particles.length-1; i>=0; i--){
-    const p=particles[i]; p.x+=p.vx*dtS*0.001; p.y+=p.vy*dtS*0.001; p.life-=dtS*0.001;
+    const p=particles[i]; p.x+=p.vx*dtS*0.001; p.y+=p.vy*dtS*0.001; p.life-=dtS*0.0018;
     if(p.life<=0) particles.splice(i,1);
   }
   for (let i=floatingTexts.length-1; i>=0; i--){
