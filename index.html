@@ -3769,11 +3769,35 @@ function spawnEnemy(tx, ty, type) {
   });
 }
 
+// Phase AG.2 — How long a zone stays empty before mobs come back. ~45 s
+// matches the MapleStory feel: long enough to pick up loot + breathe,
+// short enough that the world feels alive when you stick around.
+const ZONE_RESPAWN_MS = 45000;
+
+// Phase AG.2 — Respawn the current zone's trash mobs. Boss zones never
+// call this (the update loop gates on dungeon.bossRoom). populateFloor
+// always wipes the enemies array first, so dead corpses are cleared in
+// the process. Opts.respawn flips the player-distance guard in
+// populateFloor so mobs don't appear on the player's tile.
+function respawnZoneMobs() {
+  if (!dungeon || dungeon.bossRoom) return;
+  dungeon.respawnCount = (dungeon.respawnCount | 0) + 1;
+  populateFloor({ skipBoss: true, respawn: true });
+}
+
 // Populate a freshly-built floor: spawn enemies in non-spawn rooms scaled by floor.
-function populateFloor() {
+// Phase AG.2 — opts.skipBoss respawns trash mobs without re-spawning the boss
+// (boss-zone respawn loop calls this with skipBoss=true so a dead boss doesn't
+// reappear). Player-distance check keeps respawned mobs from materialising on
+// the player's tile.
+function populateFloor(opts) {
+  opts = opts || {};
   enemies = [];
   const spawnRoom = dungeon.rooms[0];
   const bossRoom  = dungeon.bossRoom;     // Phase K
+  const minSpawnDist = opts.respawn ? 6 : 0;   // tiles away from player on respawn
+  const ptx = (player.x / TILE) | 0;
+  const pty = (player.y / TILE) | 0;
   // Enemy budget grows with floor depth
   const budget = 6 + Math.floor(GameState.floorNum * 1.5);
   const types = ['spider','skeleton'];
@@ -3789,6 +3813,11 @@ function populateFloor() {
     if (bossRoom &&
         tx >= bossRoom.x && tx < bossRoom.x + bossRoom.w &&
         ty >= bossRoom.y && ty < bossRoom.y + bossRoom.h) continue;
+    // Phase AG.2 — keep respawn mobs at least minSpawnDist tiles from
+    // the player so they don't materialise on top of them. Manhattan
+    // distance is fine; the player can still get sandwiched by mobs in
+    // adjacent rooms — that's the desired pressure.
+    if (minSpawnDist > 0 && Math.abs(tx - ptx) + Math.abs(ty - pty) < minSpawnDist) continue;
     // Phase I — Enemy Variety: weighted pick per floor tier.
     spawnEnemy(tx, ty, pickEnemyType(GameState.floorNum));
     placed++;
@@ -3796,7 +3825,8 @@ function populateFloor() {
   // Phase K + Phase T — spawn the boss at the centre of its arena.
   // Boss roster expanded for chapters 3/4 (Phase T) — dispatch by chapter
   // when the stage select is driving floor 5/10/15/20.
-  if (bossRoom) {
+  // Phase AG.2 — skip boss spawn on respawn (boss already dead and stays dead).
+  if (bossRoom && !opts.skipBoss) {
     const bx = bossRoom.x + Math.floor(bossRoom.w / 2);
     const by = bossRoom.y + Math.floor(bossRoom.h / 2);
     const ch = GameState.chapter || (((GameState.floorNum - 1) / 5 | 0) + 1);
@@ -5674,6 +5704,11 @@ function loadFloor() {
   particles = [];
   hitFlashes = [];
   projectiles = [];
+  // Phase AG.2 — Mob respawn state. respawnTimer ticks down once the
+  // zone goes empty; on zero the zone repopulates. Boss zones leave this
+  // permanently at 0 (the bossRoom check in the tick gates it).
+  dungeon.respawnTimer = 0;
+  dungeon.respawnCount = 0;       // diagnostic: number of times this zone has re-spawned
   populateFloor();
   drawMinimap();
   // Phase S — stage-based floor label.
@@ -6787,6 +6822,30 @@ function update(dt) {
   // ── STAIR / STAGE EXIT ──
   if(!GameState.transitioning && tileAt(player.x, player.y)===T.STAIR) {
     completeStage();
+  }
+
+  // ── Phase AG.2 — MOB RESPAWN ──
+  // Non-boss zones repopulate after ZONE_RESPAWN_MS of zero alive
+  // enemies. Boss zones (dungeon.bossRoom truthy) never respawn — the
+  // boss is a one-time encounter per visit, and the boss-arena trash
+  // exclusion in populateFloor means there are no trash mobs to bring
+  // back anyway. Respawn while the player is mid-fade skips so the new
+  // wave doesn't show up in the dark.
+  if (dungeon && !dungeon.bossRoom && !GameState.transitioning) {
+    const anyAlive = enemies.some(e => e.alive);
+    if (anyAlive) {
+      // Reset the timer the moment any mob is alive, so killing the last
+      // mob always starts a fresh full countdown.
+      dungeon.respawnTimer = 0;
+    } else if (dungeon.respawnTimer === 0) {
+      dungeon.respawnTimer = ZONE_RESPAWN_MS;
+    } else {
+      dungeon.respawnTimer -= dt;
+      if (dungeon.respawnTimer <= 0) {
+        dungeon.respawnTimer = 0;
+        respawnZoneMobs();
+      }
+    }
   }
 
   // ── ENEMIES ──
