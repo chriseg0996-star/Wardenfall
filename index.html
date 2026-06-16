@@ -623,6 +623,16 @@ body.menu-screen #joystick-knob { display:none !important; }
   box-shadow:inset 0 0 60px rgba(200,30,30,0);
   transition:box-shadow 0.1s; z-index:80;
 }
+/* Phase AG — Zone fade. Replaces the STAGE CLEAR overlay break between
+   zones: when the player walks the exit stair we fade to black, swap
+   the dungeon, then fade back in. Position above the canvas + lighting
+   but BELOW menu overlays so settings still work mid-transition. */
+#zone-fade {
+  position:absolute; inset:0; background:#000;
+  opacity:0; pointer-events:none; z-index:90;
+}
+#zone-fade.fade-out { opacity:1; transition: opacity 280ms ease-in; }
+#zone-fade.fade-in  { opacity:0; transition: opacity 380ms ease-out; }
 #floor-fade {
   position:absolute; inset:0; pointer-events:none; z-index:90;
   background:#000; opacity:0; transition:opacity 0.45s;
@@ -1417,6 +1427,7 @@ body.menu-screen #joystick-knob { display:none !important; }
   <div id="pause-btn" title="Pause / Settings" onclick="toggleSettings()">⚙</div>
   <div id="paused-banner">PAUSED</div>
   <div id="damage-vignette"></div>
+  <div id="zone-fade"></div>
   <div id="floor-fade"></div>
 
   <!-- Sidescroll slice touch overlay — hidden by default, shown only in sidescroll mode -->
@@ -8209,7 +8220,8 @@ function _renderNightmareToggle() {
 // Phase S — launchStage: wires GameState to the chosen (chapter, stage),
 // sets the deterministic seed, calls loadFloor, and starts the RAF loop
 // exactly once (loopStarted guards against double-start after death returns).
-function launchStage(c, s) {
+function launchStage(c, s, opts) {
+  opts = opts || {};
   if (!isStageUnlocked(c, s)) return;
   // Phase Y — leaving menus for actual gameplay. Stop the procedural title
   // backdrop so the canvas is free for the dungeon render; drop the
@@ -8219,10 +8231,15 @@ function launchStage(c, s) {
   GameState.runSeed = stageSeed(c, s, GameState.difficulty);
   GameState.floorNum = stageRecLevel(c, s);   // drives ALL existing scaling
   GameState.transitioning = false;
-  player.potions = 3;                          // stage-scoped resource
-  resetRunStats();
-  stageLoot = [];                              // Phase S Task 3 — fresh loot log per stage
-  levelAtStageStart = player.level;           // Phase S Task 3 — detect level-ups during stage
+  if (!opts.zoneTransition) {
+    // Phase AG — fresh entry from a menu (chapter map or Continue). Reset
+    // the stage-scoped state. Walking through a portal into an adjacent
+    // zone takes the opts.zoneTransition path below and keeps these.
+    player.potions = 3;
+    resetRunStats();
+    stageLoot = [];
+    levelAtStageStart = player.level;
+  }
   hideChapterMap();
   loadFloor();
   updateHUD(); updateHotbar();
@@ -8247,18 +8264,80 @@ function stageStars() {
   return stars;
 }
 
+// Phase AG — Stepping the exit stair no longer halts the game on a
+// STAGE CLEAR overlay. Instead we record the stars (kept for the
+// achievement layer / world map UI), then smooth-fade into the next
+// zone. The boss-zone stair only reveals when the boss is dead, so the
+// chapter→chapter gate is preserved without any extra check here.
+//
+// Special case: Warden death triggers showVictory inside killEnemy, so
+// the 4-5 stair is conceptually a victory beat rather than a portal.
+// If something edge-cases us to step the stair after Warden died but
+// the victory overlay didn't show, fall back to showResults so the
+// player isn't stranded in a dead world.
 function completeStage() {
   if (GameState.transitioning) return;
-  GameState.transitioning = true;
-  gameRunning = false;                 // freeze sim immediately; drawGame keeps rendering frozen scene
-  SFX.descend();
   const c = GameState.chapter, s = GameState.stageIdx;
   const stars = stageStars();
   recordStageResult(c, s, stars);
   syncAccount();
-  // Phase S Task 3 — show the results screen directly (transitioning ends inside showResults flow).
-  GameState.transitioning = false;
-  showResults(stars);
+  // Determine the next zone.
+  let nextC = c, nextS = s + 1;
+  if (s >= 5) {
+    if (c >= 4) {
+      // End of chapter 4 — Warden territory. Surface the legacy results
+      // screen so the run feels like it has a real ending.
+      showResults(stars);
+      return;
+    }
+    nextC = c + 1; nextS = 1;
+  }
+  zoneTransition(nextC, nextS);
+}
+
+// Phase AG — Smooth fade-load between adjacent zones. Records a baseline
+// "visited" star on the source zone so the unlock predicate
+// (isStageUnlocked = previous stars > 0) lets the player walk back and
+// forth freely through a chapter without re-clearing every step.
+function zoneTransition(targetC, targetS) {
+  if (GameState.transitioning) return;
+  GameState.transitioning = true;
+  gameRunning = false;                 // freeze sim during the swap
+  SFX.descend();
+  // Mark the source zone as visited so the unlock predicate flips for
+  // the target (starsFor > 0). Doesn't downgrade a higher rating.
+  const srcC = GameState.chapter, srcS = GameState.stageIdx;
+  if (srcC && srcS) {
+    const existing = starsFor(srcC, srcS);
+    if (existing < 1) recordStageResult(srcC, srcS, 1);
+  }
+  syncAccount();
+  const fade = document.getElementById('zone-fade');
+  if (fade) {
+    fade.classList.remove('fade-in');
+    fade.classList.add('fade-out');
+  }
+  // Load the next zone after the fade-out completes. The opts.zoneTransition
+  // flag tells launchStage to keep HP/MP/potions/RunStats intact.
+  setTimeout(() => {
+    launchStage(targetC, targetS, { zoneTransition: true });
+    // Fade back in once the swap is committed. setTimeout(20) is used
+    // instead of requestAnimationFrame so the class swap still happens
+    // when the tab is backgrounded (RAF throttles to 0 Hz there and
+    // would leave the fade-out class stuck).
+    setTimeout(() => {
+      if (fade) {
+        fade.classList.remove('fade-out');
+        fade.classList.add('fade-in');
+      }
+    }, 20);
+    // Clear the transition guard once the fade-in finishes so the next
+    // STAIR step works.
+    setTimeout(() => {
+      GameState.transitioning = false;
+      if (fade) fade.classList.remove('fade-in');
+    }, 420);
+  }, 300);
 }
 
 // Phase S — returnToMap: called from the death overlay.
