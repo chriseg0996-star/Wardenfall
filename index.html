@@ -3101,6 +3101,8 @@ function populateFloor() {
                    : ch === 3 ? 'monarch'
                    : 'warden';
     spawnEnemy(bx, by, bossType);
+    // Phase U — boss arena soundtrack swap.
+    if (typeof playMusic === 'function') playMusic('boss');
   }
 }
 
@@ -3497,8 +3499,10 @@ function drawLightingPass(lights) {
 // AudioContext is unlocked on first user gesture (startGame click).
 // Persistence: localStorage 'wardenfall.audio.v1' (master + muted).
 // ─────────────────────────────────────────────
-let audioCtx = null, masterGain = null;
-const audio = { master: 0.6, muted: false };
+let audioCtx = null, masterGain = null, musicMasterGain = null;
+// Phase U — music slider/mute live alongside the existing SFX master in
+// the same persistence key ('wardenfall.audio.v1') for forward-compat.
+const audio = { master: 0.6, muted: false, music: 0.45, musicMuted: false };
 const AUDIO_STORAGE_KEY = 'wardenfall.audio.v1';
 
 function loadAudio() {
@@ -3508,6 +3512,8 @@ function loadAudio() {
     const p = JSON.parse(raw);
     if (typeof p.master === 'number') audio.master = Math.max(0, Math.min(1, p.master));
     if (typeof p.muted  === 'boolean') audio.muted  = p.muted;
+    if (typeof p.music      === 'number')  audio.music      = Math.max(0, Math.min(1, p.music));
+    if (typeof p.musicMuted === 'boolean') audio.musicMuted = p.musicMuted;
   } catch {}
 }
 function saveAudio() {
@@ -3521,11 +3527,17 @@ function ensureAudio() {
     masterGain = audioCtx.createGain();
     masterGain.gain.value = audio.muted ? 0 : audio.master;
     masterGain.connect(audioCtx.destination);
+    // Phase U — music master gain (child of masterGain). Independent volume/mute
+    // so the music slider doesn't drag SFX with it.
+    musicMasterGain = audioCtx.createGain();
+    musicMasterGain.gain.value = audio.musicMuted ? 0 : audio.music;
+    musicMasterGain.connect(masterGain);
   } catch {}
 }
 
 function applyMasterGain() {
-  if (masterGain) masterGain.gain.value = audio.muted ? 0 : audio.master;
+  if (masterGain)      masterGain.gain.value      = audio.muted      ? 0 : audio.master;
+  if (musicMasterGain) musicMasterGain.gain.value = audio.musicMuted ? 0 : audio.music;
 }
 
 // Brief tonal blip with envelope and optional pitch sweep.
@@ -3619,6 +3631,284 @@ const SFX = {
 
 // Load persisted audio settings as soon as the script runs.
 loadAudio();
+
+// ─────────────────────────────────────────────
+// MODULE: MUSIC — Phase U procedural ambient + boss music.
+// All tracks synthesized in Web Audio (no asset files). Each chapter biome
+// has its own ambient theme; the boss track replaces it when a boss spawns
+// and reverts on boss death. Crossfades are 800 ms linear gain ramps.
+// Volume + mute persist alongside the existing SFX audio in 'wardenfall.audio.v1'.
+//
+// Track factories return { id, gain, nodes, intervalIds } — playMusic owns
+// the lifecycle (build → fade in → swap → fade out the old track → stop +
+// disconnect everything to keep the audio graph small).
+// ─────────────────────────────────────────────
+const MUSIC_FADE_MS  = 800;
+let _currentMusic = null;            // { id, gain, nodes, intervalIds }
+
+// Helper — schedule a clean teardown for a track: ramp gain down then stop
+// every node + clear intervals. Decouples lifecycle from track factories.
+function _disposeMusicTrack(track, fadeMs) {
+  if (!track || !audioCtx) return;
+  const now = audioCtx.currentTime;
+  const fadeSec = (fadeMs || MUSIC_FADE_MS) / 1000;
+  try {
+    track.gain.gain.cancelScheduledValues(now);
+    track.gain.gain.setValueAtTime(track.gain.gain.value, now);
+    track.gain.gain.linearRampToValueAtTime(0.0001, now + fadeSec);
+  } catch {}
+  setTimeout(() => {
+    if (track.intervalIds) track.intervalIds.forEach(id => clearInterval(id));
+    if (track.nodes) track.nodes.forEach(n => {
+      try { if (n.stop) n.stop(); } catch {}
+      try { n.disconnect(); } catch {}
+    });
+    try { track.gain.disconnect(); } catch {}
+  }, fadeMs + 80);
+}
+
+// Generic ambient drone factory. Builds a small set of oscillators routed
+// through a low-pass filter into the track gain; an LFO modulates a chorus-
+// like detune for "breathing." Parameters tune the timbre per biome.
+function _buildAmbientTrack(opts) {
+  const ctx = audioCtx;
+  const trackGain = ctx.createGain();
+  trackGain.gain.value = 0;                     // fade in via playMusic
+  trackGain.connect(musicMasterGain);
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = opts.filterHz || 900;
+  filter.Q.value = 0.7;
+  filter.connect(trackGain);
+  const now = ctx.currentTime;
+  const nodes = [filter];
+  // Voices — each oscillator gets a slight phase + detune offset so they
+  // chorus against each other instead of phase-locking into a buzz.
+  opts.voices.forEach((v, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = v.type || 'sawtooth';
+    osc.frequency.value = v.freq;
+    osc.detune.value = (v.detune || 0) + (i - 0.5) * 4;
+    const voiceGain = ctx.createGain();
+    voiceGain.gain.value = v.gain != null ? v.gain : 0.22;
+    osc.connect(voiceGain).connect(filter);
+    osc.start(now);
+    nodes.push(osc, voiceGain);
+    // Slow LFO on detune — gives a subtle breathing chorus motion.
+    const lfo  = ctx.createOscillator();
+    const lfoG = ctx.createGain();
+    lfo.frequency.value = 0.08 + i * 0.03;
+    lfoG.gain.value = 5 + i;
+    lfo.connect(lfoG).connect(osc.detune);
+    lfo.start(now);
+    nodes.push(lfo, lfoG);
+  });
+  // Optional slow filter sweep (used by infernal for the "swell" character).
+  if (opts.filterSweep) {
+    const sweepLfo  = ctx.createOscillator();
+    const sweepGain = ctx.createGain();
+    sweepLfo.frequency.value = opts.filterSweep.rate || 0.05;
+    sweepGain.gain.value = opts.filterSweep.depth || 200;
+    sweepLfo.connect(sweepGain).connect(filter.frequency);
+    sweepLfo.start(now);
+    nodes.push(sweepLfo, sweepGain);
+  }
+  return { id: opts.id, gain: trackGain, nodes, intervalIds: [] };
+}
+
+// Track 1 — Cursed Keep: warm A-minor saw drone, root + 5th + low octave.
+function _buildKeepTrack() {
+  return _buildAmbientTrack({
+    id: 'cursed_keep',
+    filterHz: 950,
+    voices: [
+      { type:'sawtooth', freq: 110.0, detune:   0, gain: 0.18 },  // A2 root
+      { type:'sawtooth', freq: 164.8, detune:   3, gain: 0.14 },  // E3 fifth
+      { type:'triangle', freq:  55.0, detune:  -3, gain: 0.10 },  // A1 sub
+    ],
+  });
+}
+
+// Track 2 — Bone Crypt: minor-key choral pad, root + b3 + 5 sine voices.
+function _buildCryptTrack() {
+  return _buildAmbientTrack({
+    id: 'bone_crypt',
+    filterHz: 780,
+    voices: [
+      { type:'sine', freq: 138.6, detune:  0, gain: 0.16 },  // C#3 root
+      { type:'sine', freq: 164.8, detune:  4, gain: 0.13 },  // E3   minor 3rd
+      { type:'sine', freq: 207.7, detune: -4, gain: 0.13 },  // G#3  5th
+      { type:'triangle', freq: 69.3, detune: 0, gain: 0.08 },  // C#2 sub
+    ],
+  });
+}
+
+// Track 3 — Infernal Depths: low brass + sweeping filter for "swell."
+function _buildInfernalTrack() {
+  const track = _buildAmbientTrack({
+    id: 'infernal_depths',
+    filterHz: 500,
+    voices: [
+      { type:'sawtooth', freq:  82.4, detune:  0, gain: 0.20 },  // E2 root
+      { type:'sawtooth', freq: 116.5, detune:  6, gain: 0.14 },  // Bb2 tritone (dissonance)
+      { type:'square',   freq:  41.2, detune: -3, gain: 0.09 },  // E1 sub
+    ],
+    filterSweep: { rate: 0.06, depth: 280 },
+  });
+  // Crackle layer — fires a filtered noise burst every ~2.4 s with jitter.
+  if (audioCtx) {
+    const interval = setInterval(() => {
+      if (!audioCtx) return;
+      const dur = 0.18 + Math.random()*0.12;
+      const len = Math.max(64, Math.floor(audioCtx.sampleRate * dur));
+      const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = (Math.random()*2-1) * 0.4;
+      const src = audioCtx.createBufferSource(); src.buffer = buf;
+      const flt = audioCtx.createBiquadFilter(); flt.type='lowpass'; flt.frequency.value = 800;
+      const env = audioCtx.createGain();
+      const now = audioCtx.currentTime;
+      env.gain.setValueAtTime(0.10, now);
+      env.gain.exponentialRampToValueAtTime(0.001, now + dur);
+      src.connect(flt).connect(env).connect(track.gain);
+      src.start(now);
+    }, 2400);
+    track.intervalIds.push(interval);
+  }
+  return track;
+}
+
+// Track 4 — Black Bastion: high dissonant pad in tritone, sparse and cold.
+function _buildBastionTrack() {
+  return _buildAmbientTrack({
+    id: 'black_bastion',
+    filterHz: 650,
+    voices: [
+      { type:'sawtooth', freq:  73.4, detune:   0, gain: 0.16 },  // D2 root
+      { type:'sawtooth', freq: 103.8, detune:   5, gain: 0.12 },  // G#2 tritone
+      { type:'sine',     freq: 220.0, detune:  -3, gain: 0.07 },  // A3 high accent
+    ],
+    filterSweep: { rate: 0.04, depth: 220 },
+  });
+}
+
+// Track 5 — Boss: percussive kick + snare + dissonant pad. The pattern uses
+// a beat-scheduling interval so it works under iOS Safari which restricts
+// long-precise OscillatorNode timing.
+function _buildBossTrack() {
+  const ctx = audioCtx;
+  const trackGain = ctx.createGain();
+  trackGain.gain.value = 0;
+  trackGain.connect(musicMasterGain);
+  const now0 = ctx.currentTime;
+  const nodes = [];
+  // Dissonant pad (root + tritone + minor 9th)
+  [
+    { type:'sawtooth', freq: 87.3, gain: 0.12 },     // F2 root
+    { type:'sawtooth', freq:123.5, gain: 0.10 },     // B2 tritone
+    { type:'sine',     freq:174.6, gain: 0.07 },     // F3 octave
+  ].forEach((v, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = v.type; osc.frequency.value = v.freq;
+    osc.detune.value = (i - 1) * 4;
+    const g = ctx.createGain(); g.gain.value = v.gain;
+    osc.connect(g).connect(trackGain);
+    osc.start(now0);
+    nodes.push(osc, g);
+  });
+  // Percussion scheduler — 130 BPM, kick on 1+3, snare on 2+4. Uses
+  // setInterval at beat-rate; each tick schedules one drum hit.
+  const BEAT_MS = 60000 / 130;  // ~461 ms per beat
+  let beatIx = 0;
+  const tick = () => {
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    const isKick  = (beatIx % 4 === 0 || beatIx % 4 === 2);
+    const isSnare = (beatIx % 4 === 1 || beatIx % 4 === 3);
+    if (isKick) {
+      // Kick — low sine with fast pitch drop
+      const osc = ctx.createOscillator(); const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(120, t);
+      osc.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+      env.gain.setValueAtTime(0.40, t);
+      env.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      osc.connect(env).connect(trackGain);
+      osc.start(t); osc.stop(t + 0.16);
+    }
+    if (isSnare) {
+      // Snare — band-passed noise burst
+      const dur = 0.10;
+      const len = Math.max(64, Math.floor(ctx.sampleRate * dur));
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = (Math.random()*2-1) * 0.5;
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const flt = ctx.createBiquadFilter(); flt.type='bandpass'; flt.frequency.value = 1800; flt.Q.value = 1.4;
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0.30, t);
+      env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(flt).connect(env).connect(trackGain);
+      src.start(t);
+    }
+    beatIx++;
+  };
+  const interval = setInterval(tick, BEAT_MS);
+  return { id: 'boss', gain: trackGain, nodes, intervalIds: [interval] };
+}
+
+// Track factory dispatch.
+const MUSIC_TRACK_BUILDERS = {
+  cursed_keep:     _buildKeepTrack,
+  bone_crypt:      _buildCryptTrack,
+  infernal_depths: _buildInfernalTrack,
+  black_bastion:   _buildBastionTrack,
+  boss:            _buildBossTrack,
+};
+
+// Public — switch music to a new track id with an 800 ms crossfade.
+// Safe to call before user-gesture audio unlock (no-ops). Idempotent
+// when called with the currently-playing id.
+function playMusic(trackId) {
+  if (!audioCtx || !musicMasterGain) return;
+  if (audio.musicMuted || audio.music <= 0) {
+    // Settings have music silenced — still track the intent so unmuting
+    // later resumes the right track.
+    if (_currentMusic) _disposeMusicTrack(_currentMusic, 0);
+    _currentMusic = null;
+    return;
+  }
+  if (_currentMusic && _currentMusic.id === trackId) return;
+  const builder = MUSIC_TRACK_BUILDERS[trackId];
+  if (!builder) return;
+  // Build the new track (gain starts at 0), then fade it in.
+  const next = builder();
+  const now = audioCtx.currentTime;
+  const fadeSec = MUSIC_FADE_MS / 1000;
+  const targetGain = Math.max(0.0001, 1.0);    // track gain reaches 1.0; musicMasterGain scales by audio.music
+  try {
+    next.gain.gain.setValueAtTime(0.0001, now);
+    next.gain.gain.linearRampToValueAtTime(targetGain, now + fadeSec);
+  } catch {}
+  // Fade out + dispose the previous track.
+  if (_currentMusic) _disposeMusicTrack(_currentMusic, MUSIC_FADE_MS);
+  _currentMusic = next;
+}
+
+function stopMusic(fadeMs) {
+  if (!_currentMusic) return;
+  _disposeMusicTrack(_currentMusic, fadeMs != null ? fadeMs : MUSIC_FADE_MS);
+  _currentMusic = null;
+}
+
+// Phase U — helper: return the music track id for a given chapter.
+function musicTrackForChapter(c) {
+  if (c === 1) return 'cursed_keep';
+  if (c === 2) return 'bone_crypt';
+  if (c === 3) return 'infernal_depths';
+  if (c === 4) return 'black_bastion';
+  return 'cursed_keep';
+}
 
 // ─────────────────────────────────────────────
 // MODULE: PORTRAITS (Phase R)
@@ -4212,6 +4502,14 @@ function killEnemy(e) {
       } catch {}
       // Defer one frame so the death FX renders before the overlay paints.
       setTimeout(() => showVictory(), 60);
+    } else {
+      // Phase U — revert from boss track back to the chapter ambient on
+      // any boss death OTHER than Warden (whose death plays the victory
+      // music inside showVictory). Lets the corpse + loot dance breathe
+      // in chapter ambience.
+      if (typeof playMusic === 'function' && typeof GameState.chapter === 'number') {
+        playMusic(musicTrackForChapter(GameState.chapter));
+      }
     }
   }
 
@@ -4598,6 +4896,12 @@ function showVictory() {
   };
   overlay.classList.add('show');
   requestAnimationFrame(() => overlay.classList.add('show-anim'));
+  // Phase U — triumphant cadence on Warden death. Stop the boss/ambient
+  // track, then play a 3-note ascending major arpeggio (the level-up SFX
+  // motif scaled up). Then silence until the user chooses CONTINUE or
+  // NEW HERO — which themselves call playMusic('cursed_keep') / stopMusic.
+  try { stopMusic(400); } catch {}
+  if (typeof SFX !== 'undefined' && SFX.level_up) SFX.level_up();
 }
 
 function hideVictory() {
@@ -6481,10 +6785,11 @@ function renderSettings() {
       </div>
     `;
   }).join('');
-  // Phase G: audio rows
+  // Phase G + Phase U: audio rows (SFX master, music master, both mutes)
   const audioList = document.getElementById('audio-list');
   if (audioList) {
     const masterPct = Math.round(audio.master * 100);
+    const musicPct  = Math.round(audio.music  * 100);
     audioList.innerHTML = `
       <div class="kb-row">
         <span class="lbl">Master Volume</span>
@@ -6494,6 +6799,16 @@ function renderSettings() {
       <div class="kb-row">
         <span class="lbl">Mute</span>
         <span class="keys"><input type="checkbox" id="vol-mute" ${audio.muted?'checked':''}></span>
+        <span style="min-width:42px"></span>
+      </div>
+      <div class="kb-row">
+        <span class="lbl">Music Volume</span>
+        <input type="range" id="vol-music" min="0" max="100" value="${musicPct}" style="flex:1">
+        <span class="keys" id="vol-music-v" style="min-width:42px;text-align:right">${musicPct}%</span>
+      </div>
+      <div class="kb-row">
+        <span class="lbl">Mute Music</span>
+        <span class="keys"><input type="checkbox" id="vol-music-mute" ${audio.musicMuted?'checked':''}></span>
         <span style="min-width:42px"></span>
       </div>
     `;
@@ -6510,6 +6825,27 @@ function renderSettings() {
       audio.muted = muteBox.checked;
       applyMasterGain();
       saveAudio();
+    });
+    // Phase U — music controls
+    const musicSlider = document.getElementById('vol-music');
+    const musicSliderV = document.getElementById('vol-music-v');
+    musicSlider.addEventListener('input', () => {
+      audio.music = (+musicSlider.value) / 100;
+      musicSliderV.textContent = musicSlider.value + '%';
+      applyMasterGain();
+      saveAudio();
+    });
+    const musicMuteBox = document.getElementById('vol-music-mute');
+    musicMuteBox.addEventListener('change', () => {
+      audio.musicMuted = musicMuteBox.checked;
+      applyMasterGain();
+      saveAudio();
+      // If the user un-mutes music while in-game, resume the chapter track.
+      if (!audio.musicMuted && gameRunning && typeof GameState.chapter === 'number') {
+        playMusic(musicTrackForChapter(GameState.chapter));
+      } else if (audio.musicMuted) {
+        stopMusic(150);
+      }
     });
   }
   // Keybind list is collapsed by default; sync visibility + toggle caret.
@@ -6683,6 +7019,8 @@ window.addEventListener('pointerup', e=>{
 
 // showCharSelect() — rebuilds cards each time (levels may change between runs).
 function showCharSelect() {
+  // Phase U — title flow has no soundtrack; stop whatever was playing.
+  if (typeof stopMusic === 'function') stopMusic(300);
   const container = document.getElementById('cso-cards');
   container.innerHTML = '';
 
@@ -6765,6 +7103,9 @@ function showChapterMap() {
 
   // Phase T — Nightmare toggle UI (shown only once unlocked via Warden kill).
   _renderNightmareToggle();
+  // Phase U — chapter-map menu loop. Plays the Cursed Keep ambient as the
+  // "title-screen" music regardless of which character is selected.
+  if (typeof playMusic === 'function') playMusic('cursed_keep');
 
   const container = document.getElementById('cmap-chapters');
   container.innerHTML = '';
@@ -6855,6 +7196,10 @@ function launchStage(c, s) {
   loadFloor();
   updateHUD(); updateHotbar();
   addLog(`Chapter ${c}-${s}: ${STAGE_NAMES[c-1][s-1]}`, 'sys');
+  // Phase U — switch to the chapter's ambient track. The boss-spawn hook
+  // (populateFloor) will swap to the boss track when the arena populates,
+  // so even on stage 5 the chapter ambient plays for the run-up corridors.
+  if (typeof playMusic === 'function') playMusic(musicTrackForChapter(c));
   gameRunning = true;
   if (!loopStarted) {
     loopStarted = true;
