@@ -722,6 +722,25 @@ body.menu-screen #joystick-knob { display:none !important; }
   transform:translateY(-1px);
 }
 .settings-hint { color:#7a6a8a; font-size:9px; margin-top:8px; text-align:center; letter-spacing:0.5px; }
+/* Phase AD — Settings actions row (currently: Abandon Stage). Sits above
+   RESUME so the primary action stays the bottom one (muscle memory). */
+#settings-actions { margin-top:14px; display:flex; flex-direction:column; align-items:center; gap:6px; }
+#settings-actions:empty { margin-top:0; }
+.settings-danger {
+  padding:7px 22px;
+  background:linear-gradient(135deg, rgba(50,16,16,0.85), rgba(80,22,22,0.78));
+  border:1px solid rgba(192,64,64,0.55); border-radius:3px;
+  color:#f0c4c4; cursor:pointer;
+  font-size:11px; letter-spacing:3px; font-family:'Courier New',monospace;
+  transition:background 80ms ease, border-color 80ms ease, transform 80ms ease;
+}
+.settings-danger:hover {
+  background:linear-gradient(135deg, rgba(80,24,24,0.95), rgba(120,30,30,0.90));
+  border-color:#e06060; color:#ffe0e0;
+  transform:translateY(-1px);
+  box-shadow:0 0 12px rgba(224,80,80,0.35);
+}
+.settings-danger-note { font-size:8.5px; color:#7a6a8a; letter-spacing:1px; }
 .settings-subtle { color:#7a6a8a; font-size:9.5px; margin:3px 0 8px; letter-spacing:0.5px; }
 .kb-toggle {
   margin-top:10px; width:100%;
@@ -1368,6 +1387,7 @@ body.menu-screen #joystick-knob { display:none !important; }
         <div class="settings-hint">Click <b>Rebind</b>, then press the new key. ESC cancels rebind.</div>
         <button class="kb-reset" onclick="applyPreset('default')">Reset keys to default</button>
       </div>
+      <div id="settings-actions"></div>
       <button class="settings-close" onclick="closeSettings()">RESUME</button>
     </div>
   </div>
@@ -7591,6 +7611,18 @@ function renderSettings() {
       pair('Potion', bindings.potion[0]) +
       pair('Skills', [bindings.spell0[0], bindings.spell1[0], bindings.spell2[0]].map(_prettyKey).join('/'));
   }
+  // Phase AD — Abandon Stage button. Only shown while a stage is live
+  // (gameRunning + not transitioning + not dead). Hidden when the
+  // settings overlay is opened from a menu (title / charselect /
+  // chaptermap) so the menu state isn't confused with mid-run pause.
+  const actions = document.getElementById('settings-actions');
+  if (actions) {
+    const inStage = gameRunning && !player.dead && !GameState.transitioning;
+    actions.innerHTML = inStage
+      ? `<button class="settings-danger" onclick="quitToMap()">⌫ ABANDON STAGE</button>
+         <div class="settings-danger-note">XP and gear are kept · stage will not count as cleared</div>`
+      : '';
+  }
   // Binding rows
   const list = document.getElementById('kb-list');
   list.innerHTML = Object.keys(DEFAULT_BINDINGS).map(act => {
@@ -8094,6 +8126,22 @@ function returnToMap() {
   gameRunning = false;
   GameState.transitioning = false;
   applyCharacter(player.classId);   // revive + reload synced state
+  updateHUD(); updateHotbar();
+  showChapterMap();
+}
+
+// Phase AD — quitToMap: bail out of a live stage from the pause menu.
+// Saves the character (level/XP/gear are preserved), restores the
+// hero to full state (so future runs start clean), closes the pause
+// overlay, and returns to the chapter map. The stage does NOT count
+// as cleared — the player simply gave up.
+function quitToMap() {
+  if (!gameRunning) return;
+  syncAccount();
+  closeSettings();
+  gameRunning = false;
+  GameState.transitioning = false;
+  applyCharacter(player.classId);   // fullHeal + recompute
   updateHUD(); updateHotbar();
   showChapterMap();
 }
