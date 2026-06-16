@@ -24,7 +24,13 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 
 /* HUD */
 #hud {
-  position:absolute; top:0; left:0; width:100%; pointer-events:none;
+  /* Phase AF — Switched from top:0;left:0;width:100% (height auto = 0
+     because all children are absolutely positioned) to inset:0 so that
+     children using bottom:X (#hotbar-panel, #log-panel, #gold-panel)
+     anchor to the actual bottom of the viewport instead of being
+     pushed ABOVE it. Before this, the bottom-center hotbar rendered
+     at y=-68 px and was effectively invisible. */
+  position:absolute; inset:0; pointer-events:none;
   font-family:'Courier New',monospace;
 }
 /* Phase AC — Stats panel: class portrait + bigger HP/MP/XP bars, single
@@ -136,6 +142,14 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   font-weight:bold;
   text-shadow:0 0 3px rgba(0,0,0,0.9);
   letter-spacing:0.5px;
+}
+/* Phase AF — Skill icon span. Big enough that emoji icons read at a
+   glance in the 44 px slot; the slot's own font-size sets a baseline,
+   but emoji glyphs need an explicit size to render at the same scale
+   regardless of the host font. */
+.hb-icon {
+  font-size:24px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
 }
 .hb-cnt {
   position:absolute; bottom:1px; right:3px;
@@ -5727,17 +5741,21 @@ function updateBossHP() {
 function updateHotbar() {
   const hb = document.getElementById('hotbar');
   const slots = [];
+  // Phase AF — drop the inline font-size:15px so the slot's CSS font-size
+  // (22 px since the Phase AC slot enlargement) actually applies; the
+  // 44 px slots were holding 15 px icons that looked tiny vs the bigger
+  // potion emoji and made abilities hard to spot.
   slots.push(`
     <div class="hb-slot${player.potions>0?' active':''}">
-      <span class="hb-key">H</span>🧪<span class="hb-cnt">${player.potions}</span>
+      <span class="hb-key">H</span><span class="hb-icon">🧪</span><span class="hb-cnt">${player.potions}</span>
     </div>
   `);
   const kit = kitSkills();
   for (let i=0; i<3; i++) {
     const s = SKILLS[kit[i]];
     if (!s) {
-      // Phase R: skill not yet in registry (knight/ranger Tasks 2-3) — dim placeholder
-      slots.push(`<div class="hb-slot"><span class="hb-key">${i+2}</span><span style="font-size:15px;opacity:0.3">—</span></div>`);
+      // Phase R: skill not yet in registry — dim placeholder
+      slots.push(`<div class="hb-slot"><span class="hb-key">${i+2}</span><span class="hb-icon" style="opacity:0.3">—</span></div>`);
       continue;
     }
     const cd = player.spellCd[i] || 0;
@@ -5747,7 +5765,7 @@ function updateHotbar() {
     slots.push(`
       <div class="${cls}">
         <span class="hb-key">${i+2}</span>
-        <span style="font-size:15px;opacity:${ok?1:0.55}">${s.icon}</span>
+        <span class="hb-icon" style="opacity:${ok?1:0.55}">${s.icon}</span>
         <span class="hb-cnt hb-mp">${s.mp}</span>
         ${cdPct>0?`<div class="hb-cd-fill" style="height:${(cdPct*100).toFixed(1)}%"></div>`:''}
       </div>
