@@ -7261,6 +7261,14 @@ window.__sidescroll = function(){
   return 'sidescroll mode';
 };
 
+// Dev launcher: load the slice directly via the URL hash (#sidescroll) — needed
+// for the mobile feel test where there is no console. Default load (no hash)
+// stays top-down, so the shipped game is unaffected. Deferred a tick so the
+// normal boot/init finishes first.
+if (location.hash === '#sidescroll') {
+  setTimeout(() => { try { window.__sidescroll(); } catch (e) {} }, 0);
+}
+
 // ─────────────────────────────────────────────
 // Phase N — Polish (COMPLETE)
 // ─────────────────────────────────────────────
