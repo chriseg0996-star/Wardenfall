@@ -571,56 +571,122 @@ body.menu-screen #joystick-knob { display:none !important; }
   color:#f0c060; font-size:22px; letter-spacing:6px; margin-bottom:2px;
   text-shadow: 0 0 14px rgba(240,176,72,0.30), 0 0 3px rgba(240,176,72,0.7);
 }
+/* Phase AI — MapleStory class-select layout. Three big vertical
+   preview cards: huge class name + small tagline at the top, large
+   portrait, category badge, "Master of X" summary, multi-line lore
+   paragraph, stats footer. Per-class tinted background + glow. */
 .cso-cards {
-  display:flex; gap:20px; flex-wrap:wrap; justify-content:center;
-  max-width:640px; padding:0 12px;
+  display:flex; gap:18px; flex-wrap:wrap; justify-content:center;
+  max-width:780px; padding:0 12px;
 }
 .char-card {
-  flex:0 1 170px; min-width:160px; max-width:190px;
-  background:linear-gradient(135deg, rgba(20,16,28,0.92), rgba(34,24,48,0.88));
-  border:2px solid rgba(80,64,120,0.6); border-radius:6px;
-  padding:14px 10px 12px; cursor:pointer; user-select:none;
-  display:flex; flex-direction:column; align-items:center; gap:6px;
-  transition:border-color 0.12s, box-shadow 0.12s, transform 0.08s;
+  flex:0 1 220px; min-width:200px; max-width:240px;
+  background:linear-gradient(180deg, rgba(20,16,28,0.95) 0%, rgba(28,20,40,0.90) 60%, rgba(14,10,22,0.92) 100%);
+  border:2px solid rgba(80,64,120,0.6); border-radius:9px;
+  padding:14px 14px 16px; cursor:pointer; user-select:none;
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+  transition:border-color 0.14s, box-shadow 0.14s, transform 0.10s;
   position:relative;
+  min-height:430px;
+  overflow:hidden;
 }
-.char-card:hover  { transform:translateY(-3px); }
+.char-card:hover  { transform:translateY(-4px); }
 .char-card:active { transform:translateY(-1px); }
-/* Per-class accents — borders + glow + level color tied to identity. */
-.char-card.knight       { border-color:rgba(96,140,220,0.55); }
-.char-card.knight:hover { border-color:#6a9eff; box-shadow:0 0 22px rgba(96,140,220,0.45); }
-.char-card.knight .cc-level { color:#9ec0ff; }
-.char-card.knight .cc-icon  { color:#6a9eff; }
-.char-card.ranger       { border-color:rgba(96,200,128,0.55); }
-.char-card.ranger:hover { border-color:#80e090; box-shadow:0 0 22px rgba(96,200,128,0.45); }
-.char-card.ranger .cc-level { color:#9aedb0; }
-.char-card.ranger .cc-icon  { color:#80e090; }
-.char-card.mage         { border-color:rgba(160,96,224,0.55); }
-.char-card.mage:hover   { border-color:#c080ff; box-shadow:0 0 22px rgba(160,96,224,0.45); }
-.char-card.mage .cc-level { color:#dab0ff; }
-.char-card.mage .cc-icon  { color:#c080ff; }
-.char-card img   {
-  width:84px; height:84px; image-rendering:pixelated;
-  border-radius:4px; border:1px solid rgba(60,46,90,0.7);
-  background:rgba(6,4,12,0.55);
+/* Soft inner glow + scene-tinted backdrop per class — gives each card
+   the colored-glow feel from the MapleStory reference. */
+.char-card::before {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(circle at 50% 35%, var(--card-tint, rgba(120,120,180,0.20)) 0%, transparent 65%);
+  z-index:0;
 }
-.char-card .cc-icon-name {
-  display:flex; align-items:center; gap:6px;
-  font-size:13px; font-weight:bold; color:#e8dcf6; letter-spacing:2px;
+.char-card > * { position:relative; z-index:1; }
+.char-card.knight  { --card-tint: rgba(96,140,220,0.28); border-color:rgba(96,140,220,0.55); }
+.char-card.ranger  { --card-tint: rgba(96,200,128,0.26); border-color:rgba(96,200,128,0.55); }
+.char-card.mage    { --card-tint: rgba(160,96,224,0.28); border-color:rgba(160,96,224,0.55); }
+.char-card.knight:hover  { border-color:#7ab0ff; box-shadow:0 0 28px rgba(96,140,220,0.55); }
+.char-card.ranger:hover  { border-color:#88f0a0; box-shadow:0 0 28px rgba(96,200,128,0.55); }
+.char-card.mage:hover    { border-color:#d090ff; box-shadow:0 0 28px rgba(160,96,224,0.55); }
+.char-card.knight .cc-name { color:#cae0ff; text-shadow:0 0 14px rgba(96,140,220,0.55); }
+.char-card.ranger .cc-name { color:#c4f4d2; text-shadow:0 0 14px rgba(96,200,128,0.55); }
+.char-card.mage   .cc-name { color:#e6cfff; text-shadow:0 0 14px rgba(160,96,224,0.55); }
+.char-card.knight .cc-cat-icon { color:#7ab0ff; }
+.char-card.ranger .cc-cat-icon { color:#88f0a0; }
+.char-card.mage   .cc-cat-icon { color:#d090ff; }
+.char-card.knight .cc-stat-value { color:#cae0ff; }
+.char-card.ranger .cc-stat-value { color:#c4f4d2; }
+.char-card.mage   .cc-stat-value { color:#e6cfff; }
+
+/* ── Card header — big name + tagline ── */
+.cc-name {
+  font-size:22px; font-weight:bold; letter-spacing:3px;
   margin-top:2px;
+  font-family:'Courier New',monospace;
 }
-.char-card .cc-icon { font-size:14px; }
-.char-card .cc-level { font-size:13px; font-weight:bold; letter-spacing:1px; }
-.char-card .cc-gear  { font-size:9px; color:#806890; letter-spacing:1.5px; }
-.char-card .cc-kit   { display:flex; gap:6px; font-size:15px; margin-top:4px; }
-.char-card .cc-last  {
+.cc-tagline {
+  font-size:9.5px; color:#a896c0; letter-spacing:2px; font-style:italic;
+  text-align:center; line-height:1.3; margin-bottom:4px;
+  min-height:24px;
+}
+
+/* ── Portrait — bigger and centered ── */
+.char-card img {
+  width:120px; height:120px; image-rendering:pixelated;
+  border:1px solid rgba(60,46,90,0.7); border-radius:5px;
+  background:rgba(6,4,12,0.55);
+  box-shadow: inset 0 0 14px rgba(0,0,0,0.6);
+  margin:4px 0 6px;
+}
+
+/* ── Category badge + summary ── */
+.cc-category {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:3px 10px; margin-bottom:2px;
+  background:rgba(8,6,14,0.78); border:1px solid rgba(74,58,90,0.6); border-radius:12px;
+  font-size:9.5px; color:#c0a8d8; letter-spacing:2px;
+}
+.cc-cat-icon { font-size:11px; }
+.cc-summary {
+  font-size:10.5px; color:#e0d4f0; letter-spacing:1px; font-weight:bold;
+  text-align:center; line-height:1.3;
+  margin:2px 0 4px;
+  padding:0 4px;
+}
+.cc-description {
+  font-size:9.5px; color:#a896c0; letter-spacing:0.3px; line-height:1.5;
+  text-align:center;
+  padding:0 6px;
+  flex:1;
+  display:flex; align-items:center;
+}
+
+/* ── Footer stat row ── */
+.cc-stats-row {
+  width:100%;
+  display:flex; justify-content:space-around;
+  padding:8px 4px 2px; margin-top:6px;
+  border-top:1px solid rgba(74,58,90,0.55);
+}
+.cc-stat-block {
+  display:flex; flex-direction:column; align-items:center; gap:1px;
+}
+.cc-stat-label { font-size:8px; color:#7a6a8a; letter-spacing:1.5px; }
+.cc-stat-value {
+  font-size:13px; font-weight:bold; letter-spacing:1px;
+  font-family:'Courier New',monospace;
+}
+
+/* ── "LAST PLAYED" badge ── */
+.cc-last  {
   position:absolute; top:-10px; left:50%; transform:translateX(-50%);
   background:linear-gradient(135deg,#604080,#a060e0);
   border:1px solid #c090f0; border-radius:10px;
   padding:2px 10px; font-size:8px; color:#f8e8ff; letter-spacing:2px;
   white-space:nowrap;
   box-shadow:0 0 10px rgba(160,96,224,0.45);
+  z-index:2;
 }
+
+/* ── Char-select footer (controls hint) ── */
 .cso-footer {
   font-size:10px; color:#7a6a8a; text-align:center; max-width:460px;
   line-height:1.9; padding:6px 12px;
@@ -3168,24 +3234,43 @@ function buildDungeon(floorNum) {
 // zero-diff change for current gameplay. Knight/Ranger kits wire up in
 // Phase R; until then they are selectable only via window.__setClass.
 // ─────────────────────────────────────────────
+// Phase AI — class flavor: category, tagline, description.
+// Used by the MapleStory-style character select cards (big vertical
+// preview cards) and the title screen character card. All three fields
+// are pure text — no behaviour change.
 const CLASS_DEFS = {
   knight: {
     name: 'Knight', icon: '🛡',
     base:   { hp:140, mp:20, atk:14, def:8, speed:110 },
     growth: { hp:35,  mp:4,  atk:4,  def:3 },
     kit: ['bash','stance','whirlwind'],          // Phase R
+    category: 'Warrior',
+    tagline:  'Sworn Shield of the Fallen Crown',
+    summary:  'Master of Steel and Stalwart Faith',
+    description: 'A bulwark of iron and oath, the Knight strides into the deepest pits of the Cursed Keep daring foes to break against their shield. Stalwart Stance hardens them like castle walls; Whirlwind clears whole rooms in a single sweep.',
+    statLabel: 'STR',          // shown on the card under "Main Stat"
   },
   ranger: {
     name: 'Ranger', icon: '🏹',
     base:   { hp:90,  mp:30, atk:13, def:4, speed:135 },
     growth: { hp:20,  mp:6,  atk:5,  def:1 },
     kit: ['powershot','multishot','tumble'],     // Phase R
+    category: 'Hunter',
+    tagline:  'Eyes of the Forgotten Wood',
+    summary:  'Master of the Bow and the Long Sight',
+    description: 'A nimble hunter from the high passes. The Ranger keeps distance with bow and tumble, weaving past blades and turning a single shaft into a volley. Their wisdom lies in the kill before the foe ever closes.',
+    statLabel: 'DEX',
   },
   mage: {
     name: 'Mage', icon: '🔮',
     base:   { hp:100, mp:50, atk:12, def:5, speed:120 },
     growth: { hp:25,  mp:10, atk:4,  def:2 },
     kit: ['firebolt','mend','nova'],             // existing SPELLS
+    category: 'Sorcerer',
+    tagline:  'Keeper of the Ember Flame',
+    summary:  'Master of Fire, Mend, and Cataclysm',
+    description: 'A scholar of forbidden flame. The Mage burns enemies from afar with Firebolt, calms wounds with Mend, and shatters the field with Nova. Where steel falters, will and arcana prevail.',
+    statLabel: 'INT',
   },
 };
 
@@ -8330,13 +8415,48 @@ function showCharSelect() {
     // Phase Y — per-class accent (knight/ranger/mage) drives border, glow,
     // level color, and icon tint via CSS .char-card.knight / .ranger / .mage.
     card.className = 'char-card ' + cid;
+    // Phase AI — MapleStory-style card layout: name + tagline header,
+    // big portrait, category badge, summary, lore paragraph, footer
+    // stats. Lv 1 + no gear is displayed as "Empty" in the footer so
+    // empty slots read clearly.
+    const cp       = (typeof computeCombatPower === 'function') ? computeCombatPower(cid) : 0;
+    const cat      = def.category   || 'Hero';
+    const tagline  = def.tagline    || '';
+    const summary  = def.summary    || '';
+    const lore     = def.description|| '';
+    const statLbl  = def.statLabel  || 'STAT';
+    const statVal  = (cid === 'knight') ? (def.base.atk + def.growth.atk * (lvl - 1))
+                   : (cid === 'ranger') ? (def.base.atk + def.growth.atk * (lvl - 1))
+                   : (def.base.atk + def.growth.atk * (lvl - 1));
     card.innerHTML = `
       ${isLast ? '<span class="cc-last">LAST PLAYED</span>' : ''}
+      <div class="cc-name">${def.name.toUpperCase()}</div>
+      <div class="cc-tagline">${tagline}</div>
       <img id="portrait-${cid}" src="" alt="${def.name}">
-      <div class="cc-icon-name"><span class="cc-icon">${def.icon}</span><span>${def.name.toUpperCase()}</span></div>
-      <div class="cc-level">Lv.${lvl}</div>
-      <div class="cc-gear">${gearCount}/5 gear</div>
-      <div class="cc-kit">${kitIcons}</div>
+      <div class="cc-category">
+        <span class="cc-cat-icon">${def.icon}</span>
+        <span>${cat}</span>
+      </div>
+      <div class="cc-summary">${summary}</div>
+      <div class="cc-description">${lore}</div>
+      <div class="cc-stats-row">
+        <div class="cc-stat-block">
+          <span class="cc-stat-label">LEVEL</span>
+          <span class="cc-stat-value">${lvl}</span>
+        </div>
+        <div class="cc-stat-block">
+          <span class="cc-stat-label">${statLbl}</span>
+          <span class="cc-stat-value">${statVal}</span>
+        </div>
+        <div class="cc-stat-block">
+          <span class="cc-stat-label">CP</span>
+          <span class="cc-stat-value">${cp.toLocaleString()}</span>
+        </div>
+        <div class="cc-stat-block">
+          <span class="cc-stat-label">GEAR</span>
+          <span class="cc-stat-value">${gearCount}/5</span>
+        </div>
+      </div>
     `;
 
     // Set portrait src — portraits are built at script load.
