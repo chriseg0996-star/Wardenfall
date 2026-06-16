@@ -271,59 +271,109 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 .credits-close:hover { background:#3a2a60; }
 /* Phase X — While #overlay is visible, hide all in-game HUD + touch buttons
    that were leaking through the previous flat-alpha title. */
-body.title-screen #hud,
-body.title-screen #floor-label,
-body.title-screen #spell-btns,
-body.title-screen #attack-btn,
-body.title-screen #potion-btn,
-body.title-screen #gear-btn,
-body.title-screen #pause-btn,
-body.title-screen #joystick-zone,
-body.title-screen #joystick-base,
-body.title-screen #joystick-knob { display:none !important; }
+body.menu-screen #hud,
+body.menu-screen #floor-label,
+body.menu-screen #spell-btns,
+body.menu-screen #attack-btn,
+body.menu-screen #potion-btn,
+body.menu-screen #gear-btn,
+body.menu-screen #pause-btn,
+body.menu-screen #joystick-zone,
+body.menu-screen #joystick-base,
+body.menu-screen #joystick-knob { display:none !important; }
 
-/* Phase R Task 6 — character select overlay */
+/* Phase Y — Character select overlay overhaul.
+   Lower background alpha lets the procedural title backdrop show through;
+   per-class accent colors on the cards (Knight blue / Ranger green / Mage
+   purple); 3-up flex layout that wraps cleanly on narrow viewports;
+   Back button top-left to return to the title menu. */
 #charselect-overlay {
-  position:absolute; inset:0; background:rgba(0,0,0,0.92);
+  position:absolute; inset:0;
+  background:
+    linear-gradient(to bottom,
+      rgba(6,4,12,0.92) 0%,
+      rgba(6,4,12,0.65) 20%,
+      rgba(6,4,12,0.30) 50%,
+      rgba(6,4,12,0.55) 82%,
+      rgba(6,4,12,0.92) 100%);
   display:none; flex-direction:column; align-items:center; justify-content:center;
-  z-index:100; font-family:'Courier New',monospace; gap:16px;
+  z-index:100; font-family:'Courier New',monospace; gap:18px;
 }
 #charselect-overlay.open { display:flex; }
+.cso-back {
+  position:absolute; top:14px; left:14px;
+  background:rgba(28,20,40,0.85); border:1px solid rgba(128,80,200,0.5);
+  border-radius:3px; padding:6px 14px;
+  color:#d0c4e6; font-family:'Courier New',monospace;
+  font-size:11px; letter-spacing:2px; cursor:pointer;
+  transition:background 80ms ease, border-color 80ms ease, transform 80ms ease;
+}
+.cso-back:hover {
+  background:rgba(60,40,100,0.95); border-color:rgba(224,192,255,0.85);
+  color:#f0e4ff; transform:translateY(-1px); outline:none;
+}
 .cso-title {
-  color:#f0c060; font-size:18px; letter-spacing:4px; margin-bottom:4px;
+  color:#f0c060; font-size:22px; letter-spacing:6px; margin-bottom:2px;
+  text-shadow: 0 0 14px rgba(240,176,72,0.30), 0 0 3px rgba(240,176,72,0.7);
 }
 .cso-cards {
-  display:flex; gap:14px; flex-wrap:wrap; justify-content:center;
-  max-width:520px; padding:0 12px;
+  display:flex; gap:20px; flex-wrap:wrap; justify-content:center;
+  max-width:640px; padding:0 12px;
 }
 .char-card {
-  flex:1 1 130px; min-width:120px; max-width:160px;
-  background:#15151c; border:2px solid #4a3870; border-radius:6px;
-  padding:10px 8px 10px; cursor:pointer; user-select:none;
-  display:flex; flex-direction:column; align-items:center; gap:5px;
-  transition:border-color 0.12s, box-shadow 0.12s, transform 0.06s;
+  flex:0 1 170px; min-width:160px; max-width:190px;
+  background:linear-gradient(135deg, rgba(20,16,28,0.92), rgba(34,24,48,0.88));
+  border:2px solid rgba(80,64,120,0.6); border-radius:6px;
+  padding:14px 10px 12px; cursor:pointer; user-select:none;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  transition:border-color 0.12s, box-shadow 0.12s, transform 0.08s;
   position:relative;
 }
-.char-card:hover  { border-color:#8050c0; box-shadow:0 0 16px rgba(130,80,200,0.35); transform:translateY(-2px); }
-.char-card:active { transform:translateY(0); }
-.char-card img   { width:72px; height:72px; image-rendering:pixelated; border-radius:4px; border:1px solid #333; }
-.char-card .cc-icon-name {
-  display:flex; align-items:center; gap:5px;
-  font-size:12px; font-weight:bold; color:#e0d0ff; letter-spacing:1px;
+.char-card:hover  { transform:translateY(-3px); }
+.char-card:active { transform:translateY(-1px); }
+/* Per-class accents — borders + glow + level color tied to identity. */
+.char-card.knight       { border-color:rgba(96,140,220,0.55); }
+.char-card.knight:hover { border-color:#6a9eff; box-shadow:0 0 22px rgba(96,140,220,0.45); }
+.char-card.knight .cc-level { color:#9ec0ff; }
+.char-card.knight .cc-icon  { color:#6a9eff; }
+.char-card.ranger       { border-color:rgba(96,200,128,0.55); }
+.char-card.ranger:hover { border-color:#80e090; box-shadow:0 0 22px rgba(96,200,128,0.45); }
+.char-card.ranger .cc-level { color:#9aedb0; }
+.char-card.ranger .cc-icon  { color:#80e090; }
+.char-card.mage         { border-color:rgba(160,96,224,0.55); }
+.char-card.mage:hover   { border-color:#c080ff; box-shadow:0 0 22px rgba(160,96,224,0.45); }
+.char-card.mage .cc-level { color:#dab0ff; }
+.char-card.mage .cc-icon  { color:#c080ff; }
+.char-card img   {
+  width:84px; height:84px; image-rendering:pixelated;
+  border-radius:4px; border:1px solid rgba(60,46,90,0.7);
+  background:rgba(6,4,12,0.55);
 }
-.char-card .cc-icon { font-size:16px; }
-.char-card .cc-level { font-size:11px; color:#a0c0ff; font-weight:bold; }
-.char-card .cc-gear  { font-size:9px; color:#888; letter-spacing:1px; }
-.char-card .cc-kit   { display:flex; gap:4px; font-size:14px; margin-top:2px; }
+.char-card .cc-icon-name {
+  display:flex; align-items:center; gap:6px;
+  font-size:13px; font-weight:bold; color:#e8dcf6; letter-spacing:2px;
+  margin-top:2px;
+}
+.char-card .cc-icon { font-size:14px; }
+.char-card .cc-level { font-size:13px; font-weight:bold; letter-spacing:1px; }
+.char-card .cc-gear  { font-size:9px; color:#806890; letter-spacing:1.5px; }
+.char-card .cc-kit   { display:flex; gap:6px; font-size:15px; margin-top:4px; }
 .char-card .cc-last  {
-  position:absolute; top:-8px; left:50%; transform:translateX(-50%);
-  background:#6030a0; border:1px solid #a060e0; border-radius:10px;
-  padding:1px 8px; font-size:8px; color:#e0c0ff; letter-spacing:1px;
+  position:absolute; top:-10px; left:50%; transform:translateX(-50%);
+  background:linear-gradient(135deg,#604080,#a060e0);
+  border:1px solid #c090f0; border-radius:10px;
+  padding:2px 10px; font-size:8px; color:#f8e8ff; letter-spacing:2px;
   white-space:nowrap;
+  box-shadow:0 0 10px rgba(160,96,224,0.45);
 }
 .cso-footer {
-  font-size:9px; color:#666; text-align:center; max-width:420px;
-  line-height:1.8; padding:0 12px;
+  font-size:10px; color:#7a6a8a; text-align:center; max-width:460px;
+  line-height:1.9; padding:6px 12px;
+  background:rgba(8,6,14,0.55); border-radius:3px;
+}
+.cso-footer .key {
+  background:#1a1422; border:1px solid #4a3a5a; border-radius:2px;
+  padding:1px 6px; color:#e0d0f0; font-size:9.5px; margin:0 1px;
 }
 /* Phase S — Chapter Map overlay */
 #chaptermap-overlay {
@@ -994,15 +1044,16 @@ body.title-screen #joystick-knob { display:none !important; }
     </div>
   </div>
 
-  <!-- Character Select overlay (Phase R Task 6) -->
+  <!-- Character Select overlay (Phase R · Phase Y revamp) -->
   <div id="charselect-overlay">
+    <button class="cso-back" onclick="backToTitle()">‹ BACK</button>
     <div class="cso-title">CHOOSE YOUR HERO</div>
     <div class="cso-cards" id="cso-cards"></div>
     <div class="cso-footer">
-      <span class="ctrl-row"><span class="key">WASD</span>/<span class="key">↑↓←→</span> Move &nbsp;
+      <span class="key">WASD</span>/<span class="key">↑↓←→</span> Move &nbsp;
       <span class="key">SPACE</span> Attack &nbsp; <span class="key">H</span> Potion &nbsp;
-      <span class="key">ESC</span> Settings &nbsp; <span class="key">I</span> Gear &nbsp;
-      <span style="color:#666">Mobile: joystick + buttons</span></span>
+      <span class="key">ESC</span> Settings &nbsp; <span class="key">I</span> Gear<br>
+      <span style="color:#5a4870">Mobile · joystick + action buttons</span>
     </div>
   </div>
 
@@ -6680,8 +6731,8 @@ let _titleRAF = null;
 let _titleLastT = 0;
 let _titleEmbers = null;
 function startTitleScene() {
-  if (_titleRAF) return;     // idempotent
-  document.body.classList.add('title-screen');
+  if (_titleRAF) { document.body.classList.add('menu-screen'); return; }   // idempotent
+  document.body.classList.add('menu-screen');
   _titleLastT = performance.now();
   _titleEmbers = null;        // reseed on each show
   const tick = (t) => {
@@ -6692,7 +6743,7 @@ function startTitleScene() {
   _titleRAF = requestAnimationFrame(tick);
 }
 function stopTitleScene() {
-  document.body.classList.remove('title-screen');
+  document.body.classList.remove('menu-screen');
   if (_titleRAF) { cancelAnimationFrame(_titleRAF); _titleRAF = null; }
 }
 
@@ -7469,7 +7520,9 @@ function showCharSelect() {
     const isLast = (account.lastPlayed === cid);
 
     const card = document.createElement('div');
-    card.className = 'char-card';
+    // Phase Y — per-class accent (knight/ranger/mage) drives border, glow,
+    // level color, and icon tint via CSS .char-card.knight / .ranger / .mage.
+    card.className = 'char-card ' + cid;
     card.innerHTML = `
       ${isLast ? '<span class="cc-last">LAST PLAYED</span>' : ''}
       <img id="portrait-${cid}" src="" alt="${def.name}">
@@ -7614,6 +7667,10 @@ function _renderNightmareToggle() {
 // exactly once (loopStarted guards against double-start after death returns).
 function launchStage(c, s) {
   if (!isStageUnlocked(c, s)) return;
+  // Phase Y — leaving menus for actual gameplay. Stop the procedural title
+  // backdrop so the canvas is free for the dungeon render; drop the
+  // menu-screen body class so HUD + touch buttons reappear.
+  stopTitleScene();
   GameState.chapter = c; GameState.stageIdx = s;
   GameState.runSeed = stageSeed(c, s, GameState.difficulty);
   GameState.floorNum = stageRecLevel(c, s);   // drives ALL existing scaling
@@ -7732,7 +7789,10 @@ function _bootAudioAndMusic() {
   if (typeof playMusic === 'function') playMusic('cursed_keep');
 }
 function _hideTitle() {
-  stopTitleScene();
+  // Phase Y — keep the procedural backdrop running through charselect.
+  // The body.menu-screen class stays on; only #overlay (the title menu
+  // DOM) hides. stopTitleScene is reserved for launchStage where actual
+  // gameplay begins and the canvas is needed for the dungeon render.
   const ov = document.getElementById('overlay');
   if (ov) ov.style.display = 'none';
 }
@@ -7761,6 +7821,18 @@ function showCredits() {
 function hideCredits() {
   const el = document.getElementById('credits-overlay');
   if (el) el.classList.remove('open');
+}
+// Phase Y — Back from char-select returns the user to the title menu.
+function backToTitle() {
+  document.getElementById('charselect-overlay').classList.remove('open');
+  const ov = document.getElementById('overlay');
+  if (ov) ov.style.display = 'flex';
+  // Repopulate the menu (account state may have changed e.g. lastPlayed).
+  renderTitleMenu();
+  // Scene was never stopped during charselect, but startTitleScene is
+  // idempotent — calling it ensures body.menu-screen is on if anything
+  // went sideways.
+  startTitleScene();
 }
 
 // Page-load init: build the menu and start the scene exactly once.
