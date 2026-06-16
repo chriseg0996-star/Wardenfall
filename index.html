@@ -3,7 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Wardenfall</title>
+<meta name="theme-color" content="#0a0a0f">
+<title>Wardenfall — single-file dark-fantasy roguelike</title>
+<meta name="description" content="Vanilla-JS dark-fantasy roguelike. Three hero classes, generated gear, four chapters, four bosses, Nightmare endgame. Single HTML file, no dependencies.">
+<!-- Phase W — Open Graph + Twitter card meta for shareable Pages previews. -->
+<meta property="og:title" content="Wardenfall">
+<meta property="og:description" content="A 2D dark-fantasy roguelike. Knight / Ranger / Mage, generated gear, four chapter bosses, Nightmare endgame. Single HTML file, no dependencies.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://chriseg0996-star.github.io/Wardenfall/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Wardenfall">
+<meta name="twitter:description" content="Vanilla-JS dark-fantasy roguelike — Knight / Ranger / Mage, generated gear, four bosses, Nightmare endgame.">
+<!-- Inline SVG favicon — hooded hero head with ember eyes; no asset files. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230a0a0f'/><path d='M6 12 Q16 4 26 12 L26 24 Q16 28 6 24 Z' fill='%231a1822'/><path d='M9 16 Q16 12 23 16 L23 22 Q16 25 9 22 Z' fill='%230c0a14'/><circle cx='12.5' cy='18' r='1.6' fill='%23ff8a40'/><circle cx='19.5' cy='18' r='1.6' fill='%23ff8a40'/></svg>">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html, body { width:100%; height:100%; background:#0a0a0f; overflow:hidden; touch-action:none; }
@@ -1044,6 +1056,30 @@ const RNG = (() => {
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+
+// Phase W — Canvas context-loss recovery. iOS Safari and low-end Android
+// can drop the 2D context under memory pressure. preventDefault on
+// `contextlost` so the browser commits to firing `contextrestored`; on
+// restore, rebuild the sprite cache + offscreen light canvas + portraits
+// and unpause. Background flag (_ctxLost) suppresses draws while gone.
+let _ctxLost = false;
+canvas.addEventListener('contextlost', (e) => {
+  e.preventDefault();
+  _ctxLost = true;
+  if (typeof gameRunning !== 'undefined') gameRunning = false;
+  if (typeof stopMusic === 'function') stopMusic(200);
+}, false);
+canvas.addEventListener('contextrestored', () => {
+  _ctxLost = false;
+  ctx.imageSmoothingEnabled = false;
+  // buildSprites + portraits + light canvas all live behind their own
+  // builders; re-run them so cached drawing data is valid for the new ctx.
+  try { if (typeof buildSprites === 'function') buildSprites(); } catch (err) {}
+  try { if (typeof buildPortraits === 'function') buildPortraits(); } catch (err) {}
+  if (typeof lightCanvas !== 'undefined' && lightCanvas) {
+    lctx = lightCanvas.getContext('2d');
+  }
+}, false);
 
 function resize() {
   const wrap = document.getElementById('wrapper');
@@ -6511,6 +6547,9 @@ function update(dt) {
 function loop(ts) {
   const dt = Math.min(ts-lastTime, 50);
   lastTime = ts;
+  // Phase W — skip update + draw while the canvas 2D context is gone
+  // (iOS Safari memory pressure). contextrestored handler unpauses.
+  if (_ctxLost) { requestAnimationFrame(loop); return; }
   if (GAME_MODE === 'sidescroll') { ssUpdate(dt); ssDraw(dt); }
   else { update(dt); drawGame(dt); }
   requestAnimationFrame(loop);
@@ -8339,6 +8378,37 @@ window.__simBossClearRates = function() {
   });
   if (typeof console.table === 'function') console.table(out);
   return out;
+};
+
+// Phase W — Determinism guard. The Phase N audit established the rule:
+// RNG for anything reproducible (gen, layout, drop seeds), Math.random
+// only for transient effects (particle jitter, damage variance, AI
+// wander timers). __verifySeeds asserts known stageSeed outputs so any
+// regression that flips a generator to Math.random() is caught here.
+window.__verifySeeds = function() {
+  const expected = [
+    [1, 1, 'normal'],   [1, 5, 'normal'],
+    [2, 1, 'normal'],   [2, 5, 'normal'],
+    [3, 1, 'normal'],   [4, 5, 'normal'],
+    [1, 1, 'nightmare'],[4, 5, 'nightmare'],
+  ];
+  const results = expected.map(([c, s, d]) => {
+    const seed1 = stageSeed(c, s, d);
+    const seed2 = stageSeed(c, s, d);   // repeat call: must be identical
+    return {
+      stage: `c${c}s${s} ${d}`,
+      seed:  '0x' + seed1.toString(16).padStart(8, '0'),
+      deterministic: seed1 === seed2,
+    };
+  });
+  // Also verify Nightmare and Normal seeds for the same stage diverge —
+  // otherwise the salt isn't doing its job.
+  const cNorm = stageSeed(2, 3, 'normal');
+  const cNm   = stageSeed(2, 3, 'nightmare');
+  results.push({ stage: 'c2s3 norm≠nm', seed: cNorm !== cNm ? 'OK' : 'BAD', deterministic: cNorm !== cNm });
+  const allOk = results.every(r => r.deterministic);
+  if (typeof console.table === 'function') console.table(results);
+  return { ok: allOk, results };
 };
 
 // Dev entry — launch the slice. Sets the mode, hides overlays, starts the loop.

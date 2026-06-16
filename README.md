@@ -1,41 +1,73 @@
 # Wardenfall
 
-> A 2D dark-fantasy dungeon crawler. Lone hooded hero, cursed-kingdom theme.
-> The entire game lives in a single `index.html` — vanilla JS, no build step,
-> no dependencies.
+> A 2D dark-fantasy roguelike. Three hero classes, generated gear, four
+> chapters, four bosses, Nightmare endgame. The entire game lives in a
+> single `index.html` — vanilla JS, no build step, no dependencies.
 
-A pixel-art roguelike where you descend a procedurally-generated dungeon by
-the light of a flickering lantern. Fight skeletons and giant spiders, sling
-spells, loot chests, and dive deeper through stairway after stairway. Every
-floor is reproducible from a seed.
+**[Play it in your browser →](https://chriseg0996-star.github.io/Wardenfall/)**
+
+Descend a procedurally generated dungeon by lantern light. Pick one of
+three classes (Knight / Ranger / Mage), each with its own skill kit and
+sprite. Fight skeletons, spiders, archers, shield-bearers, necromancers,
+and four chapter bosses. Loot epic and legendary gear from generated drop
+tables. Beat The Warden, unlock Nightmare difficulty, and grind back
+through for top-tier rolls.
+
+Every stage is reproducible from a seed.
 
 ---
 
-## Features (shipped so far)
+## Features (v1.0)
 
-- **Procedural floors** — BSP-generated rooms + corridors, reproducible from
-  a per-run seed. Geometric HP/ATK scaling per floor, additive XP/gold rewards.
-- **Combat** — melee swing with lunge + slash arc, hit flash, screen shake,
-  knockback.
-- **Spells & MP** — Firebolt (projectile), Mend (heal-over-time), Nova (AoE),
-  each with cooldowns, MP costs, and per-spell SFX.
-- **Reusable projectile system** — wall-aware via the same `isSolid` predicate
-  the player uses; supports player + enemy ownership.
-- **Hooded hero** — silhouette-first design with ember eyes, breathing idle,
-  attack-lunge animation, procedural slash arc.
-- **Lantern lighting** — near-blackout fog-of-war (`rgba(0,0,0,0.92)` veil)
-  with destination-out radial cuts around the player and every torch tile.
-- **Enemies** — Giant Spider (articulated legs, glowing eye cluster),
-  Skeleton Warrior (hollow sockets, tattered cloth, bone-rattle jitter when
-  aggro'd), per-type death dissolves.
-- **Tall props with Z-sort** — pillars block movement and overlap the player
-  correctly based on foot Y.
-- **Hotbar + touch HUD** — potion + 3 spells, cooldown overlays, mobile
-  joystick + buttons.
-- **Custom keybinds** — full settings overlay (ESC), three presets (Default /
-  WoW-style QER+F / Arrows), per-action rebind, localStorage persistence.
-- **Web Audio SFX** — 13 procedurally-synthesized sounds (no asset files),
-  master volume + mute, persisted.
+- **Three playable classes** — Knight (tank: Bash / Stalwart Stance /
+  Whirlwind), Ranger (kiter: Powershot / Multishot / Tumble), Mage
+  (caster: Firebolt / Mend / Nova). Each has a unique sprite, portrait,
+  growth curve, and skill kit.
+- **Chapter map** — 4 chapters × 5 stages × per-stage star rating (1-3
+  ★ based on HP remaining + boss-bonus + no-deaths). Stage 5 of each
+  chapter is the boss arena.
+- **Generated gear** — 5 slots (weapon / helm / armor / boots / ring)
+  × 5 rarities (common / uncommon / rare / epic / legendary). Stat
+  budgets scale with ilvl; rarity drives lines and roll variance.
+  Loot cards on enemy + boss drops, run-scoped stash, account-saved
+  equipped gear.
+- **Four bosses** — Bone Colossus (ch1), Brood Mother (ch2 — summons
+  + web slow), Grave Monarch (ch3 — Grave Lurch pull + bone barrage),
+  The Warden (ch4 — 3-phase AI with Shadow Lances + wraith summons).
+- **Nightmare difficulty** — unlocked after first Warden kill. Enemies
+  ×1.5 HP / ×1.15 ATK, +35% rewards, bosses gain a rage timer at 30 s.
+  Stages reseed via a Nightmare salt so layouts differ.
+- **Account save** — 3 character slots + persistent stash. Per-character
+  level, gear, gold, and stage stars. Stored in `localStorage`.
+- **Procedural music** — 5 synthesized tracks via Web Audio (no asset
+  files): cursed_keep (ch1-2 ambient), bone_crypt (ch3),
+  infernal_depths / black_bastion (ch4), boss. 800 ms crossfade on
+  stage launch + boss spawn + chapter map.
+- **Procedural SFX** — 13 synthesized one-shots (swing, impact, per-type
+  death, per-spell cast, pickup tiers, level-up, descend, boss roar).
+- **Lantern lighting** — near-blackout fog-of-war (alpha 0.92) with
+  destination-out radial cuts around the player and every torch tile.
+- **A\* enemy pathing** — 4-connected pathfinder with min-heap open
+  set, staggered re-planning, and walkable cache. Enemies route around
+  pillars, walls, and corners.
+- **Custom keybinds** — full settings overlay (ESC), three presets
+  (Default / WoW QER+F / Arrows), per-action rebind, persisted.
+- **Mobile-first** — joystick + spell buttons + attack/potion/pause/
+  gear/settings touch controls scale to viewport. Tested on Chrome
+  desktop + iOS Safari.
+
+---
+
+## Hero classes
+
+| Class | Role | Base HP / MP / ATK / DEF | Kit |
+|---|---|---|---|
+| Knight | Tank / melee | 140 / 20 / 14 / 8 | Bash (stun) · Stalwart Stance (DR) · Whirlwind (AoE) |
+| Ranger | DPS / kiter | 90 / 30 / 13 / 4 | Powershot · Multishot · Tumble (iframes) |
+| Mage | Caster / control | 100 / 50 / 12 / 5 | Firebolt · Mend (HoT) · Nova (AoE) |
+
+Each class also has a basic attack: Knight + Mage use a melee swing,
+Ranger fires a bow shot.
 
 ---
 
@@ -48,27 +80,26 @@ floor is reproducible from a seed.
 | Move | `WASD` or arrows | left joystick |
 | Attack | `Space` | ⚔ button |
 | Potion | `H` | 🧪 button |
-| Firebolt | `2` | 🔥 button |
-| Mend | `3` | ➕ button |
-| Nova | `4` | 💥 button |
-| Settings / Pause | `Esc` | (n/a yet) |
+| Skill 1 / 2 / 3 | `2` / `3` / `4` | 🔥 / ➕ / 💥 buttons (per class) |
+| Settings / Pause | `Esc` | ⏸ button |
+| Gear | `G` | ⚙ gear button |
 
-### WoW preset (open Settings → click "WoW (QER+F)")
+### WoW preset (Settings → "WoW (QER+F)")
 
 | Action | Key |
 |---|---|
 | Move | `WASD` |
 | Attack | `Space` |
 | Potion | `F` |
-| Firebolt / Mend / Nova | `Q` / `E` / `R` |
+| Skill 1 / 2 / 3 | `Q` / `E` / `R` |
 
-Every action is rebindable from the in-game settings overlay.
+Every action is rebindable from the in-game settings overlay (ESC).
 
 ---
 
 ## Run it locally
 
-Wardenfall is a single static HTML file. You can either open it directly
+Wardenfall is a single static HTML file. Either open it directly
 (`file://...`), or serve it over HTTP (recommended — some browser APIs
 behave better that way):
 
@@ -81,31 +112,56 @@ python -m http.server 8000
 Any static HTTP server works (`npx serve`, `caddy`, etc.). The dev-server
 launch config lives at `.claude/launch.json`.
 
+If you see a stale build on the live URL after an update, append
+`?v=` + something (e.g. `?v=2`) to bust the Pages cache.
+
 ---
 
 ## Tech
 
-- **HTML5 Canvas** for everything visual.
+- **HTML5 Canvas** — single 2D context for everything visual, offscreen
+  light layer composited via `globalCompositeOperation = 'destination-out'`.
 - **Vanilla JS only** — no frameworks, no bundler, no `package.json`.
-- **Web Audio API** for procedurally synthesized SFX.
-- **localStorage** for bindings + audio preferences.
-- Single file, ~2300 lines.
+- **Web Audio API** — procedural music + SFX, no asset files.
+- **localStorage** — bindings, audio settings, account (characters
+  + stash + Nightmare unlock).
+- **Single file**, ~7400 lines of JavaScript inside one `index.html`.
+
+---
+
+## Dev tools
+
+The game exposes a small dev API for tuning + debugging from the browser
+console:
+
+```js
+__setClass('knight')        // hot-switch class mid-run
+__simBalance()              // print combat sim table per recLevel
+__simBossClearRates()       // normal vs Nightmare per-class boss survival
+__verifySeeds()             // assert seeded layouts are reproducible
+__sidescroll()              // dev-only side-scroll vertical slice
+```
+
+The side-scroll mode is reachable via `#sidescroll` in the URL or by
+calling `__sidescroll()` in the console. It is a separate feel
+experiment — not part of the v1.0 product.
 
 ---
 
 ## Roadmap
 
-The visual + systems overhaul is tracked in chronological phases.
-Done so far: Phase 1 (combat / loot / HUD), Phase 2 (BSP + multi-floor),
-Phase 3 (spells & MP), Phase A (hooded player + lighting), Phase B
-(enemy redesigns + death FX), Phase C (viewport zoom + pillars + Z-sort),
-Phase D (playtest polish), Phase E (lighting comfort + UI shrink),
-Phase F (keybinds & settings), Phase F.1 (collision fix), Phase G
-(audio core + SFX).
+Shipped in chronological phases, see git log for detail:
 
-Coming: bosses + enemy AI state machine (H), gear & inventory (I),
-environment textures (J), UI skin (K), QoL pass (L), meta-progression (M),
-balance pass (N), perf + cross-browser (O), release packaging (P).
+- Phases 1-3 — combat, loot, HUD, spells & MP
+- Phases A-O — visual overhaul (hooded hero, lantern lighting, redesigned
+  enemies, viewport zoom, pillars, attack lunge, keybinds, audio, A\*
+  pathing, biomes, perf pass)
+- RPG pivot P-S — stats / classes / gear / account / chapter map
+- Phase T — bosses & endgame (Grave Monarch + The Warden + Nightmare)
+- Phase U — procedural music
+- Phase V — balance pass (recLevel curves + simBalance harness + DR
+  refactor)
+- **Phase W — v1.0 release** ← you are here
 
 ---
 
