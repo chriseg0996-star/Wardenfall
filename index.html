@@ -561,70 +561,174 @@ body.menu-screen #joystick-knob { display:none !important; }
 #floor-fade .ff-biome { font-size:20px; letter-spacing:6px; }
 #floor-fade .ff-floor { font-size:12px; letter-spacing:4px; color:#888; }
 
-/* Phase F: settings / pause overlay */
+/* Phase AA — Settings / pause overlay overhaul.
+   Matches the visual language of title / charselect / chaptermap:
+   gradient vignette overlay, gradient panel with ember-gold title,
+   custom slider track + thumb, custom checkboxes that read as themed
+   pixel-art toggles, active preset highlighted with gold border. */
 #settings-overlay {
-  position:absolute; inset:0; background:rgba(0,0,0,0.86);
+  position:absolute; inset:0;
+  background:
+    linear-gradient(to bottom,
+      rgba(6,4,12,0.93) 0%,
+      rgba(6,4,12,0.78) 30%,
+      rgba(6,4,12,0.78) 70%,
+      rgba(6,4,12,0.93) 100%);
   display:none; flex-direction:column; align-items:center; justify-content:center;
-  z-index:200; font-family:'Courier New',monospace; color:#aaa;
+  z-index:200; font-family:'Courier New',monospace; color:#c0b8d0;
 }
 #settings-overlay.open { display:flex; }
 .settings-panel {
-  background:#0a0a14; border:1px solid #3a3a4a; border-radius:4px;
-  padding:14px 18px; min-width:300px; max-width:90vw; max-height:80vh; overflow-y:auto;
-  box-shadow:0 0 30px rgba(80,40,160,0.25);
+  background:linear-gradient(135deg, rgba(14,10,22,0.96), rgba(22,16,32,0.94));
+  border:1px solid rgba(80,64,120,0.6); border-radius:5px;
+  padding:18px 22px 16px; min-width:340px; max-width:92vw; max-height:84vh;
+  overflow-y:auto;
+  box-shadow:0 0 36px rgba(120,60,180,0.22);
 }
 .settings-title {
-  color:#f0c060; font-size:14px; margin-bottom:10px; letter-spacing:2px;
-  border-bottom:1px solid #3a3a4a; padding-bottom:6px;
+  color:#f0c060; font-size:18px; margin-bottom:14px; letter-spacing:5px;
+  text-shadow:0 0 14px rgba(240,176,72,0.30), 0 0 3px rgba(240,176,72,0.7);
+  border-bottom:1px solid rgba(74,58,90,0.45); padding-bottom:10px;
+  text-align:center;
 }
-.settings-section { color:#8080a0; font-size:9px; letter-spacing:2px; margin:10px 0 4px; }
+.settings-section {
+  color:#c0a0ff; font-size:10px; letter-spacing:3px;
+  margin:14px 0 6px; padding-bottom:3px;
+  border-bottom:1px solid rgba(74,58,90,0.3);
+}
 .kb-row {
   display:flex; justify-content:space-between; align-items:center;
-  gap:8px; margin:3px 0; font-size:11px;
+  gap:10px; margin:5px 0; font-size:11px;
 }
-.kb-row .lbl   { color:#aaa; min-width:88px; }
+.kb-row .lbl   { color:#a896c0; min-width:100px; letter-spacing:1px; }
 .kb-row .keys  { color:#a0c0ff; flex:1; font-weight:bold; }
 .kb-btn {
-  background:#222; border:1px solid #555; border-radius:2px;
-  padding:2px 8px; color:#eee; cursor:pointer; font-size:10px;
-  font-family:'Courier New',monospace;
+  background:rgba(28,20,40,0.85); border:1px solid rgba(128,80,200,0.5);
+  border-radius:3px; padding:3px 10px; color:#e0d0f0; cursor:pointer;
+  font-size:10px; font-family:'Courier New',monospace; letter-spacing:1px;
+  transition:background 80ms ease, border-color 80ms ease;
 }
-.kb-btn:hover { background:#333; }
-.kb-btn.listening { background:#604020; color:#fff; border-color:#a06030; }
-.preset-row { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+.kb-btn:hover { background:rgba(60,40,100,0.95); border-color:rgba(224,192,255,0.85); color:#f0e4ff; }
+.kb-btn.listening {
+  background:rgba(96,64,32,0.95); color:#fff; border-color:#f0c060;
+  box-shadow:0 0 12px rgba(240,176,72,0.4);
+}
+.preset-row { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
 .preset-btn {
-  flex:1; background:linear-gradient(135deg,#2a1840,#4a2870);
-  border:1px solid #6040a0; border-radius:3px; padding:5px 8px;
-  color:#e0c0ff; font-size:10px; cursor:pointer; letter-spacing:1px;
+  flex:1; background:rgba(18,14,26,0.85);
+  border:1px solid rgba(80,64,120,0.55); border-radius:3px;
+  padding:7px 10px; color:#a896c0;
+  font-size:10px; cursor:pointer; letter-spacing:2px;
   font-family:'Courier New',monospace; min-width:70px;
+  transition:background 80ms ease, border-color 80ms ease, color 80ms ease, transform 80ms ease;
 }
-.preset-btn:hover { background:linear-gradient(135deg,#3a2060,#5a30a0); }
-.preset-btn.reset {
-  background:#1a1a22; border-color:#555; color:#aaa;
+.preset-btn:hover {
+  background:rgba(38,28,56,0.95); border-color:rgba(160,128,220,0.7);
+  color:#e0d0f0; transform:translateY(-1px);
 }
+.preset-btn.active {
+  background:linear-gradient(135deg, rgba(72,50,18,0.92), rgba(120,80,30,0.85));
+  border-color:#f0c060; color:#fff8dc;
+  box-shadow:0 0 14px rgba(240,176,72,0.35);
+}
+.preset-btn.active::after { content:' ●'; color:#f0c060; }
 .settings-close {
-  margin-top:10px; padding:6px 16px; background:#222; border:1px solid #555;
-  border-radius:3px; color:#eee; cursor:pointer; font-size:11px;
-  font-family:'Courier New',monospace; letter-spacing:2px;
+  margin-top:16px; padding:8px 24px;
+  background:linear-gradient(135deg, rgba(28,20,40,0.85), rgba(48,32,72,0.75));
+  border:1px solid rgba(128,80,200,0.5); border-radius:3px; color:#d0c4e6;
+  cursor:pointer; font-size:11px; letter-spacing:3px;
+  font-family:'Courier New',monospace;
   display:block; margin-left:auto; margin-right:auto;
+  transition:background 80ms ease, border-color 80ms ease, transform 80ms ease;
 }
-.settings-close:hover { background:#333; }
-.settings-hint { color:#666; font-size:9px; margin-top:8px; text-align:center; }
-.settings-subtle { color:#777; font-size:9px; margin:2px 0 6px; }
+.settings-close:hover {
+  background:linear-gradient(135deg, rgba(60,40,100,0.95), rgba(100,60,160,0.85));
+  border-color:rgba(224,192,255,0.85); color:#f0e4ff;
+  transform:translateY(-1px);
+}
+.settings-hint { color:#7a6a8a; font-size:9px; margin-top:8px; text-align:center; letter-spacing:0.5px; }
+.settings-subtle { color:#7a6a8a; font-size:9.5px; margin:3px 0 8px; letter-spacing:0.5px; }
 .kb-toggle {
-  margin-top:8px; width:100%; background:#161620; border:1px solid #3a3a4a;
-  border-radius:3px; padding:7px 10px; color:#a0a0c0; cursor:pointer;
-  font-size:10px; font-family:'Courier New',monospace; letter-spacing:1px; text-align:left;
+  margin-top:10px; width:100%;
+  background:rgba(18,14,26,0.85); border:1px solid rgba(80,64,120,0.55);
+  border-radius:3px; padding:8px 12px; color:#b0a0c8; cursor:pointer;
+  font-size:10px; font-family:'Courier New',monospace; letter-spacing:1.5px;
+  text-align:left;
+  transition:background 80ms ease, border-color 80ms ease, color 80ms ease;
 }
-.kb-toggle:hover { background:#1e1e2c; color:#c0c0e0; }
-.kb-collapse { display:none; margin-top:4px; }
+.kb-toggle:hover {
+  background:rgba(38,28,56,0.95); border-color:rgba(160,128,220,0.7);
+  color:#e0d0f0;
+}
+.kb-collapse { display:none; margin-top:6px; }
 .kb-collapse.open { display:block; }
 .kb-reset {
-  margin-top:6px; background:#1a1a22; border:1px solid #555; border-radius:3px;
-  padding:4px 10px; color:#aaa; cursor:pointer; font-size:10px;
-  font-family:'Courier New',monospace; letter-spacing:1px;
+  margin-top:8px;
+  background:rgba(18,14,26,0.85); border:1px solid rgba(80,64,120,0.55);
+  border-radius:3px; padding:5px 12px; color:#a896c0; cursor:pointer;
+  font-size:10px; font-family:'Courier New',monospace; letter-spacing:1.5px;
+  transition:background 80ms ease, border-color 80ms ease, color 80ms ease;
 }
-.kb-reset:hover { background:#2a2a34; color:#ddd; }
+.kb-reset:hover {
+  background:rgba(38,28,56,0.95); border-color:rgba(160,128,220,0.7); color:#e0d0f0;
+}
+/* Phase AA — Themed slider (Master / Music volume). */
+.kb-row input[type="range"] {
+  -webkit-appearance:none; appearance:none;
+  height:5px; border-radius:3px;
+  background:linear-gradient(to right, rgba(80,64,120,0.85), rgba(38,28,56,0.85));
+  border:1px solid rgba(80,64,120,0.4);
+  outline:none; cursor:pointer;
+}
+.kb-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance:none; appearance:none;
+  width:14px; height:14px; border-radius:50%;
+  background:#f0c060;
+  border:1px solid rgba(120,80,30,0.9);
+  cursor:pointer;
+  box-shadow:0 0 8px rgba(240,176,72,0.45);
+  transition:transform 80ms ease;
+}
+.kb-row input[type="range"]::-webkit-slider-thumb:hover {
+  transform:scale(1.15);
+  box-shadow:0 0 12px rgba(240,176,72,0.75);
+}
+.kb-row input[type="range"]::-moz-range-thumb {
+  width:14px; height:14px; border-radius:50%;
+  background:#f0c060; border:1px solid rgba(120,80,30,0.9);
+  cursor:pointer; box-shadow:0 0 8px rgba(240,176,72,0.45);
+}
+.kb-row input[type="range"]::-moz-range-track {
+  height:5px; border-radius:3px;
+  background:linear-gradient(to right, rgba(80,64,120,0.85), rgba(38,28,56,0.85));
+  border:1px solid rgba(80,64,120,0.4);
+}
+/* Phase AA — Themed checkbox (Mute / Mute Music). */
+.kb-row input[type="checkbox"] {
+  -webkit-appearance:none; appearance:none;
+  width:16px; height:16px;
+  background:rgba(18,14,26,0.85);
+  border:1px solid rgba(128,80,200,0.55);
+  border-radius:3px;
+  cursor:pointer; position:relative;
+  transition:background 80ms ease, border-color 80ms ease;
+  vertical-align:middle;
+}
+.kb-row input[type="checkbox"]:hover {
+  border-color:rgba(224,192,255,0.85);
+  background:rgba(38,28,56,0.95);
+}
+.kb-row input[type="checkbox"]:checked {
+  background:linear-gradient(135deg, #72501a, #c08838);
+  border-color:#f0c060;
+  box-shadow:0 0 8px rgba(240,176,72,0.35);
+}
+.kb-row input[type="checkbox"]:checked::after {
+  content:'✓'; position:absolute; inset:0;
+  color:#fff8dc; font-size:11px; font-weight:bold;
+  display:flex; align-items:center; justify-content:center;
+  text-shadow:0 0 4px rgba(240,176,72,0.7);
+}
 
 /* Phase S Task 4 — Touch pause button + PAUSED banner */
 #pause-btn {
@@ -7337,14 +7441,39 @@ function closeSettings() {
 }
 function toggleSettings(){ settingsOpen ? closeSettings() : openSettings(); }
 
+// Phase AA — Identify which preset (if any) the live bindings match. Used
+// to highlight the active preset button in the settings overlay so the
+// player can see at a glance which scheme they're on. Returns the preset
+// name or null if the bindings are custom (any key diverges).
+function _detectActivePreset() {
+  const actionKeys = Object.keys(DEFAULT_BINDINGS);
+  for (const name of Object.keys(KEYBIND_PRESETS)) {
+    const preset = KEYBIND_PRESETS[name];
+    let match = true;
+    for (const act of actionKeys) {
+      const cur = bindings[act] || [];
+      const pre = preset[act];
+      // KEYBIND_PRESETS entries store either ['key'] or 'key' (wow style).
+      const preArr = Array.isArray(pre) ? pre : (pre != null ? [pre] : []);
+      if (cur.length !== preArr.length) { match = false; break; }
+      for (let i = 0; i < cur.length; i++) {
+        if (String(cur[i]).toLowerCase() !== String(preArr[i]).toLowerCase()) {
+          match = false; break;
+        }
+      }
+      if (!match) break;
+    }
+    if (match) return name;
+  }
+  return null;
+}
+
 function renderSettings() {
-  // Presets row
+  // Phase AA — Presets row with active highlight.
   const presetRow = document.getElementById('preset-row');
-  presetRow.innerHTML = `
-    <button class="preset-btn" onclick="applyPreset('default')">DEFAULT</button>
-    <button class="preset-btn" onclick="applyPreset('wow')">WoW (QER+F)</button>
-    <button class="preset-btn" onclick="applyPreset('arrows')">ARROWS</button>
-  `;
+  const active = _detectActivePreset();
+  const mk = (id, label) => `<button class="preset-btn${active===id?' active':''}" onclick="applyPreset('${id}')">${label}</button>`;
+  presetRow.innerHTML = mk('default', 'DEFAULT') + mk('wow', 'WoW (QER+F)') + mk('arrows', 'ARROWS');
   // Binding rows
   const list = document.getElementById('kb-list');
   list.innerHTML = Object.keys(DEFAULT_BINDINGS).map(act => {
