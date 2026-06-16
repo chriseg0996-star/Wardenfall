@@ -43,7 +43,8 @@ single file: `index.html`.
 - DONE — RPG Phase S: chapter/stage select (4×5), stage seeds, stars, results screen, touch pause.
 - DONE — RPG Phase T: bosses & endgame (Grave Monarch ch3 + Grave Lurch, The Warden ch4 w/ 3-phase AI + Shadow Lances + wraith summon + Crown drop, victory overlay, Nightmare difficulty + rage timer).
 - DONE — RPG Phase U: procedural music (MODULE: MUSIC, 5 synthesized tracks — cursed_keep/bone_crypt/infernal_depths/black_bastion/boss, 800ms crossfade, musicMasterGain child of masterGain, music slider + mute in settings, persists in wardenfall.audio.v1).
-- NEXT — RPG Phase V: balance pass (recLevel curves + window.__simBalance() TTK harness + boss clear-rate targets + XP curve).
+- DONE — RPG Phase V: balance pass (ENEMY_HP/ATK_SCALE_BY_LEVEL tables replace 1.22^f blowup, lvMul slope 0.40→0.18, mitigateDmg %-based DR replaces flat atk-def, boss base stats sim-tuned to hit 50/45/35/25% clear-rate windows, Nightmare softened to ×1.35 hp/×1.15 atk, XP curve tiered ×1.6/×1.45@L10, +22%/rl reward bonus, window.__simBalance() + __simBossClearRates() dev harness).
+- NEXT — RPG Phase W: release v1.0 (README rewrite, canvas context-loss recovery, OG + favicon meta, full QA, git tag v1.0).
 - ACTIVE — Side-scroll pivot: vertical slice behind GAME_MODE (spec/plan docs/superpowers/.../2026-06-12-sidescroll-*). Feel-gate pending user sign-off.
 
 ## First instruction to expect
