@@ -249,28 +249,29 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 }
 
 /* Overlay screens */
-/* Phase X — Title screen overhaul. Transparent middle band lets the
-   procedurally drawn title scene (drawTitleScene) show through, while
-   top + bottom vignettes anchor the wordmark and menu legibility. */
+/* Phase AH — MapleStory-layout title overhaul (left character card +
+   right hero list + corner buttons) with WoW-style ornate gold framing.
+   The procedural backdrop scene continues to paint behind a thin
+   vignette so the scene reads but card+list legibility is preserved. */
 #overlay {
   position:absolute; inset:0;
   background:
     linear-gradient(to bottom,
-      rgba(6,4,12,0.95) 0%,
-      rgba(6,4,12,0.72) 22%,
-      rgba(6,4,12,0.28) 50%,
-      rgba(6,4,12,0.55) 80%,
-      rgba(6,4,12,0.92) 100%);
-  display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
-  z-index:100; font-family:'Courier New',monospace; padding-top:8vh;
+      rgba(6,4,12,0.78) 0%,
+      rgba(6,4,12,0.32) 24%,
+      rgba(6,4,12,0.18) 50%,
+      rgba(6,4,12,0.42) 78%,
+      rgba(6,4,12,0.88) 100%);
+  z-index:100; font-family:'Courier New',monospace;
 }
-#title-stamp {
-  position:absolute; top:10px; right:14px;
-  color:#604058; font-size:10px; letter-spacing:2px;
+#title-stamp { display:none; }   /* Phase AH — version moved to bottom-right corner block */
+/* ── Top wordmark block ── */
+#title-top {
+  position:absolute; top:14px; left:0; right:0; text-align:center;
 }
 #overlay h1 {
-  color:#f0c060; font-size:42px; margin-bottom:4px; letter-spacing:8px;
-  text-shadow: 0 0 18px rgba(240,176,72,0.35), 0 0 4px rgba(240,176,72,0.7);
+  color:#f0c060; font-size:36px; margin:0 0 2px; letter-spacing:8px;
+  text-shadow: 0 0 18px rgba(240,176,72,0.40), 0 0 4px rgba(240,176,72,0.75);
   animation: title-glow 4s ease-in-out infinite;
 }
 @keyframes title-glow {
@@ -278,9 +279,190 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   50%      { text-shadow: 0 0 26px rgba(240,176,72,0.55), 0 0 6px rgba(240,176,72,0.85); }
 }
 #overlay .sub {
-  color:#8a7090; font-size:11px; margin-bottom:32px; letter-spacing:3px;
+  color:#8a7090; font-size:10.5px; letter-spacing:3px;
   font-style:italic;
 }
+
+/* ── Phase AH — Ornate gold frame shared by card + hero list ──
+   Two-layer border: outer dark trim, inner ember-gold engraved line.
+   Corner sigils at 4 corners give the "armor plate" feel without
+   needing image assets. */
+.ornate-frame {
+  position:absolute;
+  background:linear-gradient(135deg, rgba(12,8,18,0.95), rgba(22,16,32,0.92));
+  border:1px solid #6a4f1c;
+  border-radius:3px;
+  box-shadow:
+    inset 0 0 0 1px rgba(240,200,110,0.20),
+    inset 0 0 26px rgba(0,0,0,0.55),
+    0 0 30px rgba(0,0,0,0.55),
+    0 0 0 3px rgba(20,14,8,0.85),
+    0 0 0 4px rgba(106,79,28,0.85);
+}
+.ornate-frame .tcc-corner {
+  position:absolute; width:14px; height:14px;
+  background:
+    linear-gradient(135deg, #f0c060 0%, #8a5e22 60%, #4a3010 100%);
+  border:1px solid #2a1a08;
+  box-shadow:0 0 6px rgba(240,176,72,0.45);
+}
+.ornate-frame .tcc-corner.tl { top:-7px;    left:-7px;    transform:rotate(45deg); }
+.ornate-frame .tcc-corner.tr { top:-7px;    right:-7px;   transform:rotate(45deg); }
+.ornate-frame .tcc-corner.bl { bottom:-7px; left:-7px;    transform:rotate(45deg); }
+.ornate-frame .tcc-corner.br { bottom:-7px; right:-7px;   transform:rotate(45deg); }
+
+/* ── Left: character card (active hero) ── */
+#title-char-card {
+  top:50%; left:48px; transform:translateY(-50%);
+  width:240px;
+  padding:18px 18px 22px;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+}
+.tcc-star {
+  position:absolute; top:14px; left:18px;
+  color:#f0c060; font-size:18px;
+  text-shadow:0 0 6px rgba(240,176,72,0.7);
+}
+.tcc-level {
+  position:absolute; top:14px; right:20px;
+  color:#f0c060; font-size:14px; letter-spacing:2px; font-weight:bold;
+  text-shadow:0 0 6px rgba(240,176,72,0.5);
+}
+.tcc-portrait {
+  width:84px; height:84px; image-rendering:pixelated;
+  margin-top:14px; margin-bottom:8px;
+  border:2px solid #6a4f1c; border-radius:3px;
+  background:rgba(6,4,12,0.6);
+  box-shadow:
+    inset 0 0 0 1px rgba(240,200,110,0.30),
+    0 0 14px rgba(240,176,72,0.18);
+}
+.tcc-name {
+  color:#f0e4ff; font-size:14px; font-weight:bold; letter-spacing:2px;
+  text-shadow:0 0 4px rgba(0,0,0,0.95);
+}
+.tcc-class {
+  color:#c0a8d8; font-size:10px; letter-spacing:2px;
+  display:flex; align-items:center; gap:5px;
+  margin-bottom:8px;
+}
+.tcc-class .tcc-class-icon { font-size:13px; }
+.tcc-cp-label {
+  color:#8a7090; font-size:9px; letter-spacing:3px;
+  margin-top:6px;
+  padding-top:8px; width:100%; text-align:center;
+  border-top:1px solid rgba(106,79,28,0.45);
+}
+.tcc-cp {
+  color:#f0c060; font-size:24px; font-weight:bold; letter-spacing:2px;
+  font-family:'Courier New',monospace;
+  text-shadow:0 0 10px rgba(240,176,72,0.5);
+  margin-bottom:8px;
+}
+.tcc-realm {
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:5px 12px; margin-bottom:14px;
+  background:rgba(8,6,14,0.85); border:1px solid rgba(106,79,28,0.55); border-radius:18px;
+  color:#c0a8d8; font-size:10px; letter-spacing:2px;
+}
+.tcc-realm-icon { font-size:11px; }
+.tcc-enter {
+  width:100%; padding:11px 0;
+  background:linear-gradient(180deg, #d49a30 0%, #a06e1c 50%, #6a4810 100%);
+  border:1px solid #2a1a08; border-radius:3px;
+  color:#fff8dc; font-size:14px; font-weight:bold; letter-spacing:5px;
+  cursor:pointer; font-family:'Courier New',monospace;
+  box-shadow:
+    inset 0 1px 0 rgba(255,220,140,0.6),
+    inset 0 -1px 0 rgba(0,0,0,0.5),
+    0 0 14px rgba(240,176,72,0.32);
+  text-shadow:0 1px 2px rgba(0,0,0,0.8);
+  transition: filter 80ms ease, transform 80ms ease;
+}
+.tcc-enter:hover { filter:brightness(1.12); transform:translateY(-1px); }
+.tcc-enter:active { filter:brightness(0.92); transform:translateY(0); }
+.tcc-enter.empty {
+  background:linear-gradient(180deg, #4a3a28 0%, #2a2018 100%);
+  color:#a89888;
+}
+
+/* ── Right: hero slot list (all 3 classes) ── */
+#title-hero-list {
+  top:50%; right:48px; transform:translateY(-50%);
+  width:240px;
+  padding:14px 12px 14px;
+}
+.thl-header {
+  color:#f0c060; font-size:11px; letter-spacing:5px;
+  padding:0 4px 8px;
+  text-align:left;
+  border-bottom:1px solid rgba(106,79,28,0.45);
+  margin-bottom:10px;
+  text-shadow:0 0 6px rgba(240,176,72,0.4);
+}
+.thl-list { display:flex; flex-direction:column; gap:5px; }
+.thl-slot {
+  display:flex; align-items:center; gap:10px;
+  padding:7px 10px;
+  background:rgba(8,6,14,0.55);
+  border:1px solid rgba(60,46,90,0.7); border-radius:3px;
+  cursor:pointer;
+  transition: background 80ms ease, border-color 80ms ease, transform 80ms ease;
+}
+.thl-slot:hover { transform:translateX(-2px); }
+.thl-slot.active {
+  background:linear-gradient(90deg, rgba(120,80,30,0.55), rgba(60,40,18,0.45));
+  border-color:#f0c060;
+  box-shadow:0 0 14px rgba(240,176,72,0.25);
+}
+.thl-slot .thl-icon {
+  width:28px; height:28px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px;
+  background:rgba(6,4,12,0.7);
+  border:1px solid rgba(74,58,90,0.7); border-radius:2px;
+}
+.thl-slot.knight .thl-icon { border-color:rgba(96,140,220,0.6); color:#9ec0ff; }
+.thl-slot.ranger .thl-icon { border-color:rgba(96,200,128,0.6); color:#80e090; }
+.thl-slot.mage   .thl-icon { border-color:rgba(160,96,224,0.6); color:#c080ff; }
+.thl-name {
+  flex:1; color:#d0c4e6; font-size:11px; letter-spacing:2px; font-weight:bold;
+}
+.thl-meta { color:#8a7090; font-size:9.5px; letter-spacing:1px; }
+.thl-slot.active .thl-name { color:#fff8e0; }
+.thl-slot.active .thl-meta { color:#f0c060; }
+
+/* ── Bottom-left + bottom-right corners ── */
+#title-corner-bl {
+  position:absolute; bottom:18px; left:18px;
+  display:flex; flex-direction:column; gap:6px;
+}
+#title-corner-br {
+  position:absolute; bottom:18px; right:18px;
+  display:flex; flex-direction:column; align-items:flex-end; gap:8px;
+}
+.title-corner-btn {
+  display:flex; align-items:center; gap:8px;
+  padding:6px 14px;
+  background:rgba(8,6,14,0.85); border:1px solid rgba(106,79,28,0.55); border-radius:2px;
+  color:#c0a8d8; font-size:10.5px; letter-spacing:2px; cursor:pointer;
+  font-family:'Courier New',monospace;
+  transition: background 80ms ease, border-color 80ms ease, color 80ms ease;
+}
+.title-corner-btn:hover {
+  background:rgba(40,28,16,0.95); border-color:#f0c060; color:#fff8e0;
+}
+.title-corner-btn .tcb-icon { color:#f0c060; font-size:13px; min-width:14px; }
+.title-corner-btn.danger:hover { border-color:#e06060; color:#ffe0e0; }
+.title-corner-btn.danger:hover .tcb-icon { color:#e06060; }
+.title-version {
+  color:#604058; font-size:9px; letter-spacing:1.5px;
+  text-align:right; line-height:1.5;
+}
+
+/* Old #title-menu / #title-foot retired — keep style stubs so any
+   leftover reference doesn't blow up the layout. */
+#title-menu, #title-foot { display:none; }
 .ctrl-row { color:#aaa; font-size:10px; margin:3px 0; }
 .ctrl-row .key { background:#222; border:1px solid #555; border-radius:2px; padding:1px 6px; color:#eee; }
 /* Phase X — Menu list (Continue / New Hero / Settings / Credits) */
@@ -1447,14 +1629,52 @@ body.menu-screen #joystick-knob { display:none !important; }
     </div>
   </div>
 
-  <!-- Phase X — Title overlay -->
+  <!-- Phase AH — Title overlay (MapleStory layout + WoW ornate framing) -->
   <div id="overlay">
-    <div id="title-stamp">v1.0</div>
-    <h1>WARDENFALL</h1>
-    <div class="sub">A roguelike of the cursed kingdom</div>
-    <div id="title-menu"></div>
-    <div id="title-foot">
-      vanilla JS · <a href="https://github.com/chriseg0996-star/Wardenfall" target="_blank" rel="noopener">github</a> · MIT
+    <!-- Wordmark + tagline at the top, smaller than before so the scene + cards breathe -->
+    <div id="title-top">
+      <h1>WARDENFALL</h1>
+      <div class="sub">A roguelike of the cursed kingdom</div>
+    </div>
+
+    <!-- Left: pinned character card (active hero) -->
+    <div id="title-char-card" class="ornate-frame">
+      <div class="tcc-corner tl"></div>
+      <div class="tcc-corner tr"></div>
+      <div class="tcc-corner bl"></div>
+      <div class="tcc-corner br"></div>
+      <div class="tcc-star">★</div>
+      <div class="tcc-level" id="tcc-level">Lv.1</div>
+      <img class="tcc-portrait" id="tcc-portrait" alt="">
+      <div class="tcc-name" id="tcc-name">No Hero</div>
+      <div class="tcc-class" id="tcc-class">— Empty Slot —</div>
+      <div class="tcc-cp-label">COMBAT POWER</div>
+      <div class="tcc-cp" id="tcc-cp">0</div>
+      <div class="tcc-realm" id="tcc-realm"><span class="tcc-realm-icon">🏰</span><span id="tcc-realm-name">The Cursed Keep</span></div>
+      <button class="tcc-enter" id="tcc-enter" onclick="continueRun()">ENTER WORLD</button>
+    </div>
+
+    <!-- Right: hero slot list (all 3 classes) -->
+    <div id="title-hero-list" class="ornate-frame">
+      <div class="tcc-corner tl"></div>
+      <div class="tcc-corner tr"></div>
+      <div class="tcc-corner bl"></div>
+      <div class="tcc-corner br"></div>
+      <div class="thl-header">HEROES</div>
+      <div class="thl-list" id="thl-list"></div>
+    </div>
+
+    <!-- Bottom-left: settings + credits stacked, MapleStory icon style -->
+    <div id="title-corner-bl">
+      <button class="title-corner-btn" onclick="openSettingsFromTitle()"><span class="tcb-icon">⚙</span><span>Settings</span></button>
+      <button class="title-corner-btn" onclick="showCredits()"><span class="tcb-icon">?</span><span>Credits</span></button>
+      <button class="title-corner-btn danger" onclick="newHero()"><span class="tcb-icon">+</span><span>New Hero</span></button>
+    </div>
+
+    <!-- Bottom-right: mute toggle + version -->
+    <div id="title-corner-br">
+      <button class="title-corner-btn" onclick="_titleToggleMute()" id="title-mute-btn"><span class="tcb-icon" id="title-mute-icon">🔊</span></button>
+      <div class="title-version">Ver. 1.0<br><span style="color:#3a2e48">github.com/chriseg0996-star/Wardenfall</span></div>
     </div>
   </div>
 
@@ -8454,33 +8674,133 @@ function _hasProgress() {
   }
   return false;
 }
-function renderTitleMenu() {
-  const list = document.getElementById('title-menu');
-  if (!list) return;
-  const items = [];
-  if (_hasProgress()) {
-    const cid = (CLASS_DEFS[account.lastPlayed] ? account.lastPlayed : 'mage');
-    const c   = account.characters[cid] || {};
-    const def = CLASS_DEFS[cid];
-    const hint = `${def ? def.icon : ''} ${def ? def.name : ''} Lv.${c.level || 1}`;
-    items.push(`<button class="title-menu-item" onclick="continueRun()">
-      <span><span class="tm-icon">▶</span>CONTINUE</span>
-      <span class="tm-hint">${hint}</span>
-    </button>`);
+// Phase AH — Combat Power. Quick heuristic derived from base stats +
+// equipped gear contribution. Mirrors the MMO convention of summarizing
+// a character's strength as a single number players can compare.
+function computeCombatPower(cid) {
+  const def = CLASS_DEFS[cid];
+  const chr = account.characters[cid];
+  if (!def || !chr) return 0;
+  // Derive base stats from class growth (mirrors classBaseStats from
+  // Phase P) so we don't have to construct a full player object.
+  const lvl = chr.level || 1;
+  const n   = Math.max(0, lvl - 1);
+  const baseAtk = def.base.atk + def.growth.atk * n;
+  const baseDef = def.base.def + def.growth.def * n;
+  const baseHp  = def.base.hp  + def.growth.hp  * n;
+  const baseMp  = def.base.mp  + def.growth.mp  * n;
+  // Gear bonus: sum atk + def + hp/10 + mp/10 + spdPct from each equipped slot.
+  let g = { atk:0, def:0, hp:0, mp:0, spdPct:0 };
+  if (chr.equipped) {
+    for (const slot of GEAR_SLOTS) {
+      const it = chr.equipped[slot];
+      if (!it || !it.stats) continue;
+      g.atk    += it.stats.atk || 0;
+      g.def    += it.stats.def || 0;
+      g.hp     += it.stats.hp  || 0;
+      g.mp     += it.stats.mp  || 0;
+      g.spdPct += it.stats.spdPct || 0;
+    }
   }
-  items.push(`<button class="title-menu-item" onclick="newHero()">
-    <span><span class="tm-icon">+</span>NEW HERO</span>
-    <span class="tm-hint">choose a class</span>
-  </button>`);
-  items.push(`<button class="title-menu-item" onclick="openSettingsFromTitle()">
-    <span><span class="tm-icon">⚙</span>SETTINGS</span>
-    <span class="tm-hint">keys · audio</span>
-  </button>`);
-  items.push(`<button class="title-menu-item" onclick="showCredits()">
-    <span><span class="tm-icon">?</span>CREDITS</span>
-    <span class="tm-hint">how to play</span>
-  </button>`);
-  list.innerHTML = items.join('');
+  // Weighted sum tuned so a typical Lv 1 hero lands around ~50-90 CP and
+  // a Lv 15 fully-geared hero lands in the 8k-15k range — comparable
+  // to the MapleStory CP scale on screen.
+  const stats = (baseAtk + g.atk) * 8
+              + (baseDef + g.def) * 5
+              + (baseHp  + g.hp)  * 1
+              + (baseMp  + g.mp)  * 1
+              + g.spdPct * 4;
+  return Math.round(stats);
+}
+
+// Phase AH — Repaint the title overlay: pinned character card on the
+// left (active hero per account.lastPlayed) + hero slot list on the
+// right (all three classes). Replaces the previous centered menu list.
+function renderTitleMenu() {
+  // ── Left card: active / last-played hero ──
+  const lastCid = (CLASS_DEFS[account.lastPlayed] ? account.lastPlayed : null);
+  const cardCard   = document.getElementById('title-char-card');
+  const enterBtn   = document.getElementById('tcc-enter');
+  const portraitEl = document.getElementById('tcc-portrait');
+  const nameEl     = document.getElementById('tcc-name');
+  const classEl    = document.getElementById('tcc-class');
+  const cpEl       = document.getElementById('tcc-cp');
+  const lvlEl      = document.getElementById('tcc-level');
+  const realmEl    = document.getElementById('tcc-realm-name');
+
+  if (lastCid && _hasProgress()) {
+    const def = CLASS_DEFS[lastCid];
+    const chr = account.characters[lastCid];
+    if (portraitEl && portraits[lastCid]) portraitEl.src = portraits[lastCid].toDataURL();
+    if (nameEl)  nameEl.textContent  = def.name.toUpperCase() + ' HERO';
+    if (classEl) classEl.innerHTML   = `<span class="tcc-class-icon">${def.icon}</span><span>${def.name}</span>`;
+    if (cpEl)    cpEl.textContent    = computeCombatPower(lastCid).toLocaleString();
+    if (lvlEl)   lvlEl.textContent   = 'Lv.' + (chr.level || 1);
+    if (enterBtn) {
+      enterBtn.textContent = 'ENTER WORLD';
+      enterBtn.classList.remove('empty');
+      enterBtn.onclick = continueRun;
+    }
+    // Realm = furthest chapter the player has touched.
+    let chap = 1;
+    for (let c = 4; c >= 1; c--) {
+      if (starsFor(c, 1) > 0) { chap = c; break; }
+    }
+    if (realmEl && CHAPTERS[chap - 1]) realmEl.textContent = CHAPTERS[chap - 1].name;
+  } else {
+    if (portraitEl) portraitEl.removeAttribute('src');
+    if (nameEl)  nameEl.textContent  = 'NEW SOUL';
+    if (classEl) classEl.textContent = '— Pick a hero to begin —';
+    if (cpEl)    cpEl.textContent    = '0';
+    if (lvlEl)   lvlEl.textContent   = 'Lv.—';
+    if (enterBtn) {
+      enterBtn.textContent = 'CHOOSE HERO';
+      enterBtn.classList.add('empty');
+      enterBtn.onclick = newHero;
+    }
+    if (realmEl) realmEl.textContent = 'The Cursed Keep';
+  }
+
+  // ── Right list: all three hero slots ──
+  const list = document.getElementById('thl-list');
+  if (!list) return;
+  const out = ['knight','ranger','mage'].map(cid => {
+    const def = CLASS_DEFS[cid];
+    const chr = account.characters[cid] || {};
+    const lvl = chr.level || 1;
+    const isActive = (cid === lastCid);
+    const cp = computeCombatPower(cid);
+    const meta = (cp > 0) ? `Lv.${lvl} · CP ${cp.toLocaleString()}` : '— Empty —';
+    return `<div class="thl-slot ${cid}${isActive?' active':''}" onclick="_titleSelectHero('${cid}')">
+      <div class="thl-icon">${def.icon}</div>
+      <div class="thl-name">${def.name.toUpperCase()}</div>
+      <div class="thl-meta">${meta}</div>
+    </div>`;
+  });
+  list.innerHTML = out.join('');
+}
+
+// Phase AH — Click a hero in the right list: if they have any progress,
+// flip them to active (account.lastPlayed) and repaint the left card so
+// the player can preview each hero before committing. Click again on the
+// active hero (or hit ENTER WORLD) to actually launch their save.
+function _titleSelectHero(cid) {
+  if (!CLASS_DEFS[cid]) return;
+  account.lastPlayed = cid;
+  saveAccount();
+  renderTitleMenu();
+}
+
+// Phase AH — Mute toggle in the bottom-right corner. Flips audio.muted +
+// applies the gain change, updates icon, and persists. Tolerates the
+// audio module being uninitialised (first paint before any user gesture).
+function _titleToggleMute() {
+  ensureAudio();
+  audio.muted = !audio.muted;
+  if (typeof applyMasterGain === 'function') applyMasterGain();
+  if (typeof saveAudio === 'function') saveAudio();
+  const ic = document.getElementById('title-mute-icon');
+  if (ic) ic.textContent = audio.muted ? '🔇' : '🔊';
 }
 function _bootAudioAndMusic() {
   ensureAudio();
