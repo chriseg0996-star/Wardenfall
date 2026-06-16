@@ -7208,7 +7208,7 @@ window.__sidescroll = function(){
   ['overlay','charselect-overlay','chaptermap-overlay','results-overlay','death-overlay','settings-overlay']
     .forEach(id => { const el = document.getElementById(id); if (el){ el.style.display='none'; el.classList.remove('open','show','show-anim'); } });
   // Hide the shipped top-down touch HUD so it doesn't leak into slice mode.
-  ['spell-btns','potion-btn','attack-btn','pause-btn','joystick-zone','joystick-base','joystick-knob']
+  ['spell-btns','potion-btn','attack-btn','pause-btn','gear-btn','joystick-zone','joystick-base','joystick-knob']
     .forEach(id => { const el = document.getElementById(id); if (el) el.style.display='none'; });
   // Show the sidescroll touch overlay.
   const sst = document.getElementById('ss-touch');
