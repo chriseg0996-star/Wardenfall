@@ -6653,9 +6653,32 @@ function ssCamera(){
 // Palette: bright Maple-ish — warm skin, light robe, glowing staff, ember eyes.
 const ssSprites = { built: false };
 
+// Module-level peaks shape data (bx values are base offsets before parallax offX is applied).
+const SS_PEAKS = [
+  { bx:   0, bw: 80, ty: 80 },
+  { bx:  80, bw: 60, ty: 95 },
+  { bx: 160, bw: 90, ty: 72 },
+  { bx: 260, bw: 70, ty: 88 },
+  { bx: 340, bw: 80, ty: 80 },
+  { bx: 430, bw: 60, ty: 95 },
+  { bx: 510, bw: 90, ty: 72 },
+];
+
 function ssBuildSprites(){
   if (ssSprites.built) return;
   ssSprites.built = true;
+
+  // Sky gradient — created once, reused every frame in ssDraw.
+  {
+    const tmp = document.createElement('canvas');
+    tmp.width = 1; tmp.height = VIEW_H;
+    const gctx = tmp.getContext('2d');
+    const g = gctx.createLinearGradient(0, 0, 0, VIEW_H);
+    g.addColorStop(0,    '#4a7ab8');
+    g.addColorStop(0.55, '#8abce0');
+    g.addColorStop(1,    '#bcd8f0');
+    ssSprites.skyGrad = g;
+  }
 
   // ── helpers ──
   function makeCanvas(w, h){ const c = document.createElement('canvas'); c.width=w; c.height=h; return c; }
@@ -6904,37 +6927,23 @@ function ssDraw(dt){
   ctx.clearRect(0,0,VIEW_W,VIEW_H);
 
   // ── PARALLAX BACKGROUND (drawn before camera translate, in screen space) ──
-  // Sky gradient
-  ctx.fillStyle = '#5a8fc8'; ctx.fillRect(0,0,VIEW_W,VIEW_H);
-  // Horizon fade
-  const grad = ctx.createLinearGradient(0,0,0,VIEW_H);
-  grad.addColorStop(0, '#4a7ab8');
-  grad.addColorStop(0.55, '#8abce0');
-  grad.addColorStop(1,  '#bcd8f0');
-  ctx.fillStyle = grad; ctx.fillRect(0,0,VIEW_W,VIEW_H);
+  // Sky gradient (gradient created once in ssBuildSprites, reused here)
+  ctx.fillStyle = ssSprites.skyGrad || '#5a8fc8'; ctx.fillRect(0,0,VIEW_W,VIEW_H);
 
   // Distant layer (parallax factor 0.25) — far mountain silhouettes
   {
     const offX = Math.round(ss.cam.x * 0.25) % (VIEW_W + 80);
     ctx.save();
     ctx.fillStyle = '#7090b8';
-    // Draw two repeating mountain peaks (simple triangles / trapezoids)
-    const peaks = [
-      { bx: -offX,        bw: 80,  ty: 80  },
-      { bx: 80 - offX,    bw: 60,  ty: 95  },
-      { bx: 160 - offX,   bw: 90,  ty: 72  },
-      { bx: 260 - offX,   bw: 70,  ty: 88  },
-      { bx: 340 - offX,   bw: 80,  ty: 80  },
-      { bx: 430 - offX,   bw: 60,  ty: 95  },
-      { bx: 510 - offX,   bw: 90,  ty: 72  },
-    ];
-    for (const pk of peaks){
+    // Draw two repeating mountain peaks using hoisted SS_PEAKS shape data
+    for (const pk of SS_PEAKS){
+      const bx = pk.bx - offX;
       ctx.beginPath();
-      ctx.moveTo(pk.bx, VIEW_H);
-      ctx.lineTo(pk.bx, pk.ty + 40);
-      ctx.lineTo(pk.bx + pk.bw/2, pk.ty);
-      ctx.lineTo(pk.bx + pk.bw, pk.ty + 40);
-      ctx.lineTo(pk.bx + pk.bw, VIEW_H);
+      ctx.moveTo(bx, VIEW_H);
+      ctx.lineTo(bx, pk.ty + 40);
+      ctx.lineTo(bx + pk.bw/2, pk.ty);
+      ctx.lineTo(bx + pk.bw, pk.ty + 40);
+      ctx.lineTo(bx + pk.bw, VIEW_H);
       ctx.closePath(); ctx.fill();
     }
     ctx.restore();
@@ -7007,12 +7016,12 @@ function ssDraw(dt){
       const frame = ssSprites.enemyWalk[fIdx];
       ctx.save();
       if (e.facing < 0){
-        // flip horizontally around the sprite's centre x
-        ctx.translate(e.x + e.w/2, e.y - e.h);
+        // flip horizontally around the sprite's centre x (use frame dims, not body dims)
+        ctx.translate(e.x + frame.width/2, e.y - frame.height);
         ctx.scale(-1, 1);
         ctx.drawImage(frame, 0, 0, frame.width, frame.height);
       } else {
-        ctx.translate(e.x - e.w/2, e.y - e.h);
+        ctx.translate(e.x - frame.width/2, e.y - frame.height);
         ctx.drawImage(frame, 0, 0, frame.width, frame.height);
       }
       ctx.restore();
