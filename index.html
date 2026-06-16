@@ -375,66 +375,157 @@ body.menu-screen #joystick-knob { display:none !important; }
   background:#1a1422; border:1px solid #4a3a5a; border-radius:2px;
   padding:1px 6px; color:#e0d0f0; font-size:9.5px; margin:0 1px;
 }
-/* Phase S — Chapter Map overlay */
+/* Phase Z — Chapter Map overlay overhaul.
+   Stages used to be 20 long list rows that stretched full-width and read
+   like a spreadsheet. New layout: one bordered "card" per chapter with a
+   biome-tinted accent (gold / cyan / red / purple), and the 5 stages
+   inside it as a horizontal tile row — each tile a self-contained mini
+   panel showing stage id, name, rec level, stars, lock/boss icon. */
 #chaptermap-overlay {
-  position:absolute; inset:0; background:rgba(0,0,0,0.93);
+  position:absolute; inset:0;
+  background:
+    linear-gradient(to bottom,
+      rgba(6,4,12,0.94) 0%,
+      rgba(6,4,12,0.72) 18%,
+      rgba(6,4,12,0.52) 50%,
+      rgba(6,4,12,0.68) 82%,
+      rgba(6,4,12,0.94) 100%);
   display:none; flex-direction:column; align-items:center;
   z-index:100; font-family:'Courier New',monospace; overflow:hidden;
 }
 #chaptermap-overlay.open { display:flex; }
 .cmap-header {
-  width:100%; padding:14px 16px 8px;
-  display:flex; flex-direction:column; align-items:center; gap:4px;
-  border-bottom:1px solid #2a2a3a; position:relative;
+  width:100%; max-width:760px; padding:12px 18px 8px;
+  display:flex; flex-direction:row; align-items:center; justify-content:space-between;
+  gap:12px; position:relative;
+  border-bottom:1px solid rgba(74,58,90,0.4);
 }
+.cmap-header-left { display:flex; flex-direction:column; gap:3px; }
+.cmap-header-right { display:flex; align-items:center; gap:10px; }
 .cmap-settings-btn {
-  position:absolute; top:10px; right:12px;
-  min-width:44px; min-height:44px;
-  background:#1e1830; border:1px solid #4a3870; color:#c0a0ff;
-  font-family:'Courier New',monospace; font-size:18px;
-  border-radius:4px; cursor:pointer;
+  width:32px; height:32px;
+  background:rgba(28,20,40,0.85); border:1px solid rgba(128,80,200,0.5);
+  color:#c0a0ff; font-family:'Courier New',monospace; font-size:14px;
+  border-radius:3px; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
+  transition:background 80ms ease, border-color 80ms ease, transform 80ms ease;
 }
-.cmap-settings-btn:hover { background:#2a2040; border-color:#7050c0; }
-.cmap-title { color:#f0c060; font-size:16px; letter-spacing:5px; }
-.cmap-info  { display:flex; gap:16px; font-size:10px; color:#a0a0c0; }
+.cmap-settings-btn:hover {
+  background:rgba(60,40,100,0.95); border-color:rgba(224,192,255,0.85);
+  color:#f0e4ff; transform:translateY(-1px);
+}
+.cmap-title {
+  color:#f0c060; font-size:18px; letter-spacing:5px;
+  text-shadow:0 0 14px rgba(240,176,72,0.30), 0 0 3px rgba(240,176,72,0.7);
+}
+.cmap-info  { display:flex; gap:14px; font-size:11px; color:#a0a0c0; letter-spacing:1px; }
+.cmap-info .cmap-hero-pip { color:#d0c4e6; }
+.cmap-info .cmap-gold-pip { color:#f0c060; }
 .cmap-chapters {
-  flex:1; width:100%; overflow-y:auto; padding:8px 12px;
+  flex:1; width:100%; max-width:760px; overflow-y:auto; padding:14px 18px 6px;
+  display:flex; flex-direction:column; gap:14px;
 }
-.cmap-chapter { margin-bottom:10px; }
+.cmap-chapter-card {
+  background:linear-gradient(135deg, rgba(14,10,22,0.85), rgba(22,16,32,0.75));
+  border:1px solid rgba(80,64,120,0.4); border-radius:5px;
+  padding:10px 12px 12px;
+  position:relative;
+}
 .cmap-ch-header {
-  font-size:11px; color:#8fa7c4; letter-spacing:2px;
-  padding:5px 4px 4px; border-bottom:1px solid #1e2030;
-  display:flex; align-items:center; gap:6px;
-}
-.cmap-stage-row {
   display:flex; align-items:center; gap:8px;
-  min-height:44px; padding:4px 8px; cursor:pointer;
-  border-radius:4px; transition:background 0.1s;
-  border-bottom:1px solid #111318;
+  margin-bottom:9px; padding-bottom:6px;
+  border-bottom:1px solid rgba(74,58,90,0.35);
 }
-.cmap-stage-row:last-child { border-bottom:none; }
-.cmap-stage-row.unlocked:hover  { background:rgba(100,80,180,0.18); }
-.cmap-stage-row.unlocked:active { background:rgba(100,80,180,0.30); }
-.cmap-stage-row.locked { opacity:0.38; cursor:default; }
-.cmap-stage-name { flex:1; font-size:10px; color:#c8c0d8; letter-spacing:1px; }
-.cmap-stage-id   { font-size:9px; color:#666; width:28px; flex-shrink:0; }
-.cmap-stage-rec  { font-size:8px; color:#556; width:44px; flex-shrink:0; text-align:right; }
-.cmap-stage-stars { font-size:12px; width:32px; text-align:right; flex-shrink:0; }
-.cmap-stage-lock  { font-size:12px; width:16px; flex-shrink:0; }
+.cmap-ch-icon { font-size:16px; }
+.cmap-ch-name {
+  font-size:12px; letter-spacing:3px; font-weight:bold;
+  color:#c0a8d8; flex:1;
+}
+.cmap-ch-meta { font-size:9px; color:#7a6a8c; letter-spacing:1.5px; }
+/* Per-biome accent — left border + name color + boss glow */
+.cmap-chapter-card.cursed_keep     { border-left:3px solid #c8a050; }
+.cmap-chapter-card.cursed_keep .cmap-ch-name { color:#e8c878; }
+.cmap-chapter-card.bone_crypt      { border-left:3px solid #80b0c8; }
+.cmap-chapter-card.bone_crypt .cmap-ch-name { color:#a0d0e8; }
+.cmap-chapter-card.infernal_depths { border-left:3px solid #d05030; }
+.cmap-chapter-card.infernal_depths .cmap-ch-name { color:#f08060; }
+.cmap-chapter-card.black_bastion   { border-left:3px solid #8050d0; }
+.cmap-chapter-card.black_bastion .cmap-ch-name { color:#b080f0; }
+.cmap-stages-grid {
+  display:grid; grid-template-columns:repeat(5, 1fr); gap:8px;
+}
+.cmap-stage-cell {
+  background:rgba(10,8,16,0.75);
+  border:1px solid rgba(70,56,110,0.5); border-radius:4px;
+  padding:8px 6px 7px;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  cursor:pointer; user-select:none;
+  transition:background 80ms ease, border-color 80ms ease, transform 80ms ease;
+  position:relative; min-height:96px;
+}
+.cmap-stage-cell.unlocked:hover {
+  background:rgba(40,28,60,0.9); border-color:#a070d0;
+  transform:translateY(-2px);
+  box-shadow:0 0 14px rgba(160,96,224,0.30);
+}
+.cmap-stage-cell.locked {
+  opacity:0.35; cursor:default; filter:grayscale(0.6);
+}
+.cmap-stage-cell.boss {
+  background:linear-gradient(135deg, rgba(60,12,22,0.85), rgba(28,8,18,0.85));
+  border-color:rgba(192,64,64,0.55);
+}
+.cmap-stage-cell.boss.unlocked:hover {
+  border-color:#e06060; box-shadow:0 0 18px rgba(224,80,80,0.45);
+}
+.cmap-stage-cell.completed {
+  border-color:rgba(240,192,96,0.45);
+  box-shadow:inset 0 0 14px rgba(240,192,96,0.08);
+}
+.cmap-cell-id {
+  font-size:11px; color:#f0c060; font-weight:bold; letter-spacing:1px;
+}
+.cmap-stage-cell.locked .cmap-cell-id { color:#6a607a; }
+.cmap-cell-name {
+  font-size:8.5px; color:#d0c4e6; letter-spacing:0.5px;
+  text-align:center; line-height:1.2; flex:1;
+  display:flex; align-items:center;
+}
+.cmap-cell-rec { font-size:7.5px; color:#7060a0; letter-spacing:1px; }
+.cmap-cell-stars { font-size:11px; color:#f0c060; letter-spacing:1px; }
+.cmap-stage-cell.locked .cmap-cell-stars { color:#444; }
+.cmap-cell-boss-icon {
+  position:absolute; top:4px; right:5px; font-size:10px;
+  color:#e06060; text-shadow:0 0 6px rgba(224,80,80,0.6);
+}
+.cmap-cell-lock-icon {
+  position:absolute; top:4px; right:5px; font-size:10px;
+  color:#a090b0; opacity:0.7;
+}
 .cmap-footer {
-  width:100%; padding:8px 12px 10px;
-  border-top:1px solid #2a2a3a;
-  display:flex; flex-direction:column; align-items:center; gap:6px;
+  width:100%; max-width:760px; padding:8px 18px 12px;
+  border-top:1px solid rgba(74,58,90,0.4);
+  display:flex; flex-direction:column; align-items:center; gap:8px;
 }
 .cmap-change-btn {
-  background:#1e1830; border:1px solid #4a3870; color:#c0a0ff;
-  font-family:'Courier New',monospace; font-size:10px; letter-spacing:2px;
-  padding:6px 18px; border-radius:4px; cursor:pointer;
+  background:linear-gradient(135deg, rgba(28,20,40,0.85), rgba(48,32,72,0.75));
+  border:1px solid rgba(128,80,200,0.5); color:#d0c4e6;
+  font-family:'Courier New',monospace; font-size:11px; letter-spacing:3px;
+  padding:8px 22px; border-radius:3px; cursor:pointer;
+  transition:background 80ms ease, border-color 80ms ease, transform 80ms ease;
 }
-.cmap-change-btn:hover { background:#2a2040; border-color:#7050c0; }
-.cmap-hints { font-size:8px; color:#444; text-align:center; }
-.cmap-hints .key { background:#1a1a2a; border:1px solid #333; border-radius:2px; padding:1px 3px; color:#666; }
+.cmap-change-btn:hover {
+  background:linear-gradient(135deg, rgba(60,40,100,0.95), rgba(100,60,160,0.85));
+  border-color:rgba(224,192,255,0.85); color:#f0e4ff;
+  transform:translateY(-1px);
+}
+.cmap-hints {
+  font-size:9.5px; color:#7a6a8a; text-align:center; letter-spacing:0.5px;
+}
+.cmap-hints .key {
+  background:#1a1422; border:1px solid #4a3a5a; border-radius:2px;
+  padding:1px 6px; color:#e0d0f0; font-size:9px; margin:0 1px;
+}
 /* Phase T — Nightmare toggle on the chapter map (shown once unlocked) */
 #cmap-difficulty-row {
   display:flex; align-items:center; justify-content:center;
@@ -1057,14 +1148,18 @@ body.menu-screen #joystick-knob { display:none !important; }
     </div>
   </div>
 
-  <!-- Phase S: Chapter Map overlay -->
+  <!-- Phase S: Chapter Map overlay (Phase Z redesign) -->
   <div id="chaptermap-overlay">
     <div class="cmap-header">
-      <button class="cmap-settings-btn" onclick="toggleSettings()" title="Settings">⚙</button>
-      <div class="cmap-title">WARDENFALL</div>
-      <div class="cmap-info">
-        <span id="cmap-hero"></span>
-        <span id="cmap-gold"></span>
+      <div class="cmap-header-left">
+        <div class="cmap-title">WARDENFALL</div>
+        <div class="cmap-info">
+          <span class="cmap-hero-pip" id="cmap-hero"></span>
+          <span class="cmap-gold-pip" id="cmap-gold"></span>
+        </div>
+      </div>
+      <div class="cmap-header-right">
+        <button class="cmap-settings-btn" onclick="toggleSettings()" title="Settings">⚙</button>
       </div>
     </div>
     <!-- Phase T — Nightmare toggle (visible only after first Warden kill) -->
@@ -7592,13 +7687,30 @@ function showChapterMap() {
 
   const container = document.getElementById('cmap-chapters');
   container.innerHTML = '';
+
+  // Phase Z — Per-chapter card with a 5-tile horizontal stage grid.
+  // Each tile is a self-contained mini panel: id, name, rec level, stars,
+  // and a lock or boss icon. Biome-tinted left border + name color comes
+  // from the .cmap-chapter-card.<biome> CSS classes.
   CHAPTERS.forEach(ch => {
-    const sec = document.createElement('div');
-    sec.className = 'cmap-chapter';
+    const card = document.createElement('div');
+    card.className = 'cmap-chapter-card ' + ch.biome;
+
+    // Count cleared stages in this chapter for the header meta hint.
+    let cleared = 0;
+    for (let s = 1; s <= 5; s++) if (starsFor(ch.id, s) > 0) cleared++;
+
     const hdr = document.createElement('div');
     hdr.className = 'cmap-ch-header';
-    hdr.textContent = `${ch.icon} ${ch.name.toUpperCase()}`;
-    sec.appendChild(hdr);
+    hdr.innerHTML = `
+      <span class="cmap-ch-icon">${ch.icon}</span>
+      <span class="cmap-ch-name">CHAPTER ${ch.id} · ${ch.name.toUpperCase()}</span>
+      <span class="cmap-ch-meta">${cleared}/5 CLEARED</span>
+    `;
+    card.appendChild(hdr);
+
+    const grid = document.createElement('div');
+    grid.className = 'cmap-stages-grid';
 
     for (let s = 1; s <= 5; s++) {
       const recLvl = stageRecLevel(ch.id, s);
@@ -7607,27 +7719,37 @@ function showChapterMap() {
       const isBoss = (s === 5);
       const stageName = STAGE_NAMES[ch.id - 1][s - 1];
 
-      const row = document.createElement('div');
-      row.className = 'cmap-stage-row ' + (locked ? 'locked' : 'unlocked');
+      const cell = document.createElement('div');
+      const classes = ['cmap-stage-cell'];
+      classes.push(locked ? 'locked' : 'unlocked');
+      if (isBoss) classes.push('boss');
+      if (stars > 0) classes.push('completed');
+      cell.className = classes.join(' ');
 
       const starStr = (stars > 0)
         ? '★'.repeat(stars) + '☆'.repeat(3 - stars)
         : '☆☆☆';
+      const cornerIcon = locked
+        ? '<span class="cmap-cell-lock-icon">🔒</span>'
+        : isBoss
+          ? '<span class="cmap-cell-boss-icon">☠</span>'
+          : '';
 
-      row.innerHTML = `
-        <div class="cmap-stage-id">${ch.id}-${s}</div>
-        <div class="cmap-stage-name">${isBoss ? '☠ ' : ''}${stageName}</div>
-        <div class="cmap-stage-rec">rec.${recLvl}</div>
-        <div class="cmap-stage-stars" style="color:${stars>0?'#f0c060':'#333'}">${starStr}</div>
-        <div class="cmap-stage-lock">${locked ? '🔒' : ''}</div>
+      cell.innerHTML = `
+        ${cornerIcon}
+        <div class="cmap-cell-id">${ch.id}-${s}</div>
+        <div class="cmap-cell-name">${stageName}</div>
+        <div class="cmap-cell-rec">rec.${recLvl}</div>
+        <div class="cmap-cell-stars">${starStr}</div>
       `;
 
       if (!locked) {
-        row.addEventListener('click', () => launchStage(ch.id, s));
+        cell.addEventListener('click', () => launchStage(ch.id, s));
       }
-      sec.appendChild(row);
+      grid.appendChild(cell);
     }
-    container.appendChild(sec);
+    card.appendChild(grid);
+    container.appendChild(card);
   });
 
   overlay.classList.add('open');
