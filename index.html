@@ -953,45 +953,106 @@ body.menu-screen #joystick-knob { display:none !important; }
 .inv-action-btn.skip { background:#1a1a22; border-color:#555; color:#aaa; }
 .inv-action-btn.skip:hover { background:#2a2a34; }
 
-/* Phase Q — Gear screen */
+/* Phase Q (Phase AE rewrite) — Gear screen.
+   Matches the menu vocabulary: 5-stop vignette overlay, gradient panel
+   with purple-tinted border + warm glow, ember-gold title with shadow,
+   per-rarity colored borders on equipped slots and stash cards. */
 #gear-overlay {
-  position:absolute; inset:0; background:rgba(0,0,0,0.78); z-index:60;
+  position:absolute; inset:0;
+  background:
+    linear-gradient(to bottom,
+      rgba(6,4,12,0.93) 0%,
+      rgba(6,4,12,0.78) 22%,
+      rgba(6,4,12,0.62) 50%,
+      rgba(6,4,12,0.78) 78%,
+      rgba(6,4,12,0.93) 100%);
+  z-index:60;
   display:none; align-items:center; justify-content:center;
 }
 #gear-overlay.open { display:flex; }
 .gear-panel {
-  background:#15151d; border:2px solid #6a5a20; border-radius:8px;
-  padding:14px 16px; width:min(520px, 92vw); max-height:86vh;
-  display:flex; flex-direction:column; gap:8px;
+  background:linear-gradient(135deg, rgba(14,10,22,0.96), rgba(22,16,32,0.94));
+  border:1px solid rgba(80,64,120,0.6); border-radius:5px;
+  padding:18px 22px 16px; width:min(560px, 92vw); max-height:86vh;
+  display:flex; flex-direction:column; gap:10px;
   font-family:'Courier New',monospace;
+  box-shadow:0 0 36px rgba(120,60,180,0.22);
 }
-.gear-title { color:#ffd040; font-size:13px; letter-spacing:3px; text-align:center; }
-.gear-equipped { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
+.gear-title {
+  color:#f0c060; font-size:17px; letter-spacing:5px; text-align:center;
+  margin-bottom:4px; padding-bottom:8px;
+  text-shadow:0 0 14px rgba(240,176,72,0.30), 0 0 3px rgba(240,176,72,0.7);
+  border-bottom:1px solid rgba(74,58,90,0.45);
+}
+.gear-equipped { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
 .gear-slot {
-  width:84px; min-height:64px; border:1px solid #444; border-radius:6px;
-  background:#1b1b26; padding:4px; font-size:9px; color:#ccc; text-align:center;
+  width:88px; min-height:74px;
+  border:1px solid rgba(80,64,120,0.5); border-radius:4px;
+  background:linear-gradient(135deg, rgba(8,6,14,0.92), rgba(18,14,26,0.92));
+  padding:6px 4px; font-size:9px; color:#d0c4e6; text-align:center;
   cursor:pointer;
+  transition:transform 80ms ease, border-color 80ms ease, box-shadow 80ms ease;
+  display:flex; flex-direction:column; align-items:center; gap:2px;
 }
-.gear-slot .gs-icon { font-size:18px; }
-.gear-slot .gs-name { font-size:8px; line-height:1.2; }
-.gear-slot.empty { opacity:0.45; }
-.gear-stash-label { color:#999; font-size:9px; letter-spacing:2px; }
+.gear-slot:hover { transform:translateY(-2px); border-color:rgba(224,192,255,0.85); }
+.gear-slot .gs-icon { font-size:22px; line-height:1; }
+.gear-slot .gs-name { font-size:8.5px; line-height:1.2; color:#c0a8d8; letter-spacing:0.5px; }
+.gear-slot.empty { opacity:0.4; }
+.gear-slot.empty:hover { transform:none; border-color:rgba(80,64,120,0.5); }
+/* Per-rarity accent for equipped + stash items — JS sets the rarity class. */
+.gear-slot.rar-common,    .stash-card.rar-common    { border-color:rgba(140,140,150,0.6); }
+.gear-slot.rar-uncommon,  .stash-card.rar-uncommon  { border-color:rgba(76,175,80,0.7); }
+.gear-slot.rar-rare,      .stash-card.rar-rare      { border-color:rgba(33,150,243,0.75); }
+.gear-slot.rar-epic,      .stash-card.rar-epic      { border-color:rgba(156,39,176,0.75); }
+.gear-slot.rar-legendary, .stash-card.rar-legendary { border-color:rgba(255,152,0,0.85); box-shadow:0 0 12px rgba(255,152,0,0.25); }
+.gear-slot.rar-uncommon:hover,  .stash-card.rar-uncommon:hover  { box-shadow:0 0 14px rgba(76,175,80,0.4); }
+.gear-slot.rar-rare:hover,      .stash-card.rar-rare:hover      { box-shadow:0 0 14px rgba(33,150,243,0.45); }
+.gear-slot.rar-epic:hover,      .stash-card.rar-epic:hover      { box-shadow:0 0 16px rgba(156,39,176,0.5); }
+.gear-slot.rar-legendary:hover, .stash-card.rar-legendary:hover { box-shadow:0 0 18px rgba(255,152,0,0.55); }
+.gear-stash-label {
+  color:#c0a0ff; font-size:10px; letter-spacing:3px;
+  padding:6px 0 3px; border-bottom:1px solid rgba(74,58,90,0.3);
+  margin-top:4px;
+}
 .gear-stash {
   overflow-y:auto; max-height:38vh; display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:6px;
+  grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:8px;
+  padding:4px 0;
 }
 .stash-card {
-  border:1px solid #444; border-radius:6px; background:#1b1b26;
-  padding:5px; font-size:9px; color:#ccc; cursor:pointer; min-height:44px;
+  border:1px solid rgba(80,64,120,0.5); border-radius:4px;
+  background:linear-gradient(135deg, rgba(8,6,14,0.92), rgba(18,14,26,0.92));
+  padding:7px; font-size:9.5px; color:#d0c4e6; cursor:pointer; min-height:50px;
+  transition:transform 80ms ease, border-color 80ms ease, box-shadow 80ms ease;
 }
-.stash-card .sc-name { font-size:9px; }
-.stash-card .sc-stats { color:#9a9; font-size:8px; }
-.stash-card .sc-row { display:flex; gap:4px; margin-top:3px; }
+.stash-card:hover { transform:translateY(-1px); }
+.stash-card .sc-name { font-size:10px; letter-spacing:0.5px; font-weight:bold; }
+.stash-card .sc-stats { color:#9aedb0; font-size:8.5px; margin-top:2px; }
+.stash-card .sc-row { display:flex; gap:5px; margin-top:5px; }
 .stash-card button {
-  flex:1; font-size:8px; padding:3px 0; min-height:22px; cursor:pointer;
-  background:#262635; color:#ddd; border:1px solid #555; border-radius:4px;
+  flex:1; font-size:8.5px; padding:3px 0; min-height:22px; cursor:pointer;
+  background:rgba(28,20,40,0.85); color:#d0c4e6;
+  border:1px solid rgba(128,80,200,0.5); border-radius:3px;
+  letter-spacing:1px; font-family:'Courier New',monospace;
+  transition:background 80ms ease, border-color 80ms ease;
 }
-.gear-actions { display:flex; justify-content:center; }
+.stash-card button:hover {
+  background:rgba(60,40,100,0.95); border-color:rgba(224,192,255,0.85);
+  color:#f0e4ff;
+}
+.gear-actions { display:flex; justify-content:center; margin-top:6px; }
+.gear-actions .inv-action-btn {
+  background:linear-gradient(135deg, rgba(28,20,40,0.85), rgba(48,32,72,0.75));
+  border:1px solid rgba(128,80,200,0.5); border-radius:3px;
+  padding:8px 24px; color:#d0c4e6; font-size:11px; letter-spacing:3px;
+  cursor:pointer; font-family:'Courier New',monospace;
+  transition:background 80ms ease, border-color 80ms ease, transform 80ms ease;
+}
+.gear-actions .inv-action-btn:hover {
+  background:linear-gradient(135deg, rgba(60,40,100,0.95), rgba(100,60,160,0.85));
+  border-color:rgba(224,192,255,0.85); color:#f0e4ff;
+  transform:translateY(-1px);
+}
 #gear-btn {
   position:absolute; bottom:160px; right:12px;
   width:32px; height:32px; border-radius:50%;
@@ -1025,134 +1086,198 @@ body.menu-screen #joystick-knob { display:none !important; }
 }
 .boss-stats { color:#aaa; font-size:9px; text-align:center; }
 
-/* Phase L — Death Screen & Run Meta */
+/* Phase L (Phase AE rewrite) — Death Screen.
+   Matches the menu vocabulary with a darker, redder accent: vignette
+   overlay leans toward deep maroon, gradient panel with red-tinted
+   border + warm red glow, stat cards consistent with the rest of the
+   game's "dark gradient + purple border + gold value" pattern. */
 #death-overlay {
-  position:absolute; inset:0; background:rgba(0,0,0,0.94);
+  position:absolute; inset:0;
+  background:
+    linear-gradient(to bottom,
+      rgba(16,4,8,0.94) 0%,
+      rgba(10,4,12,0.78) 30%,
+      rgba(6,4,12,0.78) 70%,
+      rgba(16,4,8,0.94) 100%);
   display:none; flex-direction:column; align-items:center; justify-content:center;
-  z-index:220; font-family:'Courier New',monospace; color:#aaa;
+  z-index:220; font-family:'Courier New',monospace; color:#c0b8d0;
   opacity:0; transition: opacity 0.8s ease-out;
 }
 #death-overlay.show { display:flex; }
 #death-overlay.show-anim { opacity:1; }
 .death-panel {
-  background:#0a0a14; border:1px solid #6a3030; border-radius:4px;
-  padding:18px 22px; min-width:340px; max-width:96vw; max-height:92vh; overflow-y:auto;
-  box-shadow:0 0 60px rgba(160,30,30,0.35);
+  background:linear-gradient(135deg, rgba(20,10,12,0.96), rgba(28,14,16,0.94));
+  border:1px solid rgba(192,64,64,0.55); border-radius:5px;
+  padding:22px 26px 18px; min-width:360px; max-width:96vw; max-height:92vh; overflow-y:auto;
+  box-shadow:0 0 50px rgba(224,80,80,0.25);
 }
 .death-header {
-  color:#ff4040; font-size:20px; letter-spacing:5px; text-align:center;
-  margin-bottom:6px; text-shadow:0 0 12px rgba(255,60,60,0.55);
+  color:#ff4040; font-size:24px; letter-spacing:8px; text-align:center;
+  margin-bottom:8px; padding-bottom:10px;
+  text-shadow:0 0 18px rgba(255,60,60,0.6), 0 0 4px rgba(255,80,80,0.85);
+  border-bottom:1px solid rgba(192,64,64,0.35);
 }
 .death-saved-note {
-  text-align:center; font-size:9px; color:#999; margin-bottom:8px; letter-spacing:1px;
+  text-align:center; font-size:10px; color:#9a8aa8; margin-bottom:14px; letter-spacing:1.5px;
 }
 .death-stats {
-  display:grid; grid-template-columns: repeat(3, 1fr); gap:6px 10px;
-  margin-bottom:14px;
+  display:grid; grid-template-columns: repeat(3, 1fr); gap:7px 10px;
+  margin-bottom:16px;
 }
 .death-stat {
-  background:#15151c; border:1px solid #2a2a3a; border-radius:3px;
-  padding:6px 6px 7px; text-align:center;
+  background:linear-gradient(135deg, rgba(8,6,14,0.85), rgba(18,14,26,0.85));
+  border:1px solid rgba(80,64,120,0.5); border-radius:4px;
+  padding:8px 6px 9px; text-align:center;
 }
-.death-stat .ds-label { font-size:8px; color:#666; letter-spacing:1px; text-transform:uppercase; }
-.death-stat .ds-value { font-size:14px; color:#f0c060; font-weight:bold; margin-top:3px; font-family:'Courier New',monospace; }
-.death-stat .ds-value.best { font-size:10px; line-height:1.2; }
+.death-stat .ds-label { font-size:8.5px; color:#7a6a8a; letter-spacing:1.5px; text-transform:uppercase; }
+.death-stat .ds-value {
+  font-size:15px; color:#f0c060; font-weight:bold; margin-top:4px;
+  font-family:'Courier New',monospace;
+  text-shadow:0 0 6px rgba(240,176,72,0.35);
+}
+.death-stat .ds-value.best { font-size:10.5px; line-height:1.2; }
 .death-actions {
-  display:flex; justify-content:center; gap:10px; margin-top:6px;
+  display:flex; justify-content:center; gap:12px; margin-top:6px;
 }
 .death-btn {
-  background:linear-gradient(135deg,#2a1840,#4a2870);
-  border:1px solid #6040a0; border-radius:3px; padding:7px 18px;
-  color:#e0c0ff; font-size:11px; cursor:pointer; letter-spacing:2px;
+  background:linear-gradient(135deg, rgba(28,20,40,0.85), rgba(48,32,72,0.75));
+  border:1px solid rgba(128,80,200,0.5); border-radius:3px;
+  padding:9px 22px; color:#d0c4e6; font-size:11px; cursor:pointer; letter-spacing:3px;
   font-family:'Courier New',monospace;
+  transition:background 80ms ease, border-color 80ms ease, transform 80ms ease;
 }
-.death-btn:hover { background:linear-gradient(135deg,#3a2060,#5a30a0); }
+.death-btn:hover {
+  background:linear-gradient(135deg, rgba(60,40,100,0.95), rgba(100,60,160,0.85));
+  border-color:rgba(224,192,255,0.85); color:#f0e4ff;
+  transform:translateY(-1px);
+}
 .death-btn.primary {
-  background:linear-gradient(135deg,#6a1818,#a02828);
-  border-color:#c04040; color:#ffe0e0;
+  background:linear-gradient(135deg, rgba(80,22,22,0.92), rgba(120,30,30,0.85));
+  border-color:rgba(224,80,80,0.7); color:#ffe0e0;
 }
-.death-btn.primary:hover { background:linear-gradient(135deg,#8a2020,#c03030); }
+.death-btn.primary:hover {
+  background:linear-gradient(135deg, rgba(110,28,28,0.95), rgba(150,40,40,0.92));
+  border-color:#e06060; color:#fff0f0;
+  box-shadow:0 0 14px rgba(224,80,80,0.4);
+}
 @media (max-width: 540px) {
   .death-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* Phase S Task 3 — Results Screen */
+/* Phase S Task 3 (Phase AE rewrite) — Results / STAGE CLEAR screen.
+   Triumphant gold-tinted variant of the death overlay: vignette leans
+   gold instead of red, gradient panel with gold-amber border + warm
+   glow, dramatic 36 px stars with stagger glow, loot chips inherit the
+   gear-screen rarity-color border palette. */
 #results-overlay {
-  position:absolute; inset:0; background:rgba(0,0,0,0.94);
+  position:absolute; inset:0;
+  background:
+    linear-gradient(to bottom,
+      rgba(14,10,4,0.94) 0%,
+      rgba(10,8,12,0.78) 30%,
+      rgba(8,6,14,0.78) 70%,
+      rgba(14,10,4,0.94) 100%);
   display:none; flex-direction:column; align-items:center; justify-content:center;
-  z-index:220; font-family:'Courier New',monospace; color:#aaa;
+  z-index:220; font-family:'Courier New',monospace; color:#c0b8d0;
   opacity:0; transition: opacity 0.6s ease-out;
 }
 #results-overlay.show { display:flex; }
 #results-overlay.show-anim { opacity:1; }
 .results-panel {
-  background:#0a0c14; border:1px solid #5a4a20; border-radius:4px;
-  padding:18px 22px; min-width:340px; max-width:96vw; max-height:92vh; overflow-y:auto;
-  box-shadow:0 0 60px rgba(200,160,30,0.28);
+  background:linear-gradient(135deg, rgba(14,10,22,0.96), rgba(22,16,32,0.94));
+  border:1px solid rgba(192,160,80,0.55); border-radius:5px;
+  padding:22px 26px 18px; min-width:360px; max-width:96vw; max-height:92vh; overflow-y:auto;
+  box-shadow:0 0 50px rgba(240,176,72,0.25);
 }
 .results-header {
-  color:#f0c060; font-size:20px; letter-spacing:5px; text-align:center;
-  margin-bottom:8px; text-shadow:0 0 14px rgba(240,190,60,0.55);
+  color:#f0c060; font-size:24px; letter-spacing:8px; text-align:center;
+  margin-bottom:10px;
+  text-shadow:0 0 18px rgba(240,190,60,0.6), 0 0 4px rgba(240,200,80,0.85);
 }
 .results-stars {
-  display:flex; justify-content:center; gap:10px; margin-bottom:8px;
+  display:flex; justify-content:center; gap:14px; margin-bottom:10px;
 }
 .results-star {
-  font-size:28px; opacity:0.25; transition: opacity 0.25s ease, transform 0.25s ease;
+  font-size:36px; opacity:0.20; color:#3a2e1a;
+  transition: opacity 0.25s ease, transform 0.25s ease, text-shadow 0.25s ease;
   transform:scale(0.7);
 }
 .results-star.lit {
   opacity:1; transform:scale(1.15); color:#f0c060;
-  text-shadow:0 0 12px rgba(240,190,60,0.8);
+  text-shadow:0 0 16px rgba(240,190,60,0.85), 0 0 4px rgba(255,220,120,0.9);
 }
 .results-stage-name {
-  text-align:center; font-size:10px; color:#8090b0; letter-spacing:2px;
-  margin-bottom:12px; text-transform:uppercase;
+  text-align:center; font-size:10.5px; color:#a896c0; letter-spacing:3px;
+  margin-bottom:14px; text-transform:uppercase;
+  padding-bottom:10px; border-bottom:1px solid rgba(74,58,90,0.35);
 }
 .results-levelup {
-  text-align:center; font-size:11px; color:#c060ff; letter-spacing:3px;
-  margin-bottom:10px; text-shadow:0 0 8px rgba(160,60,255,0.6);
+  text-align:center; font-size:12px; color:#c080ff; letter-spacing:4px;
+  margin-bottom:12px;
+  text-shadow:0 0 10px rgba(160,60,255,0.7), 0 0 3px rgba(192,128,255,0.9);
 }
 .results-stats {
-  display:grid; grid-template-columns: repeat(2, 1fr); gap:6px 10px;
+  display:grid; grid-template-columns: repeat(2, 1fr); gap:7px 10px;
   margin-bottom:14px;
 }
 .results-stat {
-  background:#15151c; border:1px solid #2a2a3a; border-radius:3px;
-  padding:6px 6px 7px; text-align:center;
+  background:linear-gradient(135deg, rgba(8,6,14,0.85), rgba(18,14,26,0.85));
+  border:1px solid rgba(80,64,120,0.5); border-radius:4px;
+  padding:8px 6px 9px; text-align:center;
 }
-.results-stat .ds-label { font-size:8px; color:#666; letter-spacing:1px; text-transform:uppercase; }
-.results-stat .ds-value { font-size:14px; color:#f0c060; font-weight:bold; margin-top:3px; font-family:'Courier New',monospace; }
+.results-stat .ds-label { font-size:8.5px; color:#7a6a8a; letter-spacing:1.5px; text-transform:uppercase; }
+.results-stat .ds-value {
+  font-size:15px; color:#f0c060; font-weight:bold; margin-top:4px;
+  font-family:'Courier New',monospace;
+  text-shadow:0 0 6px rgba(240,176,72,0.35);
+}
 .results-loot-label {
-  font-size:8px; color:#666; letter-spacing:2px; text-transform:uppercase;
-  margin-bottom:6px;
+  font-size:9px; color:#c0a0ff; letter-spacing:3px; text-transform:uppercase;
+  margin-bottom:8px;
+  padding-bottom:3px; border-bottom:1px solid rgba(74,58,90,0.3);
 }
 .results-loot-chips {
-  display:flex; flex-wrap:wrap; gap:4px; margin-bottom:14px; min-height:20px;
+  display:flex; flex-wrap:wrap; gap:5px; margin-bottom:14px; min-height:22px;
 }
 .loot-chip {
-  background:#15151c; border:1px solid #333; border-radius:3px;
-  padding:2px 6px; font-size:9px; color:#ccc; letter-spacing:0.5px;
+  background:linear-gradient(135deg, rgba(8,6,14,0.85), rgba(18,14,26,0.85));
+  border:1px solid rgba(80,64,120,0.55); border-radius:3px;
+  padding:3px 7px; font-size:9px; color:#d0c4e6; letter-spacing:0.5px;
 }
+/* Rarity tints on loot chips — reuses the same palette as the gear cards
+   so the language stays consistent. */
+.loot-chip.rar-uncommon  { border-color:rgba(76,175,80,0.7); color:#bff0c4; }
+.loot-chip.rar-rare      { border-color:rgba(33,150,243,0.75); color:#b8d8ff; }
+.loot-chip.rar-epic      { border-color:rgba(156,39,176,0.75); color:#e0b8ff; }
+.loot-chip.rar-legendary { border-color:rgba(255,152,0,0.85); color:#ffd890; box-shadow:0 0 8px rgba(255,152,0,0.3); }
 .loot-chip-more {
-  background:#111; border:1px solid #2a2a3a; border-radius:3px;
-  padding:2px 6px; font-size:9px; color:#555;
+  background:rgba(6,4,12,0.6); border:1px solid rgba(74,58,90,0.4); border-radius:3px;
+  padding:3px 7px; font-size:9px; color:#7a6a8a;
 }
 .results-actions {
-  display:flex; justify-content:center; gap:10px; margin-top:6px;
+  display:flex; justify-content:center; gap:12px; margin-top:6px;
 }
 .results-btn {
-  background:linear-gradient(135deg,#2a1840,#4a2870);
-  border:1px solid #6040a0; border-radius:3px; padding:7px 18px;
-  color:#e0c0ff; font-size:11px; cursor:pointer; letter-spacing:2px;
+  background:linear-gradient(135deg, rgba(28,20,40,0.85), rgba(48,32,72,0.75));
+  border:1px solid rgba(128,80,200,0.5); border-radius:3px;
+  padding:9px 22px; color:#d0c4e6; font-size:11px; cursor:pointer; letter-spacing:3px;
   font-family:'Courier New',monospace;
+  transition:background 80ms ease, border-color 80ms ease, transform 80ms ease;
 }
-.results-btn:hover { background:linear-gradient(135deg,#3a2060,#5a30a0); }
+.results-btn:hover {
+  background:linear-gradient(135deg, rgba(60,40,100,0.95), rgba(100,60,160,0.85));
+  border-color:rgba(224,192,255,0.85); color:#f0e4ff;
+  transform:translateY(-1px);
+}
 .results-btn.primary {
-  background:linear-gradient(135deg,#403010,#806020);
-  border-color:#c09030; color:#ffe0a0;
+  background:linear-gradient(135deg, rgba(72,50,18,0.92), rgba(120,80,30,0.85));
+  border-color:#f0c060; color:#fff8dc;
 }
-.results-btn.primary:hover { background:linear-gradient(135deg,#504020,#907030); }
+.results-btn.primary:hover {
+  background:linear-gradient(135deg, rgba(100,68,22,0.95), rgba(150,100,38,0.92));
+  border-color:#f0d080; color:#fff8e0;
+  box-shadow:0 0 14px rgba(240,176,72,0.4);
+}
 @media (max-width: 540px) {
   .results-stats { grid-template-columns: repeat(2, 1fr); }
 }
@@ -5370,15 +5495,14 @@ function showResults(stars) {
   // Loot chips (max 8 displayed + "+N more")
   const chipsEl = document.getElementById('results-loot-chips');
   if (stageLoot.length === 0) {
-    chipsEl.innerHTML = '<span style="color:#444;font-size:9px">None</span>';
+    chipsEl.innerHTML = '<span style="color:#7a6a8a;font-size:9.5px;letter-spacing:1px">None</span>';
   } else {
     const shown = stageLoot.slice(0, 8);
     const extra = stageLoot.length - 8;
+    // Phase AE — rar-{rarity} class drives CSS border + glow; the chip
+    // text color is inherited from the same class.
     chipsEl.innerHTML =
-      shown.map(it => {
-        const col = RARITY_COL[it.rarity] || '#aaa';
-        return `<div class="loot-chip" style="border-color:${col}">${it.icon} <span style="color:${col}">${it.name}</span></div>`;
-      }).join('') +
+      shown.map(it => `<div class="loot-chip rar-${it.rarity}">${it.icon} ${it.name}</div>`).join('') +
       (extra > 0 ? `<div class="loot-chip-more">+${extra} more</div>` : '');
   }
   // Star row — reset all to unlit, then pop them in via staggered timeouts
@@ -7374,7 +7498,9 @@ function renderGearScreen() {
                     `<div class="gs-name">${GEAR_LABEL[slot]}<br>— empty —</div></div>`;
     const rc = RARITY_COL[it.rarity];
     const lines = Object.entries(_dispStats(it)).map(([k,v])=>`${k} ${v}`).join(' · ');
-    return `<div class="gear-slot" style="border-color:${rc}" onclick="unequipSlot('${slot}');renderGearScreen();updateHUD();">` +
+    // Phase AE — rar-{rarity} class drives CSS border + glow; name color
+    // still inline so each rarity reads as itself.
+    return `<div class="gear-slot rar-${it.rarity}" onclick="unequipSlot('${slot}');renderGearScreen();updateHUD();">` +
            `<div class="gs-icon">${it.icon}</div><div class="gs-name" style="color:${rc}">${it.name}</div>` +
            `<div class="gs-name">${lines}</div></div>`;
   }).join('');
@@ -7383,14 +7509,14 @@ function renderGearScreen() {
   st.innerHTML = gearStash.map((it, i) => {
     const rc = RARITY_COL[it.rarity];
     const lines = Object.entries(_dispStats(it)).map(([k,v])=>`${k} ${v}`).join(' · ');
-    return `<div class="stash-card" style="border-color:${rc}">` +
+    return `<div class="stash-card rar-${it.rarity}">` +
            `<div class="sc-name" style="color:${rc}">${it.icon} ${it.name}</div>` +
            `<div class="sc-stats">${lines} · ilvl ${it.ilvl}</div>` +
            `<div class="sc-row">` +
            `<button onclick="equipItem(gearStash[${i}]);renderGearScreen();updateHUD();">EQUIP</button>` +
            `<button onclick="sellStashItem(${i});renderGearScreen();">SELL ${it.gold}g</button>` +
            `</div></div>`;
-  }).join('') || `<div style="color:#666;font-size:9px;">Stash is empty — defeat enemies and open chests.</div>`;
+  }).join('') || `<div style="color:#7a6a8a;font-size:9.5px;text-align:center;padding:14px;letter-spacing:1px;">Stash is empty — defeat enemies and open chests.</div>`;
 }
 const CHEST_REROLL_COST = 30;
 
