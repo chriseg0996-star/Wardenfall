@@ -2773,11 +2773,11 @@ const ENEMY_DEFS = {
   shielder:    { sprite:'shielder',    name:'Shield Bearer',    hp:110, atk:18, xp:60, gold:[15,35], speed:28, aggroR:120, w:22, h:28 },
   necromancer: { sprite:'necromancer', name:'Necromancer',      hp:80,  atk:10, xp:80, gold:[20,50], speed:22, aggroR:180, w:20, h:30 },
   // Phase K — Boss Floors (isBoss flag drives the boss HP bar, stair gating, death rewards).
-  colossus:    { sprite:'colossus',    name:'Bone Colossus',    hp:800, atk:35, xp:500, gold:[150,300], speed:22, aggroR:9999, w:40, h:48, isBoss:true },
-  broodmother: { sprite:'broodmother', name:'Brood Mother',     hp:650, atk:28, xp:500, gold:[120,260], speed:35, aggroR:9999, w:38, h:38, isBoss:true },
+  colossus:    { sprite:'colossus',    name:'Bone Colossus',    hp:800, atk:38, xp:500, gold:[150,300], speed:22, aggroR:9999, w:40, h:48, isBoss:true },
+  broodmother: { sprite:'broodmother', name:'Brood Mother',     hp:1000,atk:36, xp:500, gold:[120,260], speed:35, aggroR:9999, w:38, h:38, isBoss:true },
   // Phase T — Boss roster expansion
-  monarch:     { sprite:'colossus',    name:'Grave Monarch',    hp:1000,atk:44, xp:700, gold:[200,380], speed:24, aggroR:9999, w:40, h:48, isBoss:true },
-  warden:      { sprite:'warden',      name:'The Warden',       hp:1400,atk:38, xp:900, gold:[280,500], speed:30, aggroR:9999, w:48, h:56, isBoss:true },
+  monarch:     { sprite:'colossus',    name:'Grave Monarch',    hp:1100,atk:42, xp:700, gold:[200,380], speed:24, aggroR:9999, w:40, h:48, isBoss:true },
+  warden:      { sprite:'warden',      name:'The Warden',       hp:1500,atk:44, xp:900, gold:[280,500], speed:30, aggroR:9999, w:48, h:56, isBoss:true },
   wraith:      { sprite:'spider',      name:'Wraith',           hp:55,  atk:18, xp:30,  gold:[0,0],     speed:50, aggroR:240, w:22, h:22 },
 };
 
@@ -3006,29 +3006,79 @@ const SKILLS = {
 };
 // Phase R: SPELL_ORDER removed — slot → id now resolved via kitSkills()[slot].
 
-// Floor scaling: HP/ATK geometric, rewards additive. Stacks with player-level mult.
-function floorStatMul(floorNum) { return Math.pow(1.22, floorNum - 1); }     // ~+22%/floor
-function floorRewardBonus(floorNum) { return 1 + (floorNum - 1) * 0.18; }    // +18%/floor
+// ── Phase V — Explicit recLevel curves. Replaces the geometric 1.22^(f-1)
+// blowup that combined with the old 0.4-per-level lvMul produced ~330×
+// enemy HP at recLevel 20 / character Lv 15. Tables are anchors at every
+// recLevel (1..20) — easy to tune in one place; the values below are the
+// Phase V sim-validated targets (see __simBalance()).
+//   HP:  +20% per chapter (gentle), ATK: +15% per chapter (gentler).
+// floorRewardBonus stays geometric since XP/gold are inflation-only.
+const ENEMY_HP_SCALE_BY_LEVEL = {
+   1:1.00,  2:1.05,  3:1.10,  4:1.15,  5:1.22,   // ch1
+   6:1.28,  7:1.34,  8:1.42,  9:1.50, 10:1.60,   // ch2
+  11:1.70, 12:1.78, 13:1.85, 14:1.92, 15:2.00,   // ch3
+  16:2.08, 17:2.16, 18:2.24, 19:2.32, 20:2.40,   // ch4
+};
+const ENEMY_ATK_SCALE_BY_LEVEL = {
+   1:1.00,  2:1.04,  3:1.08,  4:1.12,  5:1.18,
+   6:1.22,  7:1.27,  8:1.33,  9:1.40, 10:1.48,
+  11:1.55, 12:1.62, 13:1.68, 14:1.75, 15:1.82,
+  16:1.88, 17:1.94, 18:2.00, 19:2.06, 20:2.12,
+};
+function enemyHpScale(rl)  { return ENEMY_HP_SCALE_BY_LEVEL[Math.max(1, Math.min(20, rl|0))]  || 1.0; }
+function enemyAtkScale(rl) { return ENEMY_ATK_SCALE_BY_LEVEL[Math.max(1, Math.min(20, rl|0))] || 1.0; }
+// Phase V — Damage mitigation. Replaces the old `Math.max(1, atk - def)`
+// flat-reduction formula that bottomed out as soon as def ≥ atk: a Knight
+// with ~33 def at rl1 already trivialized every mob (1 dmg/hit), and by
+// rl20 Knight def=410 vs Warden atk=298 meant the endgame boss did 1 dmg.
+//
+// New formula: drPct = def / (def + K_at(rl)), capped at 75%. K grows with
+// recLevel so high-tier gear doesn't outrun the curve. Always ≥ 1 dmg.
+//   rl1  K≈48:  def 10  → 17% DR;  def 33  → 41% DR
+//   rl10 K≈210: def 100 → 32% DR;  def 200 → 49% DR
+//   rl20 K≈390: def 200 → 34% DR;  def 410 → 51% DR
+// The 75% cap prevents any build from going untouchable.
+function _kFactorAt(rl) { return 30 + Math.max(1, Math.min(20, rl|0)) * 18; }
+function mitigateDmg(rawAtk, def, rl) {
+  const k = _kFactorAt(rl || (GameState && GameState.floorNum) || 1);
+  const drPct = Math.min(0.75, def / (def + k));
+  return Math.max(1, Math.round(rawAtk * (1 - drPct)));
+}
+// Back-compat shim: any leftover callers (none expected after Phase V) get
+// the HP curve. Reward bonus +22%/recLevel (was +18%) — pairs with the
+// tiered XP curve so endgame stages stay worth the time investment.
+function floorStatMul(floorNum) { return enemyHpScale(floorNum); }
+function floorRewardBonus(floorNum) { return 1 + (floorNum - 1) * 0.22; }
 
 function spawnEnemy(tx, ty, type) {
   const def = ENEMY_DEFS[type];
-  const lvMul = 1 + (player.level-1)*0.4;
-  const fMul  = floorStatMul(GameState.floorNum);
-  const rMul  = floorRewardBonus(GameState.floorNum);
+  // Phase V — gentler per-character-level slope (was 0.4, → 0.18). The old
+  // value made enemies 6.6× tougher at Lv 15 on top of fMul, producing
+  // ~330× HP at endgame. 0.18 keeps progression meaningful (~3.5× at Lv 15)
+  // without snowballing.
+  const lvMul = 1 + (player.level-1)*0.18;
+  const rl    = GameState.floorNum;
+  const fHpMul  = enemyHpScale(rl);
+  const fAtkMul = enemyAtkScale(rl);
+  const rMul    = floorRewardBonus(rl);
   // Phase T — Nightmare modifier. All enemies: HP × 1.7, ATK × 1.4. Bosses
   // get HP × 2 instead (compounded with the base 1.7 → effective ×3.4).
   // Reward bonuses scale too so the grind stays worth it.
   const nm  = (GameState.difficulty === 'nightmare');
   const isBoss = !!def.isBoss;
-  const hpMul  = nm ? (isBoss ? 1.7 * 2.0 : 1.7) : 1.0;
-  const atkMul = nm ? 1.4 : 1.0;
+  // Phase V — Nightmare: target is ~half the normal clear rate, not 0%. The
+  // original ×3.4 boss HP / ×1.4 atk multiplier made every Nightmare fight
+  // unwinnable. Tuned via sim to ×1.35 HP / ×1.15 atk that roughly halves
+  // normal-mode survival margin without making endgame bosses impossible.
+  const hpMul  = nm ? 1.35 : 1.0;
+  const atkMul = nm ? 1.15 : 1.0;
   const rwdMul = nm ? 1.35 : 1.0;
-  const hp    = Math.round(def.hp * lvMul * fMul * hpMul);
+  const hp    = Math.round(def.hp * lvMul * fHpMul * hpMul);
   enemies.push({
     x: tx*TILE+TILE/2, y: ty*TILE+TILE/2,
     w: def.w, h: def.h,
     hp, maxHp: hp,
-    atk: Math.round(def.atk * lvMul * fMul * atkMul),
+    atk: Math.round(def.atk * lvMul * fAtkMul * atkMul),
     xp:  Math.round(def.xp * rMul * rwdMul),
     gold: [Math.round(def.gold[0]*rMul*rwdMul), Math.round(def.gold[1]*rMul*rwdMul)],
     speed: def.speed, aggroR: def.aggroR,
@@ -3382,7 +3432,8 @@ function updateProjectiles(dt) {
           spawnFloatingText(player.x, player.y - player.h/2, 'SLOW', '#a0c0ff');  // Phase N
           projectiles.splice(i,1);
         } else if (player.iframes <= 0) {
-          let dmg = Math.max(1, pr.damage - Math.floor(player.def*0.5));
+          // Phase V — %-based DR via mitigateDmg (replaces flat -def×0.5).
+          let dmg = mitigateDmg(pr.damage, player.def, GameState.floorNum);
           if (player.stanceTimer > 0) dmg = Math.max(1, Math.round(dmg * 0.5));
           player.hp = Math.max(0, player.hp - dmg);
           player.iframes = 700;
@@ -4560,7 +4611,9 @@ function killEnemy(e) {
 
 function enemyAttackPlayer(e) {
   if(player.iframes>0) return;
-  let dmg = Math.max(1, e.atk - player.def + Math.floor(Math.random()*4-2));
+  // Phase V — %-based DR via mitigateDmg replaces the old flat e.atk-player.def.
+  const rawAtk = e.atk + Math.floor(Math.random()*4-2);
+  let dmg = mitigateDmg(Math.max(1, rawAtk), player.def, GameState.floorNum);
   if (player.stanceTimer > 0) dmg = Math.max(1, Math.round(dmg * 0.5));
   player.hp = Math.max(0, player.hp-dmg);
   player.iframes = 700;
@@ -4649,7 +4702,14 @@ function checkLevelUp() {
   if(player.xp >= player.xpNext) {
     player.level++;
     player.xp -= player.xpNext;
-    player.xpNext = Math.floor(player.xpNext*1.6);
+    // Phase V — tiered XP curve. The original ×1.6 per level made
+    // L15 require 120 k XP (players accumulate ~30 k clearing ch1-ch3),
+    // so the spec's "Ch4 reachable at character L15" was unreachable. Drop
+    // to ×1.45 from L10 onward; cumulative XP to L15 ≈ 48 k → ch3-clear
+    // lands at L13-14 entering ch4 (within spec range), and Nightmare's
+    // +35% reward bonus carries the player past L18 by ch4 Nightmare clear.
+    const mult = player.level >= 10 ? 1.45 : 1.6;
+    player.xpNext = Math.floor(player.xpNext * mult);
     recomputeStats({ fullHeal: true });        // Phase P — growth comes from CLASS_DEFS
     const gr = (CLASS_DEFS[player.classId] || CLASS_DEFS.mage).growth;
     addLog(`LEVEL UP! Lv.${player.level} — ATK+${gr.atk} DEF+${gr.def} HP full`, 'lvl');
@@ -5485,7 +5545,8 @@ function archerFire(e) {
 // through walls/pillars).
 function shielderBash(e) {
   if (player.iframes <= 0) {
-    let dmg = Math.max(1, Math.round(e.atk * 1.5) - Math.floor(player.def * 0.5));
+    // Phase V — %-based DR; bash hits for 1.5× base atk.
+    let dmg = mitigateDmg(Math.round(e.atk * 1.5), player.def, GameState.floorNum);
     if (player.stanceTimer > 0) dmg = Math.max(1, Math.round(dmg * 0.5));
     player.hp = Math.max(0, player.hp - dmg);
     player.iframes = 800;
@@ -5602,7 +5663,8 @@ function colossusSlam(e) {
   // Damage check
   const d = Math.hypot(player.x - e.x, player.y - e.y);
   if (d < 60 && player.iframes <= 0) {
-    let dmg = Math.max(1, e.atk * 2 - Math.floor(player.def * 0.5));
+    // Phase V — %-based DR; slam hits for 2× base atk.
+    let dmg = mitigateDmg(e.atk * 2, player.def, GameState.floorNum);
     if (player.stanceTimer > 0) dmg = Math.max(1, Math.round(dmg * 0.5));
     player.hp = Math.max(0, player.hp - dmg);
     player.iframes = 700;
@@ -5732,7 +5794,8 @@ function wardenSlam(e) {
   hitFlashes.push({ x: e.x, y: e.y, life: 1, maxLife: 1, scale: 5 });
   const d = Math.hypot(player.x - e.x, player.y - e.y);
   if (d < 70 && player.iframes <= 0) {
-    const dmg = Math.max(1, e.atk * 2 - Math.floor(player.def * 0.5));
+    // Phase V — %-based DR; Monarch slam = 2× atk.
+    const dmg = mitigateDmg(e.atk * 2, player.def, GameState.floorNum);
     player.hp = Math.max(0, player.hp - dmg);
     player.iframes = 700;
     RunStats.damageTaken += dmg;
@@ -8087,6 +8150,196 @@ function ssDraw(dt){
   }
   ctx.restore();
 }
+
+// ─────────────────────────────────────────────
+// Phase V — __simBalance() TTK harness
+// Pure-JS combat sim: per recLevel, build a typical loadout for each class
+// and run a melee/skill DPS race against each enemy archetype. Used to
+// validate the V.1 scaling tables and tune V.3/V.4/V.5 constants.
+//
+// NOT used in real combat. Reads ENEMY_DEFS, CLASS_DEFS, ENEMY_HP/ATK_SCALE,
+// and gearBudget — so any tuning change flows through automatically.
+// ─────────────────────────────────────────────
+function _simPlayerLevelAt(rl) {
+  // Empirical XP curve: ch1 clear → ~Lv5, ch2 → ~Lv9, ch3 → ~Lv12, ch4 → ~Lv15.
+  return Math.max(1, Math.min(20, Math.round(2 + rl * 0.7)));
+}
+function _simPlayerLoadout(klass, rl) {
+  const lvl = _simPlayerLevelAt(rl);
+  const b = classBaseStats(klass, lvl);
+  // Typical run: ilvl ≈ recLevel, average rarity = rare at mid game, epic by endgame.
+  const ilvl = rl;
+  const rarity = rl < 5 ? 'uncommon' : rl < 12 ? 'rare' : rl < 18 ? 'epic' : 'legendary';
+  // Simulate one piece per slot at this rarity tier, sum primary stats.
+  // Use deterministic mid-roll (rollMul = 1.0, primary share = 0.65, no jitter)
+  // so the sim is reproducible.
+  const SLOTS = ['weapon','helm','armor','boots','ring'];
+  const gear = { atk:0, def:0, hp:0, mp:0, spdPct:0 };
+  for (const slot of SLOTS) {
+    const budget = Math.round(gearBudget(ilvl) * RARITY_MULT[rarity]);
+    const prof = SLOT_PROFILE[slot];
+    const keys = Object.keys(prof);
+    const primary = keys.reduce((a,c) => prof[a] >= prof[c] ? a : c);
+    const primaryPts = Math.round(budget * 0.65);
+    gear[primary] += Math.round(primaryPts * STAT_RATE[primary]);
+    // Spread remaining points across secondaries weighted by profile.
+    let rem = budget - primaryPts;
+    const secs = keys.filter(k => k !== primary);
+    secs.forEach((k, i) => {
+      const share = prof[k] / secs.reduce((s, kk) => s + prof[kk], 0);
+      const pts = (i === secs.length - 1) ? rem : Math.round((budget - primaryPts) * share);
+      gear[k] += Math.round(pts * STAT_RATE[k]);
+      rem -= pts;
+    });
+  }
+  if (gear.spdPct > 100) gear.spdPct = 100;   // recomputeStats clamps to 100
+  // Per-piece spd cap is 40, total ~200; clamp to a realistic cap here.
+  gear.spdPct = Math.min(gear.spdPct, 80);
+  return {
+    klass, lvl, ilvl, rarity,
+    atk:   b.atk + gear.atk,
+    def:   b.def + gear.def,
+    hp:    b.hp  + gear.hp,
+    maxHp: b.hp  + gear.hp,
+    mp:    b.mp  + gear.mp,
+    maxMp: b.mp  + gear.mp,
+    speed: Math.round(b.speed * (1 + gear.spdPct/100)),
+  };
+}
+function _simEnemyStats(eType, rl, playerLvl, nightmare) {
+  const def = ENEMY_DEFS[eType];
+  if (!def) return null;
+  const lvMul  = 1 + (playerLvl - 1) * 0.18;
+  const fHp    = enemyHpScale(rl);
+  const fAtk   = enemyAtkScale(rl);
+  const isBoss = !!def.isBoss;
+  const hpMul  = nightmare ? 1.35 : 1.0;
+  const atkMul = nightmare ? 1.15 : 1.0;
+  return {
+    type: eType, name: def.name, isBoss,
+    hp:  Math.round(def.hp  * lvMul * fHp  * hpMul),
+    atk: Math.round(def.atk * lvMul * fAtk * atkMul),
+    // melee cooldown: ~1100ms baseline, bosses ~1800ms (matches AI dispatch)
+    attackCdMs: isBoss ? 1800 : 1100,
+  };
+}
+// Player DPS estimate including basic-attack rotation and class skill avg.
+// All values are sim-only — never touches the real combat path.
+function _simPlayerDps(p) {
+  // Basic attack: cd 480ms, dmg = atk ± 2 → avg = atk.
+  const baseSwing = p.atk;
+  const cdSec = 0.480;
+  let dps = baseSwing / cdSec;
+  // Ranger basic is bow shot every 480ms, ignore arc radius. Power+Multishot
+  // skills give ~25% sustained DPS over CDs.
+  if (p.klass === 'ranger') dps *= 1.25;
+  // Mage cycles firebolt every ~1.5s for ~atk×1.4 dmg, nova every ~6s for
+  // ~atk×2 AoE. Net sustained DPS bump ~+30%.
+  if (p.klass === 'mage')   dps *= 1.30;
+  // Knight whirlwind every ~5s for ~atk×3 AoE (3 hits over 1s). +20% sustained.
+  if (p.klass === 'knight') dps *= 1.20;
+  return dps;
+}
+// Incoming DPS estimate: %-based DR via mitigateDmg, per attack window.
+// Mirrors the real combat formula so sim numbers match in-game outcomes.
+function _simIncomingDps(e, p, rl) {
+  // Bosses get their special multiplier into rawAtk: Colossus/Brood/Monarch
+  // slam/bash hit for ~1.5–2× base atk, mixed with melee in real fights.
+  // Use 1.3× as a blended average for any boss; 1.0× for regular mobs.
+  const rawAtk = e.isBoss ? Math.round(e.atk * 1.3) : e.atk;
+  let perHit = mitigateDmg(rawAtk, p.def, rl);
+  // Knight Stalwart Stance halves dmg ~6s out of ~12s CD-with-cast window
+  // → ~15% net reduction in long fights (stance CD bites mid-boss).
+  if (p.klass === 'knight') perHit = Math.max(1, perHit * 0.85);
+  // Ranger kites at range; Multishot + Tumble break aggro and grant iframes.
+  // In a boss DPS race the kite advantage is large — model as ~20% reduction.
+  if (p.klass === 'ranger') perHit = Math.max(1, perHit * 0.80);
+  // Mage uses Mend HoT to top off mid-fight; Nova as panic AoE. ~15% reduction.
+  if (p.klass === 'mage')   perHit = Math.max(1, perHit * 0.85);
+  const cdSec = e.attackCdMs / 1000;
+  return perHit / cdSec;
+}
+function _simulateFight(p, e, rl) {
+  // Pure DPS race: TTK_player = enemy.hp / playerDps; over that time, player
+  // takes incomingDps × ttk damage. Approximate i-frames and dodge in DPS coefs.
+  const pdps = _simPlayerDps(p);
+  const edps = _simIncomingDps(e, p, rl);
+  const ttkP = e.hp  / pdps;   // seconds for player to kill enemy
+  const ttkE = p.hp  / edps;   // seconds for enemy to kill player
+  const playerWins = ttkP < ttkE;
+  const hpAfter = playerWins ? Math.max(0, p.hp - edps * ttkP) : 0;
+  return {
+    ttk_s: +ttkP.toFixed(2),
+    incoming_dps: +edps.toFixed(1),
+    player_dps:   +pdps.toFixed(1),
+    hp_after_pct: playerWins ? +(100 * hpAfter / p.maxHp).toFixed(0) : 0,
+    wins: playerWins,
+  };
+}
+window.__simBalance = function(opts) {
+  opts = opts || {};
+  const nightmare = !!opts.nightmare;
+  const classes = opts.classes || ['knight','ranger','mage'];
+  const mobTypes = ['spider','skeleton','archer','shielder','necromancer'];
+  const bossSpawn = { 5:'colossus', 10:'broodmother', 15:'monarch', 20:'warden' };
+  const rows = [];
+  for (let rl = 1; rl <= 20; rl++) {
+    const pLvl = _simPlayerLevelAt(rl);
+    for (const klass of classes) {
+      const p = _simPlayerLoadout(klass, rl);
+      // Average mob fight at this recLevel (mean of mob types).
+      const mobs = mobTypes.map(t => {
+        const e = _simEnemyStats(t, rl, pLvl, nightmare);
+        return { t, ...e, ..._simulateFight(p, e, rl) };
+      });
+      const avgTtk = mobs.reduce((s,m) => s+m.ttk_s, 0) / mobs.length;
+      const avgHpAfter = mobs.reduce((s,m) => s+m.hp_after_pct, 0) / mobs.length;
+      const winRate = mobs.filter(m => m.wins).length / mobs.length;
+      rows.push({
+        rl, klass, pLvl, pAtk:p.atk, pDef:p.def, pHp:p.maxHp,
+        mob_ttk_s: +avgTtk.toFixed(2),
+        mob_hp_after_pct: Math.round(avgHpAfter),
+        mob_win_rate: +(100*winRate).toFixed(0) + '%',
+      });
+      // Boss row at chapter ends
+      const bossType = bossSpawn[rl];
+      if (bossType) {
+        const b = _simEnemyStats(bossType, rl, pLvl, nightmare);
+        const r = _simulateFight(p, b, rl);
+        rows.push({
+          rl, klass, pLvl, boss:b.name, bossHp:b.hp, bossAtk:b.atk,
+          boss_ttk_s: r.ttk_s,
+          boss_hp_after_pct: r.hp_after_pct,
+          boss_wins: r.wins,
+        });
+      }
+    }
+  }
+  if (typeof console.table === 'function') console.table(rows);
+  return rows;
+};
+// Convenience: clear-rate summary across many sim seeds. Mob win-rate is
+// deterministic given the loadout, so we only vary opts.nightmare here —
+// the sim is meant for tuning, not Monte Carlo. Real "clear rate" comes
+// from N runs over many seeds; the sim gives the canonical baseline.
+window.__simBossClearRates = function() {
+  const norm = window.__simBalance({nightmare:false});
+  const nm   = window.__simBalance({nightmare:true});
+  const bosses = norm.filter(r => r.boss);
+  const nmBosses = nm.filter(r => r.boss);
+  const out = bosses.map(r => {
+    const nmRow = nmBosses.find(n => n.boss === r.boss && n.klass === r.klass);
+    return {
+      boss: r.boss, klass: r.klass,
+      normal_ttk_s: r.boss_ttk_s, normal_hp_after: r.boss_hp_after_pct + '%', normal_wins: r.boss_wins,
+      nightmare_ttk_s: nmRow ? nmRow.boss_ttk_s : null,
+      nightmare_hp_after: nmRow ? (nmRow.boss_hp_after_pct + '%') : null,
+      nightmare_wins: nmRow ? nmRow.boss_wins : null,
+    };
+  });
+  if (typeof console.table === 'function') console.table(out);
+  return out;
+};
 
 // Dev entry — launch the slice. Sets the mode, hides overlays, starts the loop.
 window.__sidescroll = function(){
