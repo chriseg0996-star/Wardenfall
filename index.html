@@ -285,6 +285,25 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 .cmap-change-btn:hover { background:#2a2040; border-color:#7050c0; }
 .cmap-hints { font-size:8px; color:#444; text-align:center; }
 .cmap-hints .key { background:#1a1a2a; border:1px solid #333; border-radius:2px; padding:1px 3px; color:#666; }
+/* Phase T — Nightmare toggle on the chapter map (shown once unlocked) */
+#cmap-difficulty-row {
+  display:flex; align-items:center; justify-content:center;
+  gap:8px; margin:6px 0 4px;
+}
+.cmap-diff-label { font-size:9px; color:#888; letter-spacing:2px; text-transform:uppercase; }
+.cmap-diff-btn {
+  background:#1a1a2a; border:1px solid #444; border-radius:3px;
+  padding:3px 12px; font-size:10px; cursor:pointer; letter-spacing:2px;
+  color:#aaa; font-family:'Courier New',monospace;
+}
+.cmap-diff-btn:hover { background:#2a2a40; }
+.cmap-diff-btn.active.normal {
+  background:#152030; border-color:#8090a0; color:#c0d0e0;
+}
+.cmap-diff-btn.active.nightmare {
+  background:#3a0a14; border-color:#c04040; color:#ffa0a0;
+  text-shadow:0 0 8px rgba(255,60,60,0.6);
+}
 #damage-vignette {
   position:absolute; inset:0; pointer-events:none;
   box-shadow:inset 0 0 60px rgba(200,30,30,0);
@@ -698,6 +717,66 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 @media (max-width: 540px) {
   .results-stats { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Phase T — Victory overlay shown on The Warden's death */
+#victory-overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,0.96);
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  z-index:230; font-family:'Courier New',monospace; color:#aaa;
+  opacity:0; transition: opacity 1.0s ease-out;
+}
+#victory-overlay.show { display:flex; }
+#victory-overlay.show-anim { opacity:1; }
+.victory-panel {
+  background:#0a0814; border:1px solid #8a6020; border-radius:4px;
+  padding:22px 26px; min-width:340px; max-width:96vw; max-height:92vh; overflow-y:auto;
+  box-shadow:0 0 80px rgba(240,180,40,0.40);
+}
+.victory-header {
+  color:#ffe080; font-size:22px; letter-spacing:6px; text-align:center;
+  margin-bottom:8px; text-shadow:0 0 16px rgba(255,210,80,0.75);
+}
+.victory-sub {
+  color:#ffa040; font-size:11px; text-align:center; letter-spacing:3px;
+  margin-bottom:16px;
+}
+.victory-stats {
+  display:grid; grid-template-columns: repeat(3, 1fr); gap:6px 10px;
+  margin-bottom:14px;
+}
+.victory-stat {
+  background:#15151c; border:1px solid #2a2a3a; border-radius:3px;
+  padding:6px 6px 7px; text-align:center;
+}
+.victory-stat .ds-label { font-size:8px; color:#666; letter-spacing:1px; text-transform:uppercase; }
+.victory-stat .ds-value { font-size:14px; color:#f0c060; font-weight:bold; margin-top:3px; }
+.victory-crown {
+  background:linear-gradient(135deg,#1a1408,#3a2810);
+  border:2px solid #f0c060; border-radius:4px;
+  padding:10px; margin-bottom:14px; text-align:center;
+  box-shadow:0 0 30px rgba(240,200,60,0.45);
+}
+.victory-crown-label { font-size:8px; color:#a08040; letter-spacing:2px; margin-bottom:4px; }
+.victory-crown-name { font-size:14px; color:#ffe080; font-weight:bold; margin-bottom:3px; text-shadow:0 0 8px rgba(255,210,80,0.65); }
+.victory-crown-stats { font-size:10px; color:#c0a060; }
+.victory-actions {
+  display:flex; justify-content:center; gap:10px; margin-top:6px;
+}
+.victory-btn {
+  background:linear-gradient(135deg,#2a1840,#4a2870);
+  border:1px solid #6040a0; border-radius:3px; padding:8px 18px;
+  color:#e0c0ff; font-size:11px; cursor:pointer; letter-spacing:2px;
+  font-family:'Courier New',monospace;
+}
+.victory-btn:hover { background:linear-gradient(135deg,#3a2060,#5a30a0); }
+.victory-btn.primary {
+  background:linear-gradient(135deg,#601818,#a02828);
+  border-color:#c04040; color:#ffe0e0;
+}
+.victory-btn.primary:hover { background:linear-gradient(135deg,#801818,#c03030); }
+@media (max-width: 540px) {
+  .victory-stats { grid-template-columns: repeat(2, 1fr); }
+}
 </style>
 </head>
 <body>
@@ -805,6 +884,8 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
         <span id="cmap-gold"></span>
       </div>
     </div>
+    <!-- Phase T — Nightmare toggle (visible only after first Warden kill) -->
+    <div id="cmap-difficulty-row" style="display:none"></div>
     <div class="cmap-chapters" id="cmap-chapters"></div>
     <div class="cmap-footer">
       <button class="cmap-change-btn" onclick="syncAccount();hideChapterMap();showCharSelect();">CHANGE HERO</button>
@@ -860,6 +941,24 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
       <div class="results-actions">
         <button class="results-btn primary" onclick="hideResults();showChapterMap()">CONTINUE</button>
         <button class="results-btn" onclick="hideResults();launchStage(GameState.chapter,GameState.stageIdx)">RETRY</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase T — Victory overlay (shown on The Warden's death) -->
+  <div id="victory-overlay">
+    <div class="victory-panel">
+      <div class="victory-header">THE WARDEN HAS FALLEN</div>
+      <div class="victory-sub">★ THE BLACK BASTION IS YOURS ★</div>
+      <div class="victory-stats" id="victory-stats"></div>
+      <div class="victory-crown" id="victory-crown" style="display:none">
+        <div class="victory-crown-label">REWARD OBTAINED</div>
+        <div class="victory-crown-name" id="victory-crown-name">The Warden's Crown</div>
+        <div class="victory-crown-stats" id="victory-crown-stats"></div>
+      </div>
+      <div class="victory-actions">
+        <button class="victory-btn primary" id="victory-continue">CONTINUE → NIGHTMARE</button>
+        <button class="victory-btn" id="victory-newhero">NEW HERO</button>
       </div>
     </div>
   </div>
@@ -981,6 +1080,10 @@ const PAL = {
   chitin: { base:'#1e0c0c', hi:'#3a1414', sh:'#0a0408' },
   bloodE: '#ff2020',   // spider eye core
   bloodH: '#ff8080',   // spider eye hot center
+  // Phase T — Boss palette additions
+  monarch:  { base:'#3a1850', hi:'#6a30a0', sh:'#1a0828' },   // Grave Monarch purple cape
+  warden:   { base:'#0a0a14', hi:'#1a1a28', sh:'#000000' },   // The Warden black silhouette
+  wardenE:  '#ffe4a0',                                          // Warden's cold-ember accents (eyes/crown)
 };
 
 // ─────────────────────────────────────────────
@@ -1889,6 +1992,65 @@ function buildSprites() {
     g.fillStyle = '#caa078'; g.fillRect(19, 22, 1, 1); g.fillRect(26, 22, 1, 1);  // dripping tips
   });
 
+  // Phase T — THE WARDEN (chapter 4 endgame boss, 56×64).
+  // Wide black silhouette, iron-and-gold crown of thorns, single cold-ember
+  // pupil. PAL.warden + PAL.wardenE accents. Reads as the final-form void king.
+  makeSprite('warden', 56, 64, (g) => {
+    const W = PAL.warden, M = PAL.metal, GP = PAL.gold, R = PAL.rag;
+    const EM = PAL.wardenE;
+    // ── massive cloak / silhouette ──
+    g.fillStyle = W.sh;   g.fillRect( 4, 16, 48, 46);          // outer shadow flare
+    g.fillStyle = W.base; g.fillRect( 6, 18, 44, 42);          // body
+    g.fillStyle = W.hi;   g.fillRect( 8, 20,  6, 38);          // left rim catchlight
+    g.fillStyle = W.hi;   g.fillRect(28, 20,  2, 38);          // center pleat
+    // ── ragged hem ──
+    g.fillStyle = W.sh;
+    g.fillRect( 4, 58, 8, 4);  g.fillRect(14, 58, 6, 5);
+    g.fillRect(22, 58, 6, 4);  g.fillRect(30, 58, 7, 5);
+    g.fillRect(39, 58, 6, 4);  g.fillRect(47, 58, 5, 5);
+    // ── massive shoulders (pauldrons) ──
+    g.fillStyle = M.sh;   g.fillRect( 2, 18, 12, 12); g.fillRect(42, 18, 12, 12);
+    g.fillStyle = M.base; g.fillRect( 3, 19, 10, 10); g.fillRect(43, 19, 10, 10);
+    g.fillStyle = M.hi;   g.fillRect( 3, 19, 10,  2); g.fillRect(43, 19, 10,  2);
+    // ── arms (shadow) ──
+    g.fillStyle = W.sh;   g.fillRect( 4, 28, 6, 18); g.fillRect(46, 28, 6, 18);
+    g.fillStyle = '#000'; g.fillRect( 4, 28, 4, 18); g.fillRect(48, 28, 4, 18);
+    // ── chest emblem (cold ember sigil) ──
+    g.fillStyle = '#1a1820'; g.fillRect(24, 28, 8, 10);
+    g.fillStyle = EM;        g.fillRect(27, 31, 2, 4);
+    g.fillStyle = EM;        g.fillRect(26, 33, 4, 1);
+    g.fillStyle = '#fff8c0'; g.fillRect(27, 32, 2, 1);
+    // ── belt ──
+    g.fillStyle = W.sh;   g.fillRect( 6, 40, 44, 3);
+    g.fillStyle = GP.sh;  g.fillRect(25, 40,  6, 3);
+    g.fillStyle = GP.base; g.fillRect(26, 40,  4, 2);
+    // ── helm (top half of head — dark, no face) ──
+    g.fillStyle = W.sh;   g.fillRect(14,  4, 28, 18);
+    g.fillStyle = W.base; g.fillRect(15,  5, 26, 16);
+    g.fillStyle = W.hi;   g.fillRect(15,  5, 26,  2);
+    g.fillStyle = W.hi;   g.fillRect(15,  5,  2, 16);
+    // ── single cold-ember pupil (the Warden's tell) ──
+    g.fillStyle = '#1a0a14'; g.fillRect(26,  9,  8,  4);  // socket void
+    g.fillStyle = EM;        g.fillRect(28, 10,  4,  2);  // ember
+    g.fillStyle = '#fff';    g.fillRect(29, 10,  2,  1);  // bright core
+    // ── iron crown of thorns (5 jagged spikes) ──
+    g.fillStyle = GP.sh;   g.fillRect(13,  0, 30,  4);
+    g.fillStyle = GP.base; g.fillRect(13,  0, 30,  3);
+    g.fillStyle = GP.hi;
+    g.fillRect(15, -0, 3, 4);  // left horn
+    g.fillRect(21, -0, 2, 5);  // mid-left
+    g.fillRect(27, -0, 2, 6);  // center spike (tallest)
+    g.fillRect(33, -0, 2, 5);  // mid-right
+    g.fillRect(38, -0, 3, 4);  // right horn
+    g.fillStyle = '#5a3018';
+    g.fillRect(16, 0, 1, 3); g.fillRect(22, 0, 1, 4);
+    g.fillRect(28, 0, 1, 5); g.fillRect(34, 0, 1, 4); g.fillRect(39, 0, 1, 3);
+    // ── jagged shoulder rags ──
+    g.fillStyle = R.sh;
+    g.fillRect( 0, 22, 4, 8); g.fillRect(52, 22, 4, 8);
+    g.fillRect( 0, 30, 2, 4); g.fillRect(54, 30, 2, 4);
+  });
+
   // GOLD COIN
   makeSprite('coin', 12, 12, (g) => {
     g.fillStyle = '#e0b820'; g.beginPath(); g.ellipse(6,6,5,5,0,0,Math.PI*2); g.fill();
@@ -2252,7 +2414,11 @@ function generateItem(ilvl, opts) {
   let rarity = opts.rarity || _pickRarity(ilvl);
   if (opts.minRarity && RARITY_RANK[rarity] < RARITY_RANK[opts.minRarity]) rarity = opts.minRarity;
   const slot   = opts.slot || GEAR_SLOTS[Math.floor(Math.random()*GEAR_SLOTS.length)];
-  const budget = Math.max(2, Math.round(gearBudget(ilvl) * RARITY_MULT[rarity] * (0.85 + Math.random()*0.3)));
+  // Phase T — forceMaxRolls (used for The Warden's Crown) pegs the budget
+  // multiplier at its max (1.15 instead of the 0.85..1.15 random band) so
+  // legendaries from Warden death are always at the top of the roll table.
+  const rollMul = opts.forceMaxRolls ? 1.15 : (0.85 + Math.random()*0.3);
+  const budget = Math.max(2, Math.round(gearBudget(ilvl) * RARITY_MULT[rarity] * rollMul));
   const prof   = SLOT_PROFILE[slot];
   const keys   = Object.keys(prof);
   const primary = keys.reduce((a,b) => prof[a] >= prof[b] ? a : b);
@@ -2609,6 +2775,10 @@ const ENEMY_DEFS = {
   // Phase K — Boss Floors (isBoss flag drives the boss HP bar, stair gating, death rewards).
   colossus:    { sprite:'colossus',    name:'Bone Colossus',    hp:800, atk:35, xp:500, gold:[150,300], speed:22, aggroR:9999, w:40, h:48, isBoss:true },
   broodmother: { sprite:'broodmother', name:'Brood Mother',     hp:650, atk:28, xp:500, gold:[120,260], speed:35, aggroR:9999, w:38, h:38, isBoss:true },
+  // Phase T — Boss roster expansion
+  monarch:     { sprite:'colossus',    name:'Grave Monarch',    hp:1000,atk:44, xp:700, gold:[200,380], speed:24, aggroR:9999, w:40, h:48, isBoss:true },
+  warden:      { sprite:'warden',      name:'The Warden',       hp:1400,atk:38, xp:900, gold:[280,500], speed:30, aggroR:9999, w:48, h:56, isBoss:true },
+  wraith:      { sprite:'spider',      name:'Wraith',           hp:55,  atk:18, xp:30,  gold:[0,0],     speed:50, aggroR:240, w:22, h:22 },
 };
 
 function isBossEnemy(e) {
@@ -2845,14 +3015,22 @@ function spawnEnemy(tx, ty, type) {
   const lvMul = 1 + (player.level-1)*0.4;
   const fMul  = floorStatMul(GameState.floorNum);
   const rMul  = floorRewardBonus(GameState.floorNum);
-  const hp    = Math.round(def.hp * lvMul * fMul);
+  // Phase T — Nightmare modifier. All enemies: HP × 1.7, ATK × 1.4. Bosses
+  // get HP × 2 instead (compounded with the base 1.7 → effective ×3.4).
+  // Reward bonuses scale too so the grind stays worth it.
+  const nm  = (GameState.difficulty === 'nightmare');
+  const isBoss = !!def.isBoss;
+  const hpMul  = nm ? (isBoss ? 1.7 * 2.0 : 1.7) : 1.0;
+  const atkMul = nm ? 1.4 : 1.0;
+  const rwdMul = nm ? 1.35 : 1.0;
+  const hp    = Math.round(def.hp * lvMul * fMul * hpMul);
   enemies.push({
     x: tx*TILE+TILE/2, y: ty*TILE+TILE/2,
     w: def.w, h: def.h,
     hp, maxHp: hp,
-    atk: Math.round(def.atk * lvMul * fMul),
-    xp: Math.round(def.xp * rMul),
-    gold: [Math.round(def.gold[0]*rMul), Math.round(def.gold[1]*rMul)],
+    atk: Math.round(def.atk * lvMul * fMul * atkMul),
+    xp:  Math.round(def.xp * rMul * rwdMul),
+    gold: [Math.round(def.gold[0]*rMul*rwdMul), Math.round(def.gold[1]*rMul*rwdMul)],
     speed: def.speed, aggroR: def.aggroR,
     type, name: def.name, sprite: def.sprite,
     attackCd: 0, wanderTimer:0, wanderDx:0, wanderDy:0,
@@ -2879,6 +3057,11 @@ function spawnEnemy(tx, ty, type) {
     pendingAttack: null,    // 'melee'|'bash'|'slam'|'bone'|'arrow'|'web' or null
     // Phase R — Knight bash stun
     stunTimer:     0,       // ms remaining of stun (frozen, no attack, no move)
+    // Phase T — Nightmare boss "rage": counts up while alive in Nightmare;
+    // at 30 s, the boss's attackCd/bashCd are halved for the rest of the
+    // fight. Only used when isBoss AND difficulty==='nightmare'.
+    rageTimer:     0,
+    raged:         false,
   });
 }
 
@@ -2906,11 +3089,17 @@ function populateFloor() {
     spawnEnemy(tx, ty, pickEnemyType(GameState.floorNum));
     placed++;
   }
-  // Phase K — spawn the boss at the centre of its arena.
+  // Phase K + Phase T — spawn the boss at the centre of its arena.
+  // Boss roster expanded for chapters 3/4 (Phase T) — dispatch by chapter
+  // when the stage select is driving floor 5/10/15/20.
   if (bossRoom) {
     const bx = bossRoom.x + Math.floor(bossRoom.w / 2);
     const by = bossRoom.y + Math.floor(bossRoom.h / 2);
-    const bossType = ((GameState.floorNum / 5) % 2 === 1) ? 'colossus' : 'broodmother';
+    const ch = GameState.chapter || (((GameState.floorNum - 1) / 5 | 0) + 1);
+    const bossType = ch === 1 ? 'colossus'
+                   : ch === 2 ? 'broodmother'
+                   : ch === 3 ? 'monarch'
+                   : 'warden';
     spawnEnemy(bx, by, bossType);
   }
 }
@@ -3660,6 +3849,29 @@ function drawProjectiles() {
         ctx.stroke();
       }
       ctx.restore();
+    } else if (pr.kind === 'lance') {
+      // Phase T — Warden Shadow Lance: dark steel spear with a glowing
+      // cold-ember tip. Rotated along velocity vector. Heavy hit area.
+      ctx.save();
+      ctx.translate(pr.x, pr.y);
+      ctx.rotate(Math.atan2(pr.vy, pr.vx));
+      // Trailing shadow halo
+      ctx.fillStyle = 'rgba(40,20,60,0.55)';
+      ctx.fillRect(-12, -4, 22, 8);
+      // Shaft
+      ctx.fillStyle = '#1a1020';
+      ctx.fillRect(-10, -2, 16, 4);
+      ctx.fillStyle = '#3a2840';
+      ctx.fillRect(-10, -2, 16, 1);   // catchlight
+      // Spear tip (cold ember)
+      ctx.fillStyle = '#ffe4a0';
+      ctx.fillRect(6, -2, 5, 4);
+      ctx.fillStyle = '#fff8c0';
+      ctx.fillRect(7, -1, 3, 2);
+      // Fletching shadow
+      ctx.fillStyle = '#0a0014';
+      ctx.fillRect(-12, -3, 3, 6);
+      ctx.restore();
     } else {
       ctx.fillStyle = '#c0a0ff';
       ctx.fillRect(pr.x-pr.w/2, pr.y-pr.h/2, pr.w, pr.h);
@@ -3957,24 +4169,50 @@ function killEnemy(e) {
     e.summonerRef.summonCount--;
   }
 
-  // Phase K — Boss Floors: death rewards + stair reveal. Guaranteed
+  // Phase K + Phase T — Boss death rewards: stair reveal, guaranteed
   // rarity-floor drop, gold bonus, full player HP, big roar.
   if (isBossEnemy(e)) {
     dungeon.bossDefeated = true;
     revealBossStair();
     SFX.boss_roar();
     triggerShake(8, 500);
-    // Drop pool: epic+ for colossus, rare+ for broodmother.
-    const bossMinRarity = (e.type === 'colossus') ? 'epic' : 'rare';
-    spawnItem(e.x, e.y - 18, generateItem(GameState.floorNum, { minRarity: bossMinRarity }));
+    // Phase T — rarity floor by boss + Crown special-case for Warden.
+    const bossMinRarity = (e.type === 'warden')   ? 'legendary'
+                        : (e.type === 'monarch')  ? 'epic'
+                        : (e.type === 'colossus') ? 'epic'
+                        : 'rare';
+    if (e.type === 'warden') {
+      // The Warden's Crown — legendary helm, all 3 affixes maxed, at the
+      // player's recLevel cap. Generated via generateItem with slot + tier
+      // forced; the existing chest-card pickup flow handles acquireItem.
+      const crown = generateItem(20, { slot: 'helm', minRarity: 'legendary', forceMaxRolls: true });
+      crown.name = "The Warden's Crown";
+      spawnItem(e.x, e.y - 18, crown);
+    } else {
+      spawnItem(e.x, e.y - 18, generateItem(GameState.floorNum, { minRarity: bossMinRarity }));
+    }
     // Gold bonus on top of the rolled drop.
-    const bonusGold = (e.type === 'colossus') ? 300 : 250;
+    const bonusGold = (e.type === 'warden')   ? 500
+                    : (e.type === 'monarch')  ? 380
+                    : (e.type === 'colossus') ? 300
+                    : 250;
     spawnGold(e.x, e.y + 6, bonusGold);
     // Full player heal as a victory mercy.
     player.hp = player.maxHp;
     updateHUD();
     updateBossHP();
     addLog(`${e.name} falls. HP restored.`, 'lvl');
+    // Phase T — Warden death triggers victory overlay + nightmare unlock.
+    if (e.type === 'warden') {
+      try {
+        if (account && account.progress) {
+          account.progress.nightmareUnlocked = true;
+          saveAccount();
+        }
+      } catch {}
+      // Defer one frame so the death FX renders before the overlay paints.
+      setTimeout(() => showVictory(), 60);
+    }
   }
 
   // Phase B + Phase I: per-type death dissolve
@@ -4302,6 +4540,71 @@ function hideResults() {
   const overlay = document.getElementById('results-overlay');
   if (!overlay) return;
   overlay.classList.remove('show', 'show-anim');
+}
+
+// ─────────────────────────────────────────────
+// Phase T — Victory overlay (The Warden's death)
+// Fired from killEnemy when e.type === 'warden'. Shows run stats + the
+// Crown drop card; CONTINUE → flips into Nightmare mode (account flag
+// was already set in killEnemy) and returns to chapter 1 stage 1. NEW
+// HERO returns to character select.
+// ─────────────────────────────────────────────
+let victoryShown = false;     // session guard so repeated kills don't re-stack the overlay
+
+function showVictory() {
+  if (victoryShown) return;
+  victoryShown = true;
+  const overlay = document.getElementById('victory-overlay');
+  if (!overlay) return;
+  // Stats grid — final run telemetry. Reuses RunStats from Phase L.
+  const stats = document.getElementById('victory-stats');
+  const elapsed = Date.now() - (RunStats.startTime || Date.now());
+  stats.innerHTML = `
+    <div class="victory-stat"><div class="ds-label">Enemies Slain</div><div class="ds-value">${RunStats.enemiesKilled}</div></div>
+    <div class="victory-stat"><div class="ds-label">Bosses Felled</div><div class="ds-value">${RunStats.bossesKilled}</div></div>
+    <div class="victory-stat"><div class="ds-label">Gold</div><div class="ds-value">${RunStats.goldCollected}</div></div>
+    <div class="victory-stat"><div class="ds-label">Damage Dealt</div><div class="ds-value">${RunStats.damageDealt}</div></div>
+    <div class="victory-stat"><div class="ds-label">Damage Taken</div><div class="ds-value">${RunStats.damageTaken}</div></div>
+    <div class="victory-stat"><div class="ds-label">Time</div><div class="ds-value">${_formatRunTime(elapsed)}</div></div>
+  `;
+  // Crown card if dropped this run (the Warden death always drops it).
+  const crownBox = document.getElementById('victory-crown');
+  if (crownBox && RunStats.bestItem) {
+    const statsLine = Object.entries(RunStats.bestItem.stats || {})
+      .filter(([k,v]) => v > 0)
+      .map(([k,v]) => `${k.toUpperCase()} +${v}`)
+      .join('  ');
+    document.getElementById('victory-crown-name').textContent = RunStats.bestItem.name || "The Warden's Crown";
+    document.getElementById('victory-crown-stats').textContent = statsLine || 'legendary';
+    crownBox.style.display = 'block';
+  }
+  // Buttons
+  document.getElementById('victory-continue').onclick = () => {
+    hideVictory();
+    // Flip the chapter map into Nightmare mode + return to chapter 1.
+    try {
+      if (account && account.progress) {
+        account.progress.nightmareUnlocked = true;
+        saveAccount();
+      }
+    } catch {}
+    GameState.difficulty = 'nightmare';
+    if (typeof hideResults === 'function') hideResults();
+    if (typeof showChapterMap === 'function') showChapterMap();
+  };
+  document.getElementById('victory-newhero').onclick = () => {
+    hideVictory();
+    if (typeof showCharSelect === 'function') showCharSelect();
+  };
+  overlay.classList.add('show');
+  requestAnimationFrame(() => overlay.classList.add('show-anim'));
+}
+
+function hideVictory() {
+  const overlay = document.getElementById('victory-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('show', 'show-anim');
+  victoryShown = false;
 }
 
 // ─────────────────────────────────────────────
@@ -4688,6 +4991,21 @@ function drawGame(dt) {
         ctx.fillRect(sx, sy - 4, sprites[e.sprite].width, 2);
         ctx.globalAlpha = 1;
       }
+      // Phase T — Grave Monarch render: purple cape overlay on the colossus
+      // silhouette so the death-king remix reads distinct from Bone Colossus.
+      if (e.type === 'monarch') {
+        const sw = sprites[e.sprite].width, sh = sprites[e.sprite].height;
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = PAL.monarch.base;
+        // Cape — covers shoulders + back, hangs below the silhouette
+        ctx.fillRect(sx + 4, sy + 14, sw - 8, sh - 14);
+        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = PAL.monarch.hi;
+        ctx.fillRect(sx + 5, sy + 14, 3, sh - 14);          // catchlight stripe
+        ctx.fillStyle = PAL.monarch.sh;
+        ctx.fillRect(sx + 4, sy + sh - 4, sw - 8, 4);        // hem shadow
+        ctx.globalAlpha = 1;
+      }
       // Phase I — shielder: highlight when actively blocking.
       if (e.type === 'shielder' && e.shieldedNow) {
         ctx.globalAlpha = 0.55;
@@ -4827,6 +5145,10 @@ function executeQueuedAttack(e) {
     case 'bone':  colossusBoneThrow(e); break;
     case 'arrow': archerFire(e); break;
     case 'web':   broodmotherWebSpit(e); break;
+    // Phase T — endgame boss attacks
+    case 'lurch':       monarchLurch(e); break;
+    case 'warden_slam': wardenSlam(e); break;
+    case 'lance':       wardenLance(e); break;
   }
 }
 
@@ -4908,8 +5230,24 @@ function triggerPhaseFlash() {
 // shake, flash, and a log line. Idempotent (only fires on the actual
 // 1→2 transition because e.phase becomes 2 afterwards).
 function checkBossPhase(e) {
-  if (e.phase !== 1) return;
   const pct = e.hp / e.maxHp;
+  // Phase T — Warden has THREE phase gates; others have one.
+  if (e.type === 'warden') {
+    if (e.phase === 1 && pct <= 0.75) {
+      e.phase = 2;
+      triggerShake(8, 400); triggerPhaseFlash();
+      SFX.boss_phase(); SFX.boss_roar();
+      addLog('The Warden invokes Shadow Lances!', 'lvl');
+    } else if (e.phase === 2 && pct <= 0.10) {
+      e.phase = 3;
+      e.speed = 0;                    // channels — does not move
+      triggerShake(10, 500); triggerPhaseFlash();
+      SFX.boss_phase(); SFX.boss_roar();
+      addLog('The Warden calls the wraiths!', 'lvl');
+    }
+    return;
+  }
+  if (e.phase !== 1) return;
   if (e.type === 'colossus' && pct <= 0.5) {
     e.phase = 2;
     e.speed = 38;
@@ -4926,6 +5264,16 @@ function checkBossPhase(e) {
     SFX.boss_phase();
     SFX.boss_roar();
     addLog('The Brood Mother calls her children!', 'lvl');
+  } else if (e.type === 'monarch' && pct <= 0.5) {
+    // Phase T — Grave Monarch enrages: speed up + slam cd shortened.
+    e.phase = 2;
+    e.speed = Math.round(e.speed * 1.3);
+    e.slamCdMul = 0.6;                  // applied at slam queue time
+    triggerShake(8, 400);
+    triggerPhaseFlash();
+    SFX.boss_phase();
+    SFX.boss_roar();
+    addLog('The Grave Monarch awakens his wrath!', 'lvl');
   }
 }
 
@@ -5021,6 +5369,123 @@ function broodmotherSummon(e) {
     e.summonCount++;
     spawnParticles(pick.wx, pick.wy, 12, '#5a1818');
     spawnParticles(pick.wx, pick.wy,  6, '#a04040');
+  }
+  if (toSpawn > 0) SFX.summon();
+}
+
+// ─────────────────────────────────────────────
+// Phase T — Boss & Endgame AI helpers
+// ─────────────────────────────────────────────
+
+// Grave Monarch's signature ability — Grave Lurch: a 5s-cadence AoE pulse
+// at the boss origin that PULLS the player toward the boss (impulse on
+// player.x/y stepped through moveEntity, no damage). The reposition is
+// the pressure; the slam/bone-throw that follows is the damage.
+function monarchLurch(e) {
+  e.attackCd = 5000;            // own ability cooldown; slam still on bashCd
+  SFX.boss_roar();
+  triggerShake(5, 250);
+  // Particle ring (purple) — telegraphs the pull zone after the wind-up
+  for (let i = 0; i < 28; i++) {
+    const ang = (i / 28) * Math.PI * 2;
+    const spd = 60 + Math.random()*35;
+    particles.push({
+      x: e.x, y: e.y,
+      vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd,
+      life: 1.2, maxLife: 1.2,
+      col: ['#a040c0','#5a1880','#3a1850','#e080ff'][i % 4],
+      size: 2 + Math.random()*2,
+    });
+  }
+  // Pull the player ~50 px toward the boss, stepped through moveEntity so
+  // walls/pillars still block (no tunnelling). No damage applied.
+  const ang = Math.atan2(e.y - player.y, e.x - player.x);
+  const stepPx = 8, totalPx = 50;
+  const steps = Math.ceil(totalPx / stepPx);
+  for (let s = 0; s < steps; s++) {
+    moveEntity(player, Math.cos(ang)*stepPx, Math.sin(ang)*stepPx, 1);
+  }
+  spawnFloatingText(player.x, player.y - player.h/2, 'PULLED', '#c080ff');
+}
+
+// The Warden's ground slam — like colossus but with cold-ember particles
+// and tighter timing for the endgame.
+function wardenSlam(e) {
+  e.attackCd = 3000;
+  SFX.boss_slam();
+  triggerShake(9, 450);
+  for (let i = 0; i < 32; i++) {
+    const ang = (i / 32) * Math.PI * 2;
+    const spd = 140 + Math.random()*50;
+    particles.push({
+      x: e.x, y: e.y,
+      vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd,
+      life: 1.6, maxLife: 1.6,
+      col: ['#1a1a28','#0a0a14','#ffe4a0','#fff8c0'][i % 4],
+      size: 3 + Math.random()*2,
+    });
+  }
+  hitFlashes.push({ x: e.x, y: e.y, life: 1, maxLife: 1, scale: 5 });
+  const d = Math.hypot(player.x - e.x, player.y - e.y);
+  if (d < 70 && player.iframes <= 0) {
+    const dmg = Math.max(1, e.atk * 2 - Math.floor(player.def * 0.5));
+    player.hp = Math.max(0, player.hp - dmg);
+    player.iframes = 700;
+    RunStats.damageTaken += dmg;
+    spawnFloatingText(player.x, player.y - player.h/2, dmg, '#e05050');
+    addLog(`WARDEN SLAM! -${dmg} HP`, 'dmg');
+    triggerDamageVignette();
+    updateHUD();
+    if (player.hp <= 0) playerDie();
+  }
+}
+
+// The Warden's phase-2 ability — Shadow Lance: spawns a projectile aimed
+// at the player's CURRENT position (the windup already provided the tell
+// via the yellow flash). Uses a new 'lance' projectile kind rendered as a
+// fast red-dark spear with a glowing tip; drawProjectiles handles the
+// visual.
+function wardenLance(e) {
+  e.bashCd = 1400;       // secondary cooldown — slam stays on attackCd
+  const ang = Math.atan2(player.y - e.y, player.x - e.x);
+  spawnProjectile({
+    x: e.x + Math.cos(ang) * 26,
+    y: e.y + Math.sin(ang) * 26,
+    vx: Math.cos(ang) * 260, vy: Math.sin(ang) * 260,
+    w: 18, h: 6, life: 1500,
+    owner: 'enemy',
+    damage: Math.round(e.atk * 1.3),
+    kind: 'lance',
+  });
+  SFX.arrow_fire();
+}
+
+// Warden phase-3 wraith summon. Spawns up to (cap - already alive) wraiths
+// at random walkable tiles within 96 px. Wraiths are spider re-skins with
+// cold-palette death FX and faster speed — fast pressure when the Warden
+// freezes to channel.
+function wardenSummonWraiths(e) {
+  if (!dungeon || !dungeon.walkGrid) return;
+  const eTX = Math.floor(e.x / TILE), eTY = Math.floor(e.y / TILE);
+  const toSpawn = Math.min(2, 2 - e.summonCount);   // cap of 2
+  for (let n = 0; n < toSpawn; n++) {
+    const candidates = [];
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const tx = eTX + dx, ty = eTY + dy;
+      if (!walkAt(tx, ty)) continue;
+      const wx = tx * TILE + TILE/2, wy = ty * TILE + TILE/2;
+      if (Math.hypot(wx - e.x, wy - e.y) > 96) continue;
+      candidates.push({ tx, ty, wx, wy });
+    }
+    if (candidates.length === 0) break;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    spawnEnemy(pick.tx, pick.ty, 'wraith');
+    const sp = enemies[enemies.length - 1];
+    sp.summonerRef = e;
+    e.summonCount++;
+    spawnParticles(pick.wx, pick.wy, 14, '#a0c0ff');
+    spawnParticles(pick.wx, pick.wy,  8, '#ffe4a0');
   }
   if (toSpawn > 0) SFX.summon();
 }
@@ -5303,6 +5768,21 @@ function update(dt) {
     e.attackCd = Math.max(0, e.attackCd - dt);
     e.bashCd   = Math.max(0, e.bashCd   - dt);     // Phase I (shielder)
     e.iframes  = Math.max(0, e.iframes  - dt);
+    // Phase T — Nightmare boss rage. At 30 s into the fight, halve attack
+    // CDs for the rest of the engagement. One-shot transition guarded by
+    // e.raged so we don't keep halving every frame.
+    if (isBossEnemy(e) && GameState.difficulty === 'nightmare' && !e.raged) {
+      e.rageTimer += dt;
+      if (e.rageTimer >= 30000) {
+        e.raged = true;
+        e.attackCd = Math.floor(e.attackCd * 0.5);
+        e.bashCd   = Math.floor(e.bashCd   * 0.5);
+        triggerShake(7, 350);
+        triggerPhaseFlash();
+        SFX.boss_roar();
+        addLog(`${e.name} bursts with nightmare rage!`, 'lvl');
+      }
+    }
     // Phase N — telegraph: tick the windup; fire the queued attack on expiry.
     if (e.windupTimer > 0) {
       e.windupTimer = Math.max(0, e.windupTimer - dt);
@@ -5451,6 +5931,40 @@ function update(dt) {
             e.summonTimer -= dt;
             if (e.summonTimer <= 0 && e.summonCount < 4) {
               broodmotherSummon(e);
+              e.summonTimer = 2500;
+            }
+          }
+          break;
+
+        case 'monarch':
+          // Phase T — Grave Monarch: Colossus pattern + Grave Lurch pull.
+          checkBossPhase(e);
+          // Slam (60 px AoE) gates on attackCd; phase-2 multiplier shortens cd.
+          if (dist < 60 && e.attackCd <= 0) queueAttack(e, 'slam');
+          // Bone throw — both phases, secondary cooldown.
+          if (dist > 50 && e.bashCd <= 0) queueAttack(e, 'bone');
+          // Grave Lurch — its own timer; pulls player toward boss.
+          e.lurchTimer = (e.lurchTimer || 5000) - dt;
+          if (e.lurchTimer <= 0 && dist > 40 && dist < 260) {
+            queueAttack(e, 'lurch');
+            e.lurchTimer = 5000;
+          }
+          break;
+
+        case 'warden':
+          // Phase T — The Warden: 3-phase endgame boss.
+          checkBossPhase(e);
+          // P1+: ground slam in melee range, 70 px AoE.
+          if (dist < 70 && e.attackCd <= 0) queueAttack(e, 'warden_slam');
+          // P2+: Shadow Lances at any range, fast 1.4 s cd.
+          if (e.phase >= 2 && dist > 30 && dist < 320 && e.bashCd <= 0) {
+            queueAttack(e, 'lance');
+          }
+          // P3: stop moving + summon wraiths every 2.5 s, max 2 alive.
+          if (e.phase === 3) {
+            e.summonTimer = (e.summonTimer || 0) - dt;
+            if (e.summonTimer <= 0 && e.summonCount < 2) {
+              wardenSummonWraiths(e);
               e.summonTimer = 2500;
             }
           }
@@ -6249,6 +6763,9 @@ function showChapterMap() {
   document.getElementById('cmap-hero').textContent = `${icon} Lv.${player.level} ${(def ? def.name : '').toUpperCase()}`;
   document.getElementById('cmap-gold').textContent = `${player.gold}g`;
 
+  // Phase T — Nightmare toggle UI (shown only once unlocked via Warden kill).
+  _renderNightmareToggle();
+
   const container = document.getElementById('cmap-chapters');
   container.innerHTML = '';
   CHAPTERS.forEach(ch => {
@@ -6294,6 +6811,31 @@ function showChapterMap() {
 
 function hideChapterMap() {
   document.getElementById('chaptermap-overlay').classList.remove('open');
+}
+
+// Phase T — Nightmare toggle UI helper. The row stays hidden until the
+// player kills The Warden once (account.progress.nightmareUnlocked === true).
+// Two buttons: NORMAL / NIGHTMARE — clicking flips GameState.difficulty
+// (which feeds stageSeed and spawnEnemy modifiers), then re-renders the
+// chapter map so seeds/labels refresh.
+function _renderNightmareToggle() {
+  const row = document.getElementById('cmap-difficulty-row');
+  if (!row) return;
+  const unlocked = !!(account && account.progress && account.progress.nightmareUnlocked);
+  if (!unlocked) { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  const cur = GameState.difficulty === 'nightmare' ? 'nightmare' : 'normal';
+  row.innerHTML = `
+    <span class="cmap-diff-label">Difficulty</span>
+    <button class="cmap-diff-btn active normal ${cur==='normal'?'active':''}"     style="${cur!=='normal'?'opacity:0.5;':''}" data-diff="normal">NORMAL</button>
+    <button class="cmap-diff-btn active nightmare ${cur==='nightmare'?'active':''}" style="${cur!=='nightmare'?'opacity:0.5;':''}" data-diff="nightmare">NIGHTMARE</button>
+  `;
+  row.querySelectorAll('button[data-diff]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      GameState.difficulty = btn.dataset.diff;
+      if (typeof showChapterMap === 'function') showChapterMap();   // re-render with new state
+    });
+  });
 }
 
 // Phase S — launchStage: wires GameState to the chosen (chapter, stage),
