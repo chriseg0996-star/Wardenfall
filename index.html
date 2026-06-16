@@ -27,23 +27,45 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   position:absolute; top:0; left:0; width:100%; pointer-events:none;
   font-family:'Courier New',monospace;
 }
+/* Phase AC — Stats panel: class portrait + bigger HP/MP/XP bars, single
+   gradient-paneled card matching the menu visual vocabulary. */
 #stats-panel {
   position:absolute; top:8px; left:8px;
-  background:rgba(0,0,0,0.82); border:1px solid #3a3a4a;
-  border-radius:4px; padding:7px 10px; min-width:150px;
+  background:linear-gradient(135deg, rgba(14,10,22,0.92), rgba(22,16,32,0.88));
+  border:1px solid rgba(80,64,120,0.55); border-radius:5px;
+  padding:8px 10px 9px; min-width:200px;
+  display:flex; flex-direction:row; align-items:stretch; gap:10px;
   pointer-events:none;
+  box-shadow:0 0 14px rgba(80,40,160,0.18);
 }
-.hero-name { color:#f0c060; font-size:12px; font-weight:bold; margin-bottom:5px; }
+#hud-portrait {
+  width:48px; height:48px; image-rendering:pixelated;
+  border:1px solid rgba(192,160,80,0.55); border-radius:3px;
+  background:rgba(6,4,12,0.6);
+  align-self:flex-start;
+  box-shadow:0 0 8px rgba(240,176,72,0.18);
+}
+.stats-panel-body { display:flex; flex-direction:column; flex:1; min-width:140px; gap:1px; }
+.hero-name {
+  color:#f0c060; font-size:12px; font-weight:bold; margin-bottom:4px;
+  letter-spacing:1.5px;
+  text-shadow:0 0 6px rgba(240,176,72,0.35);
+}
 .bar-row { display:flex; align-items:center; gap:5px; margin:2px 0; }
-.bar-lbl { font-size:9px; width:18px; font-family:'Courier New',monospace; }
-.bar-bg { flex:1; height:7px; background:#1a1a22; border-radius:2px; overflow:hidden; border:1px solid #333; }
+.bar-lbl { font-size:9px; width:18px; font-family:'Courier New',monospace; letter-spacing:0.5px; }
+.bar-bg {
+  flex:1; height:10px;
+  background:rgba(8,6,14,0.85);
+  border-radius:2px; overflow:hidden;
+  border:1px solid rgba(74,58,90,0.55);
+}
 .bar-fill { height:100%; border-radius:1px; transition:width 0.15s; }
-.hp-f { background:linear-gradient(90deg,#8b1a1a,#e03030); }
-.mp-f { background:linear-gradient(90deg,#1a3a8b,#3060e0); }
-.xp-f { background:linear-gradient(90deg,#5a1a8b,#9030e0); }
-.bar-val { font-size:9px; color:#777; width:46px; text-align:right; font-family:'Courier New',monospace; }
-.stat-row { font-size:9px; color:#888; margin-top:4px; }
-.stat-row span { color:#f0c060; }
+.hp-f { background:linear-gradient(90deg,#5a0e0e,#e03030); box-shadow:inset 0 0 6px rgba(255,80,80,0.35); }
+.mp-f { background:linear-gradient(90deg,#0e1e5a,#3060e0); box-shadow:inset 0 0 6px rgba(80,120,255,0.35); }
+.xp-f { background:linear-gradient(90deg,#3a0e5a,#9030e0); box-shadow:inset 0 0 6px rgba(160,80,255,0.35); }
+.bar-val { font-size:9.5px; color:#a896c0; width:60px; text-align:right; font-family:'Courier New',monospace; }
+.stat-row { font-size:9.5px; color:#a896c0; margin-top:5px; letter-spacing:1px; }
+.stat-row span { color:#f0c060; font-weight:bold; }
 
 #floor-label {
   position:absolute; top:8px; left:50%; transform:translateX(-50%);
@@ -80,22 +102,47 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 .log-sys  { color:#8080a0; }
 .log-lvl  { color:#c060ff; }
 
+/* Phase AC — Bottom hotbar overhaul. Single horizontal command bar
+   centered at the bottom of the viewport with bigger slots, gold key
+   chips, themed cooldown overlay, and MP cost pill so the hotbar reads
+   as the primary skill UI instead of a side panel. The right-stack
+   touch buttons are hidden on desktop so they don't compete. */
 #hotbar-panel {
-  position:absolute; bottom:8px; left:8px;
-  background:rgba(0,0,0,0.8); border:1px solid #3a3a4a;
-  border-radius:3px; padding:5px 7px;
+  position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+  background:linear-gradient(135deg, rgba(14,10,22,0.92), rgba(22,16,32,0.88));
+  border:1px solid rgba(80,64,120,0.55); border-radius:5px;
+  padding:6px 8px;
   pointer-events:none;
+  box-shadow:0 0 16px rgba(80,40,160,0.18);
 }
-.hb-title { font-size:9px; color:#f0c060; font-family:'Courier New',monospace; margin-bottom:4px; }
-#hotbar { display:flex; gap:3px; }
+.hb-title { display:none; }   /* Phase AC — title row dropped; the hotbar is self-explanatory */
+#hotbar { display:flex; gap:5px; }
 .hb-slot {
-  width:34px; height:34px; background:#111118; border:1px solid #444;
-  border-radius:3px; display:flex; align-items:center; justify-content:center;
-  font-size:16px; position:relative;
+  width:44px; height:44px;
+  background:linear-gradient(135deg, rgba(8,6,14,0.95), rgba(18,14,26,0.95));
+  border:1px solid rgba(80,64,120,0.5);
+  border-radius:4px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; position:relative;
+  transition:border-color 80ms ease, transform 80ms ease;
 }
-.hb-slot.active { border-color:#f0c060; }
-.hb-key { position:absolute; top:1px; left:3px; font-size:7px; color:#555; font-family:'Courier New',monospace; }
-.hb-cnt { position:absolute; bottom:1px; right:3px; font-size:8px; color:#ffd; font-family:'Courier New',monospace; }
+.hb-slot.active {
+  border-color:#f0c060;
+  box-shadow:0 0 10px rgba(240,176,72,0.32);
+}
+.hb-key {
+  position:absolute; top:2px; left:3px;
+  font-size:8.5px; color:#f0c060; font-family:'Courier New',monospace;
+  font-weight:bold;
+  text-shadow:0 0 3px rgba(0,0,0,0.9);
+  letter-spacing:0.5px;
+}
+.hb-cnt {
+  position:absolute; bottom:1px; right:3px;
+  font-size:9px; color:#fff8dc; font-family:'Courier New',monospace;
+  font-weight:bold;
+  text-shadow:0 0 3px rgba(0,0,0,0.95);
+}
 
 /* Tooltip */
 #tooltip {
@@ -167,13 +214,25 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   text-shadow:0 0 2px #000, 0 0 2px #000; z-index:2;
 }
 
-/* Hotbar cooldown overlay (fills bottom-up) */
+/* Hotbar cooldown overlay (fills bottom-up) — Phase AC tuned for the
+   larger 44px slots: darker veil for legibility, rounded radius to match. */
 .hb-cd-fill {
   position:absolute; left:0; bottom:0; width:100%;
-  background:rgba(0,0,0,0.55); pointer-events:none; border-radius:2px;
+  background:rgba(6,4,12,0.72); pointer-events:none; border-radius:0 0 3px 3px;
 }
-.hb-mp { color:#6090ff !important; }
-.hb-slot.cooldown { border-color:#334; }
+.hb-mp { color:#80a8ff !important; }
+.hb-slot.cooldown { border-color:rgba(50,42,72,0.7); }
+.hb-slot.cooldown .hb-key { color:#7a6a8a; }
+/* Phase AC — Touch buttons (right-stack + bottom attack/potion) are
+   only useful on real touch devices. Hidden on desktop so the bottom
+   hotbar reads as the single source of truth for skills. The joystick
+   zone is JS-driven (only shows after pointerdown), so we leave it
+   visible for hybrid devices. */
+@media (hover: hover) and (pointer: fine) {
+  #spell-btns,
+  #potion-btn,
+  #attack-btn { display: none !important; }
+}
 
 /* Overlay screens */
 /* Phase X — Title screen overhaul. Transparent middle band lets the
@@ -1147,23 +1206,26 @@ body.menu-screen #joystick-knob { display:none !important; }
   <!-- HUD -->
   <div id="hud">
     <div id="stats-panel">
-      <div class="hero-name">Hero <span id="lvl-span" style="color:#a0c0ff;font-size:10px">Lv.1</span></div>
-      <div class="bar-row">
-        <span class="bar-lbl" style="color:#e03030">HP</span>
-        <div class="bar-bg"><div class="bar-fill hp-f" id="hp-bar" style="width:100%"></div></div>
-        <span class="bar-val" id="hp-val">100/100</span>
+      <img id="hud-portrait" alt="">
+      <div class="stats-panel-body">
+        <div class="hero-name"><span id="hero-name-text">Hero</span> <span id="lvl-span" style="color:#a0c0ff;font-size:10px">Lv.1</span></div>
+        <div class="bar-row">
+          <span class="bar-lbl" style="color:#e03030">HP</span>
+          <div class="bar-bg"><div class="bar-fill hp-f" id="hp-bar" style="width:100%"></div></div>
+          <span class="bar-val" id="hp-val">100/100</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-lbl" style="color:#3060e0">MP</span>
+          <div class="bar-bg"><div class="bar-fill mp-f" id="mp-bar" style="width:100%"></div></div>
+          <span class="bar-val" id="mp-val">50/50</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-lbl" style="color:#9030e0">XP</span>
+          <div class="bar-bg"><div class="bar-fill xp-f" id="xp-bar" style="width:0%"></div></div>
+          <span class="bar-val" id="xp-val">0/100</span>
+        </div>
+        <div class="stat-row">ATK:<span id="atk-v"> 12</span> &nbsp;DEF:<span id="def-v"> 5</span></div>
       </div>
-      <div class="bar-row">
-        <span class="bar-lbl" style="color:#3060e0">MP</span>
-        <div class="bar-bg"><div class="bar-fill mp-f" id="mp-bar" style="width:100%"></div></div>
-        <span class="bar-val" id="mp-val">50/50</span>
-      </div>
-      <div class="bar-row">
-        <span class="bar-lbl" style="color:#9030e0">XP</span>
-        <div class="bar-bg"><div class="bar-fill xp-f" id="xp-bar" style="width:0%"></div></div>
-        <span class="bar-val" id="xp-val">0/100</span>
-      </div>
-      <div class="stat-row">ATK:<span id="atk-v"> 12</span> &nbsp;DEF:<span id="def-v"> 5</span></div>
     </div>
     <div id="floor-label">☠ The Cursed Keep — Floor 1</div>
     <!-- Phase K — Boss Floors: shown only when a boss is alive on this floor -->
@@ -5490,6 +5552,15 @@ function updateHUD() {
   document.getElementById('atk-v').textContent = ' '+p.atk;
   document.getElementById('def-v').textContent = ' '+p.def;
   document.getElementById('gold-v').textContent = p.gold;
+  // Phase AC — class portrait + name in the HUD panel.
+  const portraitEl = document.getElementById('hud-portrait');
+  const def = CLASS_DEFS[p.classId];
+  if (portraitEl && portraits[p.classId]) {
+    const src = portraits[p.classId].toDataURL();
+    if (portraitEl.src !== src) portraitEl.src = src;
+  }
+  const nameEl = document.getElementById('hero-name-text');
+  if (nameEl && def) nameEl.textContent = def.name;
 }
 // Phase K — Boss Floors: top-of-screen boss HP bar. Hidden when no boss
 // is alive on the current floor; shows name, hp/maxHp, and current phase.
