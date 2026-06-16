@@ -51,7 +51,7 @@ Every stage is reproducible from a seed.
   set, staggered re-planning, and walkable cache. Enemies route around
   pillars, walls, and corners.
 - **Custom keybinds** — full settings overlay (ESC), three presets
-  (Default / WoW QER+F / Arrows), per-action rebind, persisted.
+  (Default / Alt QER+F / Arrows), per-action rebind, persisted.
 - **Mobile-first** — joystick + spell buttons + attack/potion/pause/
   gear/settings touch controls scale to viewport. Tested on Chrome
   desktop + iOS Safari.
@@ -84,7 +84,7 @@ Ranger fires a bow shot.
 | Settings / Pause | `Esc` | ⏸ button |
 | Gear | `G` | ⚙ gear button |
 
-### WoW preset (Settings → "WoW (QER+F)")
+### Alt preset (Settings → "ALT (QER+F)")
 
 | Action | Key |
 |---|---|

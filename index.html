@@ -581,20 +581,36 @@ body.menu-screen #joystick-knob { display:none !important; }
 .settings-panel {
   background:linear-gradient(135deg, rgba(14,10,22,0.96), rgba(22,16,32,0.94));
   border:1px solid rgba(80,64,120,0.6); border-radius:5px;
-  padding:18px 22px 16px; min-width:340px; max-width:92vw; max-height:84vh;
+  padding:14px 20px 12px; min-width:340px; max-width:92vw; max-height:84vh;
   overflow-y:auto;
   box-shadow:0 0 36px rgba(120,60,180,0.22);
 }
 .settings-title {
-  color:#f0c060; font-size:18px; margin-bottom:14px; letter-spacing:5px;
+  color:#f0c060; font-size:17px; margin-bottom:10px; letter-spacing:5px;
   text-shadow:0 0 14px rgba(240,176,72,0.30), 0 0 3px rgba(240,176,72,0.7);
-  border-bottom:1px solid rgba(74,58,90,0.45); padding-bottom:10px;
+  border-bottom:1px solid rgba(74,58,90,0.45); padding-bottom:8px;
   text-align:center;
 }
 .settings-section {
   color:#c0a0ff; font-size:10px; letter-spacing:3px;
-  margin:14px 0 6px; padding-bottom:3px;
+  margin:10px 0 5px; padding-bottom:3px;
   border-bottom:1px solid rgba(74,58,90,0.3);
+}
+/* Phase AB — Active preset key summary. Compact chip row that mirrors the
+   currently-selected preset's actual key bindings, so the player sees what
+   each scheme does without having to open Customize Keys. */
+.preset-summary {
+  display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center;
+  margin:8px 0 0; padding:6px 8px;
+  background:rgba(8,6,14,0.55); border:1px solid rgba(74,58,90,0.3);
+  border-radius:3px;
+  font-size:9.5px; color:#8a78a4; letter-spacing:0.5px;
+}
+.preset-summary .ps-pair { display:flex; gap:4px; align-items:center; white-space:nowrap; }
+.preset-summary .ps-pair .ps-lbl { color:#7a6a8a; }
+.preset-summary .ps-pair .ps-key {
+  background:#1a1422; border:1px solid #4a3a5a; border-radius:2px;
+  padding:0 5px; color:#f0d8a0; font-size:9px; font-weight:bold;
 }
 .kb-row {
   display:flex; justify-content:space-between; align-items:center;
@@ -1282,8 +1298,8 @@ body.menu-screen #joystick-knob { display:none !important; }
       <div class="settings-section">AUDIO</div>
       <div id="audio-list"></div>
       <div class="settings-section">CONTROLS</div>
-      <div class="settings-subtle">Pick a control scheme, or expand to rebind individual keys.</div>
       <div class="preset-row" id="preset-row"></div>
+      <div class="preset-summary" id="preset-summary"></div>
       <button class="kb-toggle" id="kb-toggle" onclick="toggleKbList()">⌨ Customize keys ▸</button>
       <div id="kb-collapse" class="kb-collapse">
         <div id="kb-list"></div>
@@ -7157,7 +7173,10 @@ const DEFAULT_BINDINGS = {
 // Named presets the user can apply with one click.
 const KEYBIND_PRESETS = {
   default: DEFAULT_BINDINGS,
-  wow: {
+  // ALT layout — WASD + QER for spells + F for potion. Generic MMO/ARPG
+  // keybind familiar to players coming from games that put skills on the
+  // home row instead of the number row.
+  alt: {
     moveUp:    ['w'],
     moveDown:  ['s'],
     moveLeft:  ['a'],
@@ -7453,7 +7472,7 @@ function _detectActivePreset() {
     for (const act of actionKeys) {
       const cur = bindings[act] || [];
       const pre = preset[act];
-      // KEYBIND_PRESETS entries store either ['key'] or 'key' (wow style).
+      // KEYBIND_PRESETS entries store either ['key'] or 'key'.
       const preArr = Array.isArray(pre) ? pre : (pre != null ? [pre] : []);
       if (cur.length !== preArr.length) { match = false; break; }
       for (let i = 0; i < cur.length; i++) {
@@ -7468,12 +7487,39 @@ function _detectActivePreset() {
   return null;
 }
 
+// Phase AB — Render a compact key chip for a given action under the live
+// bindings (case-aware: 'Space' display, single letter uppercased). Used
+// by the preset summary row.
+function _prettyKey(k) {
+  if (k === ' ') return 'Space';
+  if (k === 'Escape') return 'Esc';
+  if (k && k.length === 1) return k.toUpperCase();
+  return k;
+}
+
 function renderSettings() {
   // Phase AA — Presets row with active highlight.
   const presetRow = document.getElementById('preset-row');
   const active = _detectActivePreset();
   const mk = (id, label) => `<button class="preset-btn${active===id?' active':''}" onclick="applyPreset('${id}')">${label}</button>`;
-  presetRow.innerHTML = mk('default', 'DEFAULT') + mk('wow', 'WoW (QER+F)') + mk('arrows', 'ARROWS');
+  presetRow.innerHTML = mk('default', 'DEFAULT') + mk('alt', 'ALT (QER+F)') + mk('arrows', 'ARROWS');
+
+  // Phase AB — Active-scheme summary row: shows the live bindings for the
+  // most-used actions so the player sees at a glance what the current
+  // preset does without expanding Customize Keys. Updates live whenever
+  // bindings change (renderSettings re-runs on every preset/rebind).
+  const sumEl = document.getElementById('preset-summary');
+  if (sumEl) {
+    const move = (bindings.moveUp[0] || '?') + (bindings.moveLeft[0] || '?')
+               + (bindings.moveDown[0] || '?') + (bindings.moveRight[0] || '?');
+    const moveDisp = /^[a-z]{4}$/i.test(move) ? move.toUpperCase() : 'Keys';
+    const pair = (lbl, key) => `<span class="ps-pair"><span class="ps-lbl">${lbl}</span><span class="ps-key">${_prettyKey(key)}</span></span>`;
+    sumEl.innerHTML =
+      `<span class="ps-pair"><span class="ps-lbl">Move</span><span class="ps-key">${moveDisp}</span></span>` +
+      pair('Attack', bindings.attack[0]) +
+      pair('Potion', bindings.potion[0]) +
+      pair('Skills', [bindings.spell0[0], bindings.spell1[0], bindings.spell2[0]].map(_prettyKey).join('/'));
+  }
   // Binding rows
   const list = document.getElementById('kb-list');
   list.innerHTML = Object.keys(DEFAULT_BINDINGS).map(act => {
