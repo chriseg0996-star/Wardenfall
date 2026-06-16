@@ -41,7 +41,8 @@ single file: `index.html`.
 - DONE — RPG Phase Q: gear system core (generateItem, equip/stash, gear screen, loot cards).
 - DONE — RPG Phase R: SKILLS kits (knight/ranger/mage), class sprites+portraits, account save, title/char-select.
 - DONE — RPG Phase S: chapter/stage select (4×5), stage seeds, stars, results screen, touch pause.
-- NEXT — RPG Phase T: bosses & endgame (Grave Monarch ch3, The Warden ch4, victory, Nightmare unlock).
+- DONE — RPG Phase T: bosses & endgame (Grave Monarch ch3 + Grave Lurch, The Warden ch4 w/ 3-phase AI + Shadow Lances + wraith summon + Crown drop, victory overlay, Nightmare difficulty + rage timer).
+- NEXT — RPG Phase U: procedural music (per-chapter ambient loops + boss track, crossfades, music volume in audio.v1).
 - ACTIVE — Side-scroll pivot: vertical slice behind GAME_MODE (spec/plan docs/superpowers/.../2026-06-12-sidescroll-*). Feel-gate pending user sign-off.
 
 ## First instruction to expect
