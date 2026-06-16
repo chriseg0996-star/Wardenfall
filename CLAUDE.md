@@ -45,6 +45,7 @@ single file: `index.html`.
 - DONE — RPG Phase U: procedural music (MODULE: MUSIC, 5 synthesized tracks — cursed_keep/bone_crypt/infernal_depths/black_bastion/boss, 800ms crossfade, musicMasterGain child of masterGain, music slider + mute in settings, persists in wardenfall.audio.v1).
 - DONE — RPG Phase V: balance pass (ENEMY_HP/ATK_SCALE_BY_LEVEL tables replace 1.22^f blowup, lvMul slope 0.40→0.18, mitigateDmg %-based DR replaces flat atk-def, boss base stats sim-tuned to hit 50/45/35/25% clear-rate windows, Nightmare softened to ×1.35 hp/×1.15 atk, XP curve tiered ×1.6/×1.45@L10, +22%/rl reward bonus, window.__simBalance() + __simBossClearRates() dev harness).
 - DONE — RPG Phase W: v1.0 release (README rewritten for current shipped state, canvas contextlost/restored recovery, window.__verifySeeds() determinism guard, Open Graph + Twitter card meta + inline SVG favicon, full preview probe pass — tagged as v1.0).
+- DONE — Phase X: title screen overhaul (procedural animated backdrop — castle gate + sconces + hooded hero silhouette + lantern flicker + drifting embers + twinkling stars; menu list with Continue/New Hero/Settings/Credits; v1.0 stamp + foot link; gradient vignette so scene shows through; HUD hidden via body.title-screen class; combined Credits + How to Play overlay; cursed_keep music starts on first user gesture and flows through to chapter map).
 - ACTIVE — Side-scroll pivot: vertical slice behind GAME_MODE (spec/plan docs/superpowers/.../2026-06-12-sidescroll-*). Feel-gate pending user sign-off.
 
 ## First instruction to expect
