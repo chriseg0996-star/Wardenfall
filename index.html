@@ -176,23 +176,111 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
 .hb-slot.cooldown { border-color:#334; }
 
 /* Overlay screens */
+/* Phase X — Title screen overhaul. Transparent middle band lets the
+   procedurally drawn title scene (drawTitleScene) show through, while
+   top + bottom vignettes anchor the wordmark and menu legibility. */
 #overlay {
-  position:absolute; inset:0; background:rgba(0,0,0,0.88);
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  z-index:100; font-family:'Courier New',monospace;
+  position:absolute; inset:0;
+  background:
+    linear-gradient(to bottom,
+      rgba(6,4,12,0.95) 0%,
+      rgba(6,4,12,0.72) 22%,
+      rgba(6,4,12,0.28) 50%,
+      rgba(6,4,12,0.55) 80%,
+      rgba(6,4,12,0.92) 100%);
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+  z-index:100; font-family:'Courier New',monospace; padding-top:8vh;
 }
-#overlay h1 { color:#f0c060; font-size:22px; margin-bottom:6px; letter-spacing:3px; }
-#overlay .sub { color:#8080a0; font-size:11px; margin-bottom:20px; }
+#title-stamp {
+  position:absolute; top:10px; right:14px;
+  color:#604058; font-size:10px; letter-spacing:2px;
+}
+#overlay h1 {
+  color:#f0c060; font-size:42px; margin-bottom:4px; letter-spacing:8px;
+  text-shadow: 0 0 18px rgba(240,176,72,0.35), 0 0 4px rgba(240,176,72,0.7);
+  animation: title-glow 4s ease-in-out infinite;
+}
+@keyframes title-glow {
+  0%, 100% { text-shadow: 0 0 14px rgba(240,176,72,0.30), 0 0 3px rgba(240,176,72,0.65); }
+  50%      { text-shadow: 0 0 26px rgba(240,176,72,0.55), 0 0 6px rgba(240,176,72,0.85); }
+}
+#overlay .sub {
+  color:#8a7090; font-size:11px; margin-bottom:32px; letter-spacing:3px;
+  font-style:italic;
+}
 .ctrl-row { color:#aaa; font-size:10px; margin:3px 0; }
 .ctrl-row .key { background:#222; border:1px solid #555; border-radius:2px; padding:1px 6px; color:#eee; }
-#start-btn {
-  margin-top:20px; padding:10px 28px;
-  background:linear-gradient(135deg,#3a2060,#6030a0);
-  border:1px solid #8050c0; border-radius:4px;
-  color:#e0c0ff; font-size:13px; cursor:pointer; letter-spacing:2px;
+/* Phase X — Menu list (Continue / New Hero / Settings / Credits) */
+#title-menu {
+  display:flex; flex-direction:column; gap:8px;
+  margin-top:auto; margin-bottom:48px;
+  min-width:240px;
+}
+.title-menu-item {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 18px;
+  background: linear-gradient(135deg, rgba(28,20,40,0.85), rgba(48,32,72,0.75));
+  border:1px solid rgba(128,80,200,0.5);
+  border-radius:3px;
+  color:#d0c4e6; font-size:12px; cursor:pointer; letter-spacing:3px;
+  font-family:'Courier New',monospace;
+  text-align:left;
+  transition: background 80ms ease, border-color 80ms ease, transform 80ms ease;
+}
+.title-menu-item:hover, .title-menu-item:focus {
+  background: linear-gradient(135deg, rgba(60,40,100,0.95), rgba(100,60,160,0.85));
+  border-color: rgba(224,192,255,0.85);
+  color:#f0e4ff; outline:none;
+  transform: translateY(-1px);
+}
+.title-menu-item .tm-icon { color:#f0c060; margin-right:10px; min-width:18px; }
+.title-menu-item .tm-hint { color:#8a6090; font-size:10px; letter-spacing:1px; margin-left:14px; }
+#title-foot {
+  position:absolute; bottom:8px; left:0; right:0;
+  text-align:center; color:#504058; font-size:9px; letter-spacing:1.5px;
+}
+#title-foot a { color:#7a5090; text-decoration:none; }
+#title-foot a:hover { color:#c090e0; }
+/* Phase X — Combined Credits + How to Play overlay */
+#credits-overlay {
+  position:absolute; inset:0; background:rgba(6,4,12,0.93);
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  z-index:130; font-family:'Courier New',monospace; padding:20px;
+}
+#credits-overlay.open { display:flex; }
+.credits-panel {
+  background:#0a0814; border:1px solid #3a2a4e; border-radius:4px;
+  padding:20px 26px; max-width:420px; width:100%;
+  max-height:84vh; overflow-y:auto;
+  box-shadow: 0 0 32px rgba(120,60,180,0.15);
+}
+.credits-panel h2 { color:#f0c060; font-size:16px; letter-spacing:4px; margin-bottom:10px; text-align:center; }
+.credits-panel h3 { color:#d0a0f0; font-size:11px; letter-spacing:2px; margin:14px 0 6px; }
+.credits-panel p, .credits-panel li { color:#9a8aa8; font-size:10.5px; line-height:1.55; }
+.credits-panel ul { list-style:none; padding-left:0; }
+.credits-panel .key {
+  background:#1a1422; border:1px solid #4a3a5a; border-radius:2px;
+  padding:1px 6px; color:#e0d0f0; font-size:9.5px;
+}
+.credits-close {
+  display:block; margin:18px auto 0; padding:6px 22px;
+  background:#2a1a40; border:1px solid #5a3a8a; border-radius:3px;
+  color:#e0c4ff; font-size:11px; cursor:pointer; letter-spacing:2px;
   font-family:'Courier New',monospace;
 }
-#start-btn:hover { background:linear-gradient(135deg,#4a30a0,#7040c0); }
+.credits-close:hover { background:#3a2a60; }
+/* Phase X — While #overlay is visible, hide all in-game HUD + touch buttons
+   that were leaking through the previous flat-alpha title. */
+body.title-screen #hud,
+body.title-screen #floor-label,
+body.title-screen #spell-btns,
+body.title-screen #attack-btn,
+body.title-screen #potion-btn,
+body.title-screen #gear-btn,
+body.title-screen #pause-btn,
+body.title-screen #joystick-zone,
+body.title-screen #joystick-base,
+body.title-screen #joystick-knob { display:none !important; }
 
 /* Phase R Task 6 — character select overlay */
 #charselect-overlay {
@@ -867,11 +955,43 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
     </div>
   </div>
 
-  <!-- Overlay -->
+  <!-- Phase X — Title overlay -->
   <div id="overlay">
+    <div id="title-stamp">v1.0</div>
     <h1>WARDENFALL</h1>
-    <div class="sub">The Cursed Keep — Descend or Perish</div>
-    <button id="start-btn" onclick="ensureAudio();document.getElementById('overlay').style.display='none';showCharSelect();">CHOOSE YOUR HERO</button>
+    <div class="sub">A roguelike of the cursed kingdom</div>
+    <div id="title-menu"></div>
+    <div id="title-foot">
+      vanilla JS · <a href="https://github.com/chriseg0996-star/Wardenfall" target="_blank" rel="noopener">github</a> · MIT
+    </div>
+  </div>
+
+  <!-- Phase X — Credits + Controls overlay -->
+  <div id="credits-overlay">
+    <div class="credits-panel">
+      <h2>WARDENFALL</h2>
+      <p style="text-align:center; color:#604a78;">v1.0 — A 2D dark-fantasy roguelike</p>
+      <h3>HOW TO PLAY</h3>
+      <ul>
+        <li>Pick a hero: <b style="color:#c8b8e8">Knight</b> (tank), <b style="color:#c8b8e8">Ranger</b> (kiter), <b style="color:#c8b8e8">Mage</b> (caster).</li>
+        <li>Descend by lantern light through 4 chapters × 5 stages.</li>
+        <li>Loot gear, level up, beat the chapter boss to advance.</li>
+        <li>Defeat <b style="color:#f0c060">The Warden</b> to unlock <b style="color:#e06060">Nightmare</b>.</li>
+      </ul>
+      <h3>CONTROLS</h3>
+      <ul>
+        <li><span class="key">WASD</span> / <span class="key">↑↓←→</span> Move</li>
+        <li><span class="key">Space</span> Attack &nbsp; <span class="key">H</span> Potion</li>
+        <li><span class="key">2</span> / <span class="key">3</span> / <span class="key">4</span> Skills</li>
+        <li><span class="key">I</span> Gear &nbsp; <span class="key">Esc</span> Settings (rebind keys, audio)</li>
+        <li>Mobile: left joystick + action buttons (right)</li>
+      </ul>
+      <h3>CREDITS</h3>
+      <p>Built by Christopher · designed + coded with <a href="https://claude.ai/code" target="_blank" rel="noopener" style="color:#c090e0">Claude Code</a>.</p>
+      <p>Single-file vanilla JavaScript. Zero dependencies. ~7500 lines.</p>
+      <p style="margin-top:8px;">Source: <a href="https://github.com/chriseg0996-star/Wardenfall" target="_blank" rel="noopener" style="color:#c090e0">github.com/chriseg0996-star/Wardenfall</a></p>
+      <button class="credits-close" onclick="hideCredits()">CLOSE</button>
+    </div>
   </div>
 
   <!-- Character Select overlay (Phase R Task 6) -->
@@ -6544,6 +6664,212 @@ function update(dt) {
 // ─────────────────────────────────────────────
 // (BUG-5 FIXED — potionPressed_prev moved up to module-state block)
 
+// ─────────────────────────────────────────────
+// MODULE: TITLE SCENE (Phase X)
+// Paints a procedural backdrop on the main canvas while the #overlay
+// title screen is visible: night-sky gradient, distant castle gate
+// silhouette with a warm sconce glow, near-ground horizon, hooded hero
+// silhouette breathing center-bottom, lantern in their off-hand flickering
+// warm light, and a fountain of drifting embers.
+//
+// Runs on its own RAF (`_titleRAF`) so the in-game `loop` doesn't have to
+// know about title state. Started in startGame (page-load init) and
+// stopped when the player picks a menu action.
+// ─────────────────────────────────────────────
+let _titleRAF = null;
+let _titleLastT = 0;
+let _titleEmbers = null;
+function startTitleScene() {
+  if (_titleRAF) return;     // idempotent
+  document.body.classList.add('title-screen');
+  _titleLastT = performance.now();
+  _titleEmbers = null;        // reseed on each show
+  const tick = (t) => {
+    if (_ctxLost) { _titleRAF = requestAnimationFrame(tick); return; }
+    drawTitleScene(t);
+    _titleRAF = requestAnimationFrame(tick);
+  };
+  _titleRAF = requestAnimationFrame(tick);
+}
+function stopTitleScene() {
+  document.body.classList.remove('title-screen');
+  if (_titleRAF) { cancelAnimationFrame(_titleRAF); _titleRAF = null; }
+}
+
+function drawTitleScene(t) {
+  const dt = Math.min(t - _titleLastT, 50);
+  _titleLastT = t;
+
+  // ── 1. Night-sky vertical gradient ──
+  const sky = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+  sky.addColorStop(0.00, '#06040c');
+  sky.addColorStop(0.45, '#100a1a');
+  sky.addColorStop(0.75, '#1a1024');
+  sky.addColorStop(1.00, '#08060e');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  // Faint stars (deterministic — same dots every frame, no jitter)
+  if (!drawTitleScene._stars) {
+    const arr = [];
+    let s = 0x1a2b3c4d;
+    const rng = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    for (let i = 0; i < 30; i++) arr.push({
+      x: (rng() * VIEW_W) | 0,
+      y: (rng() * VIEW_H * 0.5) | 0,
+      a: 0.15 + rng() * 0.35,
+      phase: rng() * Math.PI * 2,
+    });
+    drawTitleScene._stars = arr;
+  }
+  for (const st of drawTitleScene._stars) {
+    const tw = st.a + Math.sin(t * 0.001 + st.phase) * 0.12;
+    ctx.fillStyle = `rgba(220,210,255,${tw.toFixed(3)})`;
+    ctx.fillRect(st.x, st.y, 1, 1);
+  }
+
+  // ── 2. Distant castle gate silhouette ──
+  const horizon = (VIEW_H * 0.78) | 0;
+  // Wall
+  ctx.fillStyle = '#04030a';
+  ctx.fillRect(0, horizon - 30, VIEW_W, 30);
+  // Three towers
+  const towerXs = [VIEW_W * 0.20, VIEW_W * 0.50, VIEW_W * 0.80];
+  for (const tx of towerXs) {
+    const x = (tx - 14) | 0;
+    ctx.fillRect(x, horizon - 60, 28, 60);
+    // Crenellation
+    for (let c = 0; c < 4; c++) ctx.fillRect(x + c * 8, horizon - 64, 5, 5);
+    // Sconce window on center tower
+    if (tx === towerXs[1]) {
+      const lx = x + 14, ly = horizon - 40;
+      const flick = 0.55 + Math.sin(t * 0.012) * 0.18 + Math.sin(t * 0.029) * 0.08;
+      ctx.fillStyle = `rgba(255,150,60,${flick.toFixed(3)})`;
+      ctx.fillRect(lx - 2, ly - 3, 4, 6);
+      const tg = ctx.createRadialGradient(lx, ly, 0, lx, ly, 22);
+      tg.addColorStop(0, `rgba(255,140,60,${(0.35*flick).toFixed(3)})`);
+      tg.addColorStop(1, 'rgba(255,140,60,0)');
+      ctx.fillStyle = tg;
+      ctx.fillRect(lx - 24, ly - 24, 48, 48);
+    }
+  }
+  // Central gate arch
+  const gx = (VIEW_W / 2 - 16) | 0, gw = 32;
+  ctx.fillStyle = '#02010a';
+  ctx.beginPath();
+  ctx.moveTo(gx, horizon);
+  ctx.lineTo(gx, horizon - 24);
+  ctx.quadraticCurveTo(VIEW_W / 2, horizon - 36, gx + gw, horizon - 24);
+  ctx.lineTo(gx + gw, horizon);
+  ctx.fill();
+  // Gate glow (warm, behind the hero)
+  const gg = ctx.createRadialGradient(VIEW_W / 2, horizon - 12, 0, VIEW_W / 2, horizon - 12, 48);
+  gg.addColorStop(0, 'rgba(255,140,60,0.22)');
+  gg.addColorStop(1, 'rgba(255,140,60,0)');
+  ctx.fillStyle = gg;
+  ctx.fillRect(gx - 24, horizon - 60, gw + 48, 60);
+
+  // ── 3. Foreground ground ──
+  const ground = ctx.createLinearGradient(0, horizon, 0, VIEW_H);
+  ground.addColorStop(0, '#080510');
+  ground.addColorStop(1, '#04030a');
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, horizon, VIEW_W, VIEW_H - horizon);
+
+  // ── 4. Hooded hero silhouette (center-bottom, ~3.5× sprite size) ──
+  const breath = Math.sin(t * 0.0014) * 0.6;
+  const hx = (VIEW_W / 2) | 0;
+  const hy = horizon + 22 + breath;
+  // Cloak (wide trapezoid)
+  ctx.fillStyle = '#080414';
+  ctx.beginPath();
+  ctx.moveTo(hx - 24, hy + 36);
+  ctx.lineTo(hx - 13, hy);
+  ctx.lineTo(hx - 11, hy - 24);
+  ctx.lineTo(hx + 11, hy - 24);
+  ctx.lineTo(hx + 13, hy);
+  ctx.lineTo(hx + 24, hy + 36);
+  ctx.fill();
+  // Cloak inner shadow line
+  ctx.strokeStyle = 'rgba(40,28,52,0.6)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(hx, hy - 22); ctx.lineTo(hx, hy + 34);
+  ctx.stroke();
+  // Hood (rounded top)
+  ctx.fillStyle = '#100a1c';
+  ctx.beginPath();
+  ctx.moveTo(hx - 14, hy - 10);
+  ctx.lineTo(hx - 11, hy - 28);
+  ctx.quadraticCurveTo(hx, hy - 38, hx + 11, hy - 28);
+  ctx.lineTo(hx + 14, hy - 10);
+  ctx.lineTo(hx + 10, hy - 5);
+  ctx.lineTo(hx - 10, hy - 5);
+  ctx.fill();
+  // Hood inner darkness
+  ctx.fillStyle = '#04020a';
+  ctx.beginPath();
+  ctx.moveTo(hx - 10, hy - 12);
+  ctx.lineTo(hx - 8, hy - 23);
+  ctx.quadraticCurveTo(hx, hy - 30, hx + 8, hy - 23);
+  ctx.lineTo(hx + 10, hy - 12);
+  ctx.fill();
+  // Ember eyes
+  const eyeFlick = 0.85 + Math.sin(t * 0.006) * 0.15;
+  ctx.fillStyle = `rgba(255,138,64,${eyeFlick.toFixed(3)})`;
+  ctx.fillRect(hx - 4, hy - 19, 2, 2);
+  ctx.fillRect(hx + 2, hy - 19, 2, 2);
+
+  // ── 5. Lantern (right hand) + warm light cone ──
+  const lhx = hx + 16, lhy = hy - 2;
+  const flick = 1.0 + Math.sin(t * 0.013) * 0.10 + Math.sin(t * 0.031) * 0.05;
+  // Lantern frame (iron + warm interior)
+  ctx.fillStyle = '#2a1a0c';
+  ctx.fillRect(lhx - 3, lhy - 6, 6, 9);
+  ctx.fillStyle = '#5a3a18';
+  ctx.fillRect(lhx - 3, lhy - 6, 6, 1);
+  ctx.fillRect(lhx - 3, lhy + 2, 6, 1);
+  // Glowing interior
+  ctx.fillStyle = `rgba(255,180,80,${(0.9 * flick).toFixed(3)})`;
+  ctx.fillRect(lhx - 2, lhy - 4, 4, 5);
+  // Lantern light radial cone
+  const lr = 70 * flick;
+  const lg = ctx.createRadialGradient(lhx, lhy, 0, lhx, lhy, lr);
+  lg.addColorStop(0.00, `rgba(255,180,80,${(0.55 * flick).toFixed(3)})`);
+  lg.addColorStop(0.35, `rgba(255,140,60,${(0.18 * flick).toFixed(3)})`);
+  lg.addColorStop(1.00, 'rgba(255,120,40,0)');
+  ctx.fillStyle = lg;
+  ctx.fillRect(lhx - lr, lhy - lr, lr * 2, lr * 2);
+
+  // ── 6. Drifting embers (rising from off-screen bottom) ──
+  if (!_titleEmbers) {
+    _titleEmbers = [];
+    for (let i = 0; i < 18; i++) _titleEmbers.push({
+      x: Math.random() * VIEW_W,
+      y: VIEW_H + Math.random() * VIEW_H * 0.5,
+      vy: 0.012 + Math.random() * 0.022,
+      phase: Math.random() * Math.PI * 2,
+      life: Math.random(),
+      size: 1 + Math.random() * 0.8,
+    });
+  }
+  for (const e of _titleEmbers) {
+    e.y -= e.vy * dt;
+    e.x += Math.sin(e.phase + t * 0.0012) * 0.08 * (dt / 16);
+    e.life -= 0.00045 * dt;
+    if (e.y < -8 || e.life < 0) {
+      e.x = Math.random() * VIEW_W;
+      e.y = VIEW_H + 5;
+      e.vy = 0.012 + Math.random() * 0.022;
+      e.life = 1;
+      e.phase = Math.random() * Math.PI * 2;
+    }
+    const a = Math.max(0, Math.min(1, e.life)) * 0.75;
+    ctx.fillStyle = `rgba(255,${(140 + Math.sin(e.phase) * 30) | 0},60,${a.toFixed(3)})`;
+    ctx.fillRect(e.x | 0, e.y | 0, e.size | 0 || 1, e.size | 0 || 1);
+  }
+}
+
 function loop(ts) {
   const dt = Math.min(ts-lastTime, 50);
   lastTime = ts;
@@ -7121,8 +7447,10 @@ window.addEventListener('pointerup', e=>{
 
 // showCharSelect() — rebuilds cards each time (levels may change between runs).
 function showCharSelect() {
-  // Phase U — title flow has no soundtrack; stop whatever was playing.
-  if (typeof stopMusic === 'function') stopMusic(300);
+  // Phase X — menu music (cursed_keep) plays from title through charselect
+  // and chapter map. playMusic is idempotent on the same track id, so this
+  // is a no-op when the title scene already kicked the loop off.
+  if (typeof playMusic === 'function') playMusic('cursed_keep');
   const container = document.getElementById('cso-cards');
   container.innerHTML = '';
 
@@ -7345,11 +7673,105 @@ function returnToMap() {
   showChapterMap();
 }
 
+// ─────────────────────────────────────────────
+// MODULE: TITLE MENU (Phase X)
+// Populates #title-menu based on account state, wires action handlers.
+// Continue appears only when account has detectable progress (any
+// character above L1, any equipped gear, any stage stars). Otherwise
+// the player must pick a hero via New Hero → Character Select.
+// ─────────────────────────────────────────────
+function _hasProgress() {
+  if (!account) return false;
+  // Any character past L1?
+  for (const cid of ['knight','ranger','mage']) {
+    const c = account.characters[cid];
+    if (c && c.level && c.level > 1) return true;
+    if (c && c.equipped) {
+      for (const slot of GEAR_SLOTS) if (c.equipped[slot]) return true;
+    }
+  }
+  // Any stage cleared?
+  if (account.progress && account.progress.stages) {
+    for (const k in account.progress.stages) {
+      const e = account.progress.stages[k];
+      if (e && e.stars > 0) return true;
+    }
+  }
+  return false;
+}
+function renderTitleMenu() {
+  const list = document.getElementById('title-menu');
+  if (!list) return;
+  const items = [];
+  if (_hasProgress()) {
+    const cid = (CLASS_DEFS[account.lastPlayed] ? account.lastPlayed : 'mage');
+    const c   = account.characters[cid] || {};
+    const def = CLASS_DEFS[cid];
+    const hint = `${def ? def.icon : ''} ${def ? def.name : ''} Lv.${c.level || 1}`;
+    items.push(`<button class="title-menu-item" onclick="continueRun()">
+      <span><span class="tm-icon">▶</span>CONTINUE</span>
+      <span class="tm-hint">${hint}</span>
+    </button>`);
+  }
+  items.push(`<button class="title-menu-item" onclick="newHero()">
+    <span><span class="tm-icon">+</span>NEW HERO</span>
+    <span class="tm-hint">choose a class</span>
+  </button>`);
+  items.push(`<button class="title-menu-item" onclick="openSettingsFromTitle()">
+    <span><span class="tm-icon">⚙</span>SETTINGS</span>
+    <span class="tm-hint">keys · audio</span>
+  </button>`);
+  items.push(`<button class="title-menu-item" onclick="showCredits()">
+    <span><span class="tm-icon">?</span>CREDITS</span>
+    <span class="tm-hint">how to play</span>
+  </button>`);
+  list.innerHTML = items.join('');
+}
+function _bootAudioAndMusic() {
+  ensureAudio();
+  if (typeof playMusic === 'function') playMusic('cursed_keep');
+}
+function _hideTitle() {
+  stopTitleScene();
+  const ov = document.getElementById('overlay');
+  if (ov) ov.style.display = 'none';
+}
+function continueRun() {
+  _bootAudioAndMusic();
+  _hideTitle();
+  const cid = (CLASS_DEFS[account.lastPlayed] ? account.lastPlayed : 'mage');
+  selectCharacter(cid);   // applyCharacter + showChapterMap
+}
+function newHero() {
+  _bootAudioAndMusic();
+  _hideTitle();
+  showCharSelect();
+}
+function openSettingsFromTitle() {
+  _bootAudioAndMusic();
+  // Settings is a separate modal layered above the title — keep title
+  // overlay + scene running behind so closing settings returns the player
+  // to the title menu without rebooting anything.
+  if (typeof openSettings === 'function') openSettings();
+}
+function showCredits() {
+  const el = document.getElementById('credits-overlay');
+  if (el) el.classList.add('open');
+}
+function hideCredits() {
+  const el = document.getElementById('credits-overlay');
+  if (el) el.classList.remove('open');
+}
+
+// Page-load init: build the menu and start the scene exactly once.
+renderTitleMenu();
+startTitleScene();
+
 // Legacy entry point kept in case external code references it.
 // Now routes through selectCharacter → showChapterMap.
 function startGame(classId) {
   if (!classId) classId = account.lastPlayed || 'mage';
-  document.getElementById('overlay').style.display = 'none';
+  _hideTitle();
   document.getElementById('charselect-overlay').classList.remove('open');
   selectCharacter(classId);
 }
