@@ -384,6 +384,57 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   z-index:199; display:none; pointer-events:none;
 }
 
+/* Sidescroll slice — touch overlay (shown only when GAME_MODE==='sidescroll') */
+#ss-touch {
+  position:absolute; inset:0; z-index:12;
+  display:none; pointer-events:none;
+  touch-action:none; user-select:none; -webkit-user-select:none;
+}
+/* D-pad cluster — bottom-left */
+#ss-dpad {
+  position:absolute; bottom:20px; left:20px;
+  width:148px; height:148px;
+  pointer-events:none;
+}
+.ss-dpad-btn {
+  position:absolute;
+  width:48px; height:48px; border-radius:10px;
+  background:rgba(143,167,196,0.18); border:1px solid rgba(143,167,196,0.45);
+  color:#8fa7c4; font-size:20px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; pointer-events:all; touch-action:none;
+  font-family:'Courier New',monospace;
+}
+.ss-dpad-btn:active { background:rgba(143,167,196,0.42); transform:scale(0.93); }
+#ss-left  { left:0;   bottom:50px; }
+#ss-right { left:100px; bottom:50px; }
+#ss-up    { left:50px; bottom:100px; }
+#ss-down  { left:50px; bottom:0px; }
+/* Action buttons — bottom-right */
+#ss-actions {
+  position:absolute; bottom:20px; right:20px;
+  display:flex; flex-direction:column; gap:10px; align-items:flex-end;
+  pointer-events:none;
+}
+.ss-act-btn {
+  width:56px; height:56px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Courier New',monospace; font-weight:bold; font-size:13px;
+  cursor:pointer; pointer-events:all; touch-action:none;
+  letter-spacing:0;
+}
+.ss-act-btn:active { transform:scale(0.93); }
+#ss-jump {
+  background:rgba(109,176,255,0.25); border:2px solid rgba(109,176,255,0.65);
+  color:#6db0ff;
+}
+#ss-fire {
+  background:rgba(255,140,60,0.22); border:2px solid rgba(255,160,80,0.60);
+  color:#ff9040;
+}
+#ss-blink {
+  background:rgba(176,144,255,0.22); border:2px solid rgba(176,144,255,0.60);
+  color:#b090ff;
+}
 /* Phase J — Inventory & Item Decisions: chest-opened modal */
 #inventory-overlay {
   position:absolute; inset:0; background:rgba(0,0,0,0.88);
@@ -707,6 +758,23 @@ canvas#game { display:block; image-rendering:pixelated; image-rendering:crisp-ed
   <div id="paused-banner">PAUSED</div>
   <div id="damage-vignette"></div>
   <div id="floor-fade"></div>
+
+  <!-- Sidescroll slice touch overlay — hidden by default, shown only in sidescroll mode -->
+  <div id="ss-touch">
+    <!-- D-pad cluster (bottom-left) -->
+    <div id="ss-dpad">
+      <div class="ss-dpad-btn" id="ss-up">▲</div>
+      <div class="ss-dpad-btn" id="ss-left">◀</div>
+      <div class="ss-dpad-btn" id="ss-right">▶</div>
+      <div class="ss-dpad-btn" id="ss-down">▼</div>
+    </div>
+    <!-- Action buttons (bottom-right) -->
+    <div id="ss-actions">
+      <div class="ss-act-btn" id="ss-jump">JUMP</div>
+      <div class="ss-act-btn" id="ss-fire">FIRE</div>
+      <div class="ss-act-btn" id="ss-blink">BLINK</div>
+    </div>
+  </div>
 
   <!-- Overlay -->
   <div id="overlay">
@@ -5978,6 +6046,31 @@ document.getElementById('attack-btn').addEventListener('pointerup',   ()=>{ atta
 document.getElementById('potion-btn').addEventListener('pointerdown', ()=>{ potionPressed=true; });
 document.getElementById('potion-btn').addEventListener('pointerup',   ()=>{ potionPressed=false; });
 
+// ── Sidescroll slice touch buttons — feed the global `keys` map exactly like keyboard ──
+// Each button maps to the same key string SSK reads. pointercancel/pointerleave clear
+// the key so the body never drifts if the finger slides off.
+(function(){
+  const SS_BTN_MAP = [
+    ['ss-left',  'ArrowLeft'],
+    ['ss-right', 'ArrowRight'],
+    ['ss-up',    'ArrowUp'],
+    ['ss-down',  'ArrowDown'],
+    ['ss-jump',  ' '],
+    ['ss-fire',  'j'],
+    ['ss-blink', 'k'],
+  ];
+  SS_BTN_MAP.forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const press  = e => { e.preventDefault(); keys[key] = true;  };
+    const release= e => {                     keys[key] = false; };
+    el.addEventListener('pointerdown',   press);
+    el.addEventListener('pointerup',     release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('pointerleave',  release);
+  });
+})();
+
 // Spell buttons (mobile). Edge detection happens in update() so we just track held state.
 for (let i=0; i<3; i++) {
   const el = document.getElementById('spell-btn-'+i);
@@ -7114,6 +7207,12 @@ window.__sidescroll = function(){
   GAME_MODE = 'sidescroll';
   ['overlay','charselect-overlay','chaptermap-overlay','results-overlay','death-overlay','settings-overlay']
     .forEach(id => { const el = document.getElementById(id); if (el){ el.style.display='none'; el.classList.remove('open','show','show-anim'); } });
+  // Hide the shipped top-down touch HUD so it doesn't leak into slice mode.
+  ['spell-btns','potion-btn','attack-btn','pause-btn','joystick-zone','joystick-base','joystick-knob']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.style.display='none'; });
+  // Show the sidescroll touch overlay.
+  const sst = document.getElementById('ss-touch');
+  if (sst) sst.style.display = 'block';
   // Authored stage — 42 cols × 18 rows (42×32=1344px wide, 18×32=576px tall)
   // Body convention: b.y=foot; spawn row 16 means foot on row-17 ground.
   //
@@ -7165,7 +7264,7 @@ window.__sidescroll = function(){
 // ─────────────────────────────────────────────
 // Phase N — Polish (COMPLETE)
 // ─────────────────────────────────────────────
-// Wardenfall — phases A–O complete; RPG pivot P–S shipped (stats, classes, gear, account, stages).
+// Wardenfall — phases A–O complete; RPG pivot P–S shipped (stats, classes, gear, account, stages); side-scroll vertical slice (dev: window.__sidescroll()) — feel prototype, GAME_MODE-gated.
 </script>
 </body>
 </html>
